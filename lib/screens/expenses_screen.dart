@@ -124,61 +124,63 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       appBar: AppBar(
         title: const Text('Monthly Expenses'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          Card(
-            color: Theme.of(context).colorScheme.primaryContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  const Text('Monthly Income',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  InkWell(
-                    onTap: _showEditIncomeDialog,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('\$${_monthlyIncome.toStringAsFixed(2)}',
-                              style: Theme.of(context).textTheme.headlineSmall),
-                          const SizedBox(width: 8),
-                          Icon(Icons.edit, color: Theme.of(context).colorScheme.primary, size: 18),
-                        ],
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            Card(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    const Text('Monthly Income',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: _showEditIncomeDialog,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('\$${_monthlyIncome.toStringAsFixed(2)}',
+                                style: Theme.of(context).textTheme.headlineSmall),
+                            const SizedBox(width: 8),
+                            Icon(Icons.edit, color: Theme.of(context).colorScheme.primary, size: 18),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('50/30/20 Rule Breakdown',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              IconButton(
-                icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.primary),
-                onPressed: _resetExpenses,
-                tooltip: 'Reset Expenses',
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildCategoryCard(
-              'Needs (50%)', _needsSpent, needsLimit, Colors.blue),
-          const SizedBox(height: 12),
-          _buildCategoryCard(
-              'Wants (30%)', _wantsSpent, wantsLimit, Colors.orange),
-          const SizedBox(height: 12),
-          _buildCategoryCard('Savings/Investments (20%)', _savingsSpent,
-              savingsLimit, Colors.green),
-        ],
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('50/30/20 Rule Breakdown',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                IconButton(
+                  icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.primary),
+                  onPressed: _resetExpenses,
+                  tooltip: 'Reset Expenses',
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildCategoryCard(
+                'Needs (50%)', _needsSpent, needsLimit, Colors.blue),
+            const SizedBox(height: 12),
+            _buildCategoryCard(
+                'Wants (30%)', _wantsSpent, wantsLimit, Colors.orange),
+            const SizedBox(height: 12),
+            _buildCategoryCard('Savings/Investments (20%)', _savingsSpent,
+                savingsLimit, Colors.green),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
@@ -192,7 +194,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   Widget _buildCategoryCard(
       String title, double spent, double limit, Color color) {
-    final double progress = (spent / limit).clamp(0.0, 1.0);
+    final double progress = (limit > 0) ? (spent / limit).clamp(0.0, 1.0) : 0.0;
     final bool overBudget = spent > limit;
 
     return Card(
@@ -201,29 +203,43 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // Make card height dynamic
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16)),
-                Text(
-                  '\$$spent / \$$limit',
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge?.color,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    '\$${spent.toStringAsFixed(0)} / \$${limit.toStringAsFixed(0)}',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: Theme.of(context).textTheme.bodyLarge?.color,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            LinearProgressIndicator(
-              value: progress,
-              color: overBudget ? Colors.red : color,
-              backgroundColor: color.withAlpha(51),
-              minHeight: 10,
-              borderRadius: BorderRadius.circular(5),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0), // Padding for progress bar
+              child: LinearProgressIndicator(
+                value: progress,
+                color: overBudget ? Colors.red : color,
+                backgroundColor: color.withAlpha(51),
+                minHeight: 10,
+                borderRadius: BorderRadius.circular(5),
+              ),
             ),
             if (overBudget)
               Padding(

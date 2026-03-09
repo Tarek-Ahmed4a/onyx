@@ -399,8 +399,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
           ),
         ),
       ),
-      body: Column(
-        children: [
+      body: SafeArea(
+        child: Column(
+          children: [
           // Dashboard Summary Card
           Card(
             margin: const EdgeInsets.all(16),
@@ -444,7 +445,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                   ),
                   const SizedBox(height: 16),
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: Theme.of(context).scaffoldBackgroundColor,
                       borderRadius: BorderRadius.circular(12),
@@ -453,16 +454,20 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Total ROI', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                        Text(
-                          '${totalRoiPercentage > 0 ? '+' : ''}${totalRoiPercentage.toStringAsFixed(2)}%',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: totalRoiPercentage > 0
-                                ? Colors.greenAccent
-                                : (totalRoiPercentage < 0
-                                    ? Colors.redAccent
-                                    : Theme.of(context).textTheme.bodyLarge?.color),
+                        Flexible(
+                          child: Text(
+                            '${totalRoiPercentage > 0 ? '+' : ''}${totalRoiPercentage.toStringAsFixed(2)}%',
+                            textAlign: TextAlign.right,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: totalRoiPercentage > 0
+                                  ? Colors.greenAccent
+                                  : (totalRoiPercentage < 0
+                                      ? Colors.redAccent
+                                      : Theme.of(context).textTheme.bodyLarge?.color),
+                            ),
                           ),
                         ),
                       ],
@@ -601,6 +606,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
           ),
         ],
       ),
+    ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddAssetDialog,
         child: const Icon(Icons.add),
