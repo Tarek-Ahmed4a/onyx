@@ -79,9 +79,9 @@ class _MainScaffoldState extends State<MainScaffold> {
         index: _currentIndex,
         children: _screens,
       ),
-      bottomNavigationBar: Container(
-        color: Colors.transparent,
-        child: SafeArea(
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          color: Colors.transparent,
           child: Padding(
             padding: const EdgeInsets.all(15.0),
             child: GNav(

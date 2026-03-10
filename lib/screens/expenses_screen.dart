@@ -179,6 +179,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             const SizedBox(height: 12),
             _buildCategoryCard('Savings/Investments (20%)', _savingsSpent,
                 savingsLimit, Colors.green),
+            const SizedBox(height: 80), // Prevent FAB overlap
           ],
         ),
       ),
@@ -209,7 +210,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
+                Flexible(
                   flex: 3,
                   child: Text(
                     title,
@@ -217,7 +218,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
+                Flexible(
                   flex: 2,
                   child: Text(
                     '\$${spent.toStringAsFixed(0)} / \$${limit.toStringAsFixed(0)}',
