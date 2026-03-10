@@ -410,14 +410,14 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
             ),
             elevation: 4,
             child: Padding(
-              padding: const EdgeInsets.all(20.0),
+              padding: const EdgeInsets.all(12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
                     '${activePortfolio.name} Dashboard',
                     style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Theme.of(context).textTheme.titleLarge?.color),
                   ),
@@ -428,24 +428,24 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Total Spent', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+                          Text('Total Spent', style: TextStyle(color: Colors.grey.shade400, fontSize: 11)),
                           const SizedBox(height: 4),
-                          Text('\$${totalSpent.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          Text('\$${totalSpent.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         ],
                       ),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text('Current Value', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+                          Text('Current Value', style: TextStyle(color: Colors.grey.shade400, fontSize: 11)),
                           const SizedBox(height: 4),
-                          Text('\$${currentValue.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          Text('\$${currentValue.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     decoration: BoxDecoration(
                       color: Theme.of(context).scaffoldBackgroundColor,
                       borderRadius: BorderRadius.circular(12),
@@ -453,14 +453,14 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Total ROI', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                        const Text('Total ROI', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                         Flexible(
                           child: Text(
                             '${totalRoiPercentage > 0 ? '+' : ''}${totalRoiPercentage.toStringAsFixed(2)}%',
                             textAlign: TextAlign.right,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: totalRoiPercentage > 0
                                   ? Colors.greenAccent
@@ -484,7 +484,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
               alignment: Alignment.centerLeft,
               child: Text(
                 'Assets',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
               ),
             ),
           ),
@@ -498,7 +498,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.only(top: 8, bottom: 80),
+                    padding: const EdgeInsets.only(top: 8, bottom: 100),
                     itemCount: activePortfolio.assets.length,
                     itemBuilder: (context, index) {
                       final asset = activePortfolio.assets[index];
@@ -529,7 +529,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                           ),
                           elevation: 1,
                           child: Padding(
-                            padding: const EdgeInsets.all(16.0),
+                            padding: const EdgeInsets.all(12.0),
                             child: Row(
                               children: [
                                 Expanded(
@@ -540,7 +540,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                                       Text(
                                         asset.name,
                                         style: TextStyle(
-                                            fontSize: 16,
+                                            fontSize: 14,
                                             fontWeight: FontWeight.bold,
                                             color: Theme.of(context).colorScheme.primary),
                                       ),
@@ -548,7 +548,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                                       Text(
                                         'Qty: ${asset.quantity}',
                                         style: TextStyle(
-                                            fontSize: 13,
+                                            fontSize: 11,
                                             color: Colors.grey.shade400),
                                       ),
                                     ],
@@ -563,7 +563,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                                         mainAxisAlignment: MainAxisAlignment.end,
                                         children: [
                                           Text('Buy: \$${asset.buyPrice.toStringAsFixed(2)}',
-                                              style: TextStyle(fontSize: 13, color: Theme.of(context).textTheme.bodyMedium?.color)),
+                                              style: TextStyle(fontSize: 11, color: Theme.of(context).textTheme.bodyMedium?.color)),
                                         ],
                                       ),
                                       const SizedBox(height: 4),
@@ -571,7 +571,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                                         mainAxisAlignment: MainAxisAlignment.end,
                                         children: [
                                           Text('Cur: \$${asset.currentPrice.toStringAsFixed(2)}',
-                                              style: TextStyle(fontSize: 13, color: Theme.of(context).textTheme.bodyMedium?.color)),
+                                              style: TextStyle(fontSize: 11, color: Theme.of(context).textTheme.bodyMedium?.color)),
                                         ],
                                       ),
                                     ],
@@ -586,7 +586,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                                       '${assetRoi > 0 ? '+' : ''}${assetRoi.toStringAsFixed(2)}%',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 15,
+                                        fontSize: 13,
                                         color: assetRoi > 0
                                             ? Colors.greenAccent
                                             : (assetRoi < 0
@@ -607,6 +607,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
         ],
       ),
     ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddAssetDialog,
         child: const Icon(Icons.add),

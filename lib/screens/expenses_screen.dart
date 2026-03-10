@@ -131,11 +131,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             Card(
               color: Theme.of(context).colorScheme.primaryContainer,
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.all(12.0),
                 child: Column(
                   children: [
                     const Text('Monthly Income',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                     const SizedBox(height: 8),
                     InkWell(
                       onTap: _showEditIncomeDialog,
@@ -146,7 +146,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text('\$${_monthlyIncome.toStringAsFixed(2)}',
-                                style: Theme.of(context).textTheme.headlineSmall),
+                                style: Theme.of(context).textTheme.titleLarge),
                             const SizedBox(width: 8),
                             Icon(Icons.edit, color: Theme.of(context).colorScheme.primary, size: 18),
                           ],
@@ -162,7 +162,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('50/30/20 Rule Breakdown',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 IconButton(
                   icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.primary),
                   onPressed: _resetExpenses,
@@ -179,10 +179,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             const SizedBox(height: 12),
             _buildCategoryCard('Savings/Investments (20%)', _savingsSpent,
                 savingsLimit, Colors.green),
-            const SizedBox(height: 80), // Prevent FAB overlap
+            const SizedBox(height: 100), // Prevent FAB overlap, increased to 100
           ],
         ),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           _showAddExpenseDialog(context);
@@ -201,7 +202,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     return Card(
       elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min, // Make card height dynamic
@@ -214,7 +215,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   flex: 3,
                   child: Text(
                     title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                 ),
                 const SizedBox(width: 8),

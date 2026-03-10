@@ -82,37 +82,36 @@ class _MainScaffoldState extends State<MainScaffold> {
       bottomNavigationBar: SafeArea(
         child: Container(
           color: Colors.transparent,
-          child: Padding(
-            padding: const EdgeInsets.all(15.0),
-            child: GNav(
-              gap: 8,
-              activeColor: const Color(0xFFFFFFFF),
-              iconSize: 24,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              duration: const Duration(milliseconds: 400),
-              tabBackgroundColor: const Color(0xFF1E1E1E),
-              color: const Color(0xFF555555), // Inactive icon color
-              tabs: const [
-                GButton(
-                  icon: Icons.check_circle_outline,
-                  text: 'Tasks',
-                ),
-                GButton(
-                  icon: Icons.calendar_today_outlined,
-                  text: 'Calendar',
-                ),
-                GButton(
-                  icon: Icons.trending_up_outlined,
-                  text: 'Investments',
-                ),
-                GButton(
-                  icon: Icons.account_balance_wallet_outlined,
-                  text: 'Expenses',
-                ),
-              ],
-              selectedIndex: _currentIndex,
-              onTabChange: _onTabTapped,
-            ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: GNav(
+            gap: 6,
+            activeColor: const Color(0xFFFFFFFF),
+            iconSize: 20,
+            textStyle: const TextStyle(fontSize: 12, color: Color(0xFFFFFFFF), fontWeight: FontWeight.w600),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            duration: const Duration(milliseconds: 400),
+            tabBackgroundColor: const Color(0xFF1E1E1E),
+            color: const Color(0xFF555555), // Inactive icon color
+            tabs: const [
+              GButton(
+                icon: Icons.check_circle_outline,
+                text: 'Tasks',
+              ),
+              GButton(
+                icon: Icons.calendar_today_outlined,
+                text: 'Calendar',
+              ),
+              GButton(
+                icon: Icons.trending_up_outlined,
+                text: 'Investments',
+              ),
+              GButton(
+                icon: Icons.account_balance_wallet_outlined,
+                text: 'Expenses',
+              ),
+            ],
+            selectedIndex: _currentIndex,
+            onTabChange: _onTabTapped,
           ),
         ),
       ),
