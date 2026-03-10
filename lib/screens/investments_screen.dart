@@ -333,7 +333,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
       appBar: AppBar(
         title: const Text('Investments',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFF000000),
         elevation: 0,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
@@ -498,9 +498,12 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.only(top: 8, bottom: 100),
-                    itemCount: activePortfolio.assets.length,
+                    padding: const EdgeInsets.only(top: 8),
+                    itemCount: activePortfolio.assets.length + 1,
                     itemBuilder: (context, index) {
+                      if (index == activePortfolio.assets.length) {
+                        return const SizedBox(height: 100);
+                      }
                       final asset = activePortfolio.assets[index];
                       final assetRoi = ((asset.currentPrice - asset.buyPrice) /
                               asset.buyPrice) *

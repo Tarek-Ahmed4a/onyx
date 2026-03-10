@@ -171,7 +171,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       appBar: AppBar(
         title:
             const Text('Calendar', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFF000000),
         elevation: 0,
       ),
       body: Column(

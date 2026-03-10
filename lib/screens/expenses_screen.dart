@@ -29,7 +29,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final double? needs = prefs.getDouble('needs_spent');
     final double? wants = prefs.getDouble('wants_spent');
     final double? savings = prefs.getDouble('savings_spent');
-    
+
     if (mounted) {
       setState(() {
         if (income != null) _monthlyIncome = income;
@@ -63,7 +63,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 
   void _showEditIncomeDialog() {
-    final controller = TextEditingController(text: _monthlyIncome.toStringAsFixed(2));
+    final controller =
+        TextEditingController(text: _monthlyIncome.toStringAsFixed(2));
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -123,6 +124,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Monthly Expenses'),
+        backgroundColor: const Color(0xFF000000),
+        elevation: 0,
       ),
       body: SafeArea(
         child: ListView(
@@ -162,9 +165,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('50/30/20 Rule Breakdown',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 IconButton(
-                  icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.primary),
+                  icon: Icon(Icons.refresh,
+                      color: Theme.of(context).colorScheme.primary),
                   onPressed: _resetExpenses,
                   tooltip: 'Reset Expenses',
                 ),
@@ -179,7 +184,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             const SizedBox(height: 12),
             _buildCategoryCard('Savings/Investments (20%)', _savingsSpent,
                 savingsLimit, Colors.green),
-            const SizedBox(height: 100), // Prevent FAB overlap, increased to 100
+            const SizedBox(
+                height: 100), // Prevent FAB overlap, increased to 100
           ],
         ),
       ),
@@ -215,7 +221,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   flex: 3,
                   child: Text(
                     title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -234,7 +241,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             ),
             const SizedBox(height: 12),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4.0), // Padding for progress bar
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 4.0), // Padding for progress bar
               child: LinearProgressIndicator(
                 value: progress,
                 color: overBudget ? Colors.red : color,
@@ -298,7 +306,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               FilledButton(
                 onPressed: () {
                   if (amountController.text.isNotEmpty) {
-                    final double? amount = double.tryParse(amountController.text);
+                    final double? amount =
+                        double.tryParse(amountController.text);
                     if (amount != null) {
                       _addExpense(selectedCategory, amount);
                       Navigator.pop(context);

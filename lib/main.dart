@@ -90,7 +90,7 @@ class _MainScaffoldState extends State<MainScaffold> {
             textStyle: const TextStyle(fontSize: 12, color: Color(0xFFFFFFFF), fontWeight: FontWeight.w600),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             duration: const Duration(milliseconds: 400),
-            tabBackgroundColor: const Color(0xFF1E1E1E),
+            tabBackgroundColor: const Color(0xFF121212),
             color: const Color(0xFF555555), // Inactive icon color
             tabs: const [
               GButton(
