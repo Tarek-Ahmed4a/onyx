@@ -110,6 +110,7 @@ class _TasksScreenState extends State<TasksScreen> {
             channelDescription: 'Notifications for scheduled tasks',
             importance: Importance.max,
             priority: Priority.high,
+            icon: 'ic_launcher',
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,

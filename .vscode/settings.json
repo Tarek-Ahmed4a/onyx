@@ -1,0 +1,9 @@
+{
+    "C_Cpp.files.exclude": {
+        "**/.vscode": true,
+        "**/.vs": true,
+        "linux/**": true,
+        "macos/**": true,
+        "ios/**": true
+    }
+}

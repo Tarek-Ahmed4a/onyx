@@ -16,7 +16,7 @@ void main() async {
   tz.initializeTimeZones();
 
   const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
+      AndroidInitializationSettings('ic_launcher');
   
   const DarwinInitializationSettings initializationSettingsIOS =
       DarwinInitializationSettings();
