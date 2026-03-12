@@ -41,7 +41,7 @@ class FinanceApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Personal Finance App',
+      title: 'Onyx',
       themeMode: ThemeMode.dark, // Force dark mode for global OLED minimalist theme
       darkTheme: ThemeData(
         brightness: Brightness.dark,

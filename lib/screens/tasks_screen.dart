@@ -119,6 +119,11 @@ class _TasksScreenState extends State<TasksScreen> {
       );
     } catch (e) {
       debugPrint('Error scheduling notification: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
     }
   }
 
