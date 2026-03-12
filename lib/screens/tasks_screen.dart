@@ -97,24 +97,28 @@ class _TasksScreenState extends State<TasksScreen> {
 
     if (scheduledDate.isBefore(tz.TZDateTime.now(tz.local))) return;
 
-    await flutterLocalNotificationsPlugin.zonedSchedule(
-      task.id.hashCode,
-      'Task Reminder',
-      task.title,
-      scheduledDate,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'task_reminders',
-          'Task Reminders',
-          channelDescription: 'Notifications for scheduled tasks',
-          importance: Importance.max,
-          priority: Priority.high,
+    try {
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        task.id.hashCode,
+        'Task Reminder',
+        task.title,
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'task_reminders_channel',
+            'Task Reminders',
+            channelDescription: 'Notifications for scheduled tasks',
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
         ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } catch (e) {
+      debugPrint('Error scheduling notification: $e');
+    }
   }
 
   Future<void> _cancelNotification(TaskItem task) async {
@@ -405,6 +409,14 @@ class _TasksScreenState extends State<TasksScreen> {
                     );
                   }
                   _addTask(controller.text, finalDateTime);
+                  
+                  if (finalDateTime != null) {
+                    final timeString = TimeOfDay.fromDateTime(finalDateTime).format(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Task saved. Alarm set for $timeString')),
+                    );
+                  }
+                  
                   Navigator.pop(context);
                 },
                 child: const Text('Save'),
