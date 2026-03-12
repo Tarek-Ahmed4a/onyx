@@ -310,7 +310,10 @@ class _TasksScreenState extends State<TasksScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton.icon(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                        ),
                         onPressed: () async {
                           final date = await showDatePicker(
                             context: context,
@@ -323,15 +326,32 @@ class _TasksScreenState extends State<TasksScreen> {
                             setState(() => selectedDate = date);
                           }
                         },
-                        icon: const Icon(Icons.calendar_today, size: 16),
-                        label: Text(selectedDate == null
-                            ? 'Date'
-                            : '${selectedDate!.month}/${selectedDate!.day}'),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.calendar_today, size: 16),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  selectedDate == null
+                                      ? 'Date'
+                                      : '${selectedDate!.month}/${selectedDate!.day}',
+                                  maxLines: 1,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: OutlinedButton.icon(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                        ),
                         onPressed: () async {
                           final time = await showTimePicker(
                             context: context,
@@ -341,10 +361,24 @@ class _TasksScreenState extends State<TasksScreen> {
                             setState(() => selectedTime = time);
                           }
                         },
-                        icon: const Icon(Icons.access_time, size: 16),
-                        label: Text(selectedTime == null
-                            ? 'Time'
-                            : selectedTime!.format(context)),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.access_time, size: 16),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  selectedTime == null
+                                      ? 'Time'
+                                      : selectedTime!.format(context),
+                                  maxLines: 1,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
