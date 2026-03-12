@@ -1,28 +1,37 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import '../main.dart';
 
 class TaskItem {
   final String id;
   String title;
   bool isCompleted;
+  DateTime? scheduledAt;
 
   TaskItem({
     required this.id,
     required this.title,
     this.isCompleted = false,
+    this.scheduledAt,
   });
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
         'isCompleted': isCompleted,
+        'scheduledAt': scheduledAt?.toIso8601String(),
       };
 
   factory TaskItem.fromJson(Map<String, dynamic> json) => TaskItem(
         id: json['id'],
         title: json['title'],
         isCompleted: json['isCompleted'] ?? false,
+        scheduledAt: json['scheduledAt'] != null
+            ? DateTime.parse(json['scheduledAt'])
+            : null,
       );
 }
 
@@ -68,7 +77,48 @@ class _TasksScreenState extends State<TasksScreen> {
   @override
   void initState() {
     super.initState();
+    _requestPermissions();
     _loadTasks();
+  }
+
+  Future<void> _requestPermissions() async {
+    final androidImplementation =
+        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    await androidImplementation?.requestNotificationsPermission();
+    await androidImplementation?.requestExactAlarmsPermission();
+  }
+
+  Future<void> _scheduleNotification(TaskItem task) async {
+    if (task.scheduledAt == null) return;
+
+    final tz.TZDateTime scheduledDate =
+        tz.TZDateTime.from(task.scheduledAt!, tz.local);
+
+    if (scheduledDate.isBefore(tz.TZDateTime.now(tz.local))) return;
+
+    await flutterLocalNotificationsPlugin.zonedSchedule(
+      task.id.hashCode,
+      'Task Reminder',
+      task.title,
+      scheduledDate,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'task_reminders',
+          'Task Reminders',
+          channelDescription: 'Notifications for scheduled tasks',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+  }
+
+  Future<void> _cancelNotification(TaskItem task) async {
+    await flutterLocalNotificationsPlugin.cancel(task.id.hashCode);
   }
 
   Future<void> _loadTasks() async {
@@ -143,6 +193,9 @@ class _TasksScreenState extends State<TasksScreen> {
                 ),
                 FilledButton(
                   onPressed: () {
+                    for (var task in category.items) {
+                      _cancelNotification(task);
+                    }
                     setState(() {
                       _categories.remove(category);
                       if (_activeCategoryId == category.id) {
@@ -159,7 +212,7 @@ class _TasksScreenState extends State<TasksScreen> {
             ));
   }
 
-  void _addTask(String title) {
+  void _addTask(String title, [DateTime? scheduledAt]) {
     if (title.trim().isEmpty || _activeCategoryId == null) return;
     final activeCategory =
         _categories.firstWhere((c) => c.id == _activeCategoryId);
@@ -167,12 +220,16 @@ class _TasksScreenState extends State<TasksScreen> {
     final newTask = TaskItem(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title.trim(),
+      scheduledAt: scheduledAt,
     );
 
     setState(() {
       activeCategory.items.add(newTask);
     });
     _saveTasks();
+    if (scheduledAt != null) {
+      _scheduleNotification(newTask);
+    }
   }
 
   void _deleteTask(TaskItem task) {
@@ -183,6 +240,7 @@ class _TasksScreenState extends State<TasksScreen> {
     setState(() {
       activeCategory.items.remove(task);
     });
+    _cancelNotification(task);
     _saveTasks();
   }
 
@@ -190,6 +248,12 @@ class _TasksScreenState extends State<TasksScreen> {
     setState(() {
       task.isCompleted = !task.isCompleted;
     });
+    if (task.isCompleted) {
+      _cancelNotification(task);
+    } else if (task.scheduledAt != null &&
+        task.scheduledAt!.isAfter(DateTime.now())) {
+      _scheduleNotification(task);
+    }
     _saveTasks();
   }
 
@@ -224,30 +288,97 @@ class _TasksScreenState extends State<TasksScreen> {
 
   void _showAddTaskDialog() {
     final controller = TextEditingController();
+    DateTime? selectedDate;
+    TimeOfDay? selectedTime;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('New Task'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: 'Task Title'),
-          autofocus: true,
-          textCapitalization: TextCapitalization.sentences,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              _addTask(controller.text);
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('New Task'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(labelText: 'Task Title'),
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate ?? DateTime.now(),
+                            firstDate: DateTime.now(),
+                            lastDate:
+                                DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (date != null) {
+                            setState(() => selectedDate = date);
+                          }
+                        },
+                        icon: const Icon(Icons.calendar_today, size: 16),
+                        label: Text(selectedDate == null
+                            ? 'Date'
+                            : '${selectedDate!.month}/${selectedDate!.day}'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: selectedTime ?? TimeOfDay.now(),
+                          );
+                          if (time != null) {
+                            setState(() => selectedTime = time);
+                          }
+                        },
+                        icon: const Icon(Icons.access_time, size: 16),
+                        label: Text(selectedTime == null
+                            ? 'Time'
+                            : selectedTime!.format(context)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  DateTime? finalDateTime;
+                  if (selectedDate != null) {
+                    final time =
+                        selectedTime ?? const TimeOfDay(hour: 9, minute: 0);
+                    finalDateTime = DateTime(
+                      selectedDate!.year,
+                      selectedDate!.month,
+                      selectedDate!.day,
+                      time.hour,
+                      time.minute,
+                    );
+                  }
+                  _addTask(controller.text, finalDateTime);
+                  Navigator.pop(context);
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        });
+      },
     );
   }
 
@@ -406,17 +537,53 @@ class _TasksScreenState extends State<TasksScreen> {
                             ),
                           ),
                           Expanded(
-                            child: Text(
-                              task.title,
-                              style: TextStyle(
-                                fontSize: 16,
-                                decoration: task.isCompleted
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                                color: task.isCompleted
-                                    ? Colors.grey.shade500
-                                    : Theme.of(context).textTheme.bodyLarge?.color,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  task.title,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    decoration: task.isCompleted
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                    color: task.isCompleted
+                                        ? Colors.grey.shade500
+                                        : Theme.of(context)
+                                            .textTheme
+                                            .bodyLarge
+                                            ?.color,
+                                  ),
+                                ),
+                                if (task.scheduledAt != null) ...[
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.alarm,
+                                        size: 14,
+                                        color: task.isCompleted
+                                            ? Colors.grey.shade500
+                                            : Theme.of(context)
+                                                .colorScheme
+                                                .primary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${task.scheduledAt!.month}/${task.scheduledAt!.day} at ${TimeOfDay.fromDateTime(task.scheduledAt!).format(context)}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: task.isCompleted
+                                              ? Colors.grey.shade500
+                                              : Theme.of(context)
+                                                  .colorScheme
+                                                  .primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                         ],
