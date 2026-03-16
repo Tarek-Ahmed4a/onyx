@@ -283,7 +283,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               lastDay: DateTime.utc(2100, 12, 31),
               focusedDay: _focusedDay,
               calendarFormat: _calendarFormat,
-              rowHeight: 90,
+              rowHeight: 73,
               daysOfWeekHeight: 30,
               selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
               eventLoader: _getEventsForDay,

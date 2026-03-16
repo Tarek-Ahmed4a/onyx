@@ -84,6 +84,19 @@ class MainScaffold extends StatefulWidget {
 
 class _MainScaffoldState extends State<MainScaffold> {
   int _currentIndex = 0;
+  late final PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   final List<Widget> _screens = const [
     TasksScreen(),
@@ -96,13 +109,26 @@ class _MainScaffoldState extends State<MainScaffold> {
     setState(() {
       _currentIndex = index;
     });
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void _onPageChanged(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: _onPageChanged,
+        physics: const BouncingScrollPhysics(),
         children: _screens,
       ),
       bottomNavigationBar: SafeArea(
