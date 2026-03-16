@@ -165,6 +165,106 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
+  Widget _buildTaskPill(CalendarTask task) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 2, left: 2, right: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: task.isCompleted ? Colors.grey[800] : const Color(0xFF1E88E5), // Blue background for tasks
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        task.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 9,
+          color: task.isCompleted ? Colors.grey[400] : Colors.white,
+          decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCalendarCell(
+    DateTime day, {
+    bool isToday = false,
+    bool isSelected = false,
+    bool isOutside = false,
+  }) {
+    final events = _getEventsForDay(day);
+
+    TextStyle textStyle = TextStyle(
+      color: isOutside ? Colors.grey[700] : const Color(0xFFE0E0E0),
+      fontWeight: isToday || isSelected ? FontWeight.bold : FontWeight.normal,
+    );
+
+    Widget dayNumberWidget = Text('${day.day}', style: textStyle);
+
+    if (isToday) {
+      dayNumberWidget = Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFD4AF37),
+          shape: BoxShape.circle,
+        ),
+        padding: const EdgeInsets.all(6),
+        child: Text(
+          '${day.day}',
+          style: const TextStyle(color: Color(0xFF121212), fontWeight: FontWeight.bold),
+        ),
+      );
+    } else if (isSelected) {
+      dayNumberWidget = Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          shape: BoxShape.rectangle,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Text(
+          '${day.day}',
+          style: const TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.bold),
+        ),
+      );
+    }
+
+    final displayTasks = events.take(2).toList();
+    final remainingCount = events.length - displayTasks.length;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isOutside ? const Color(0xFF0C0C0C) : Colors.transparent,
+        border: Border.all(color: Colors.grey[900]!, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 2),
+          Align(
+            alignment: Alignment.topCenter,
+            child: dayNumberWidget,
+          ),
+          const Spacer(),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ...displayTasks.map((task) => _buildTaskPill(task)),
+              if (remainingCount > 0)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4.0, bottom: 2.0),
+                  child: Text(
+                    '+$remainingCount more',
+                    style: TextStyle(fontSize: 9, color: Colors.grey[400]),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -177,19 +277,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
       body: Column(
         children: [
           Container(
-            padding: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(24),
-                bottomRight: Radius.circular(24),
-              ),
-            ),
+            color: const Color(0xFF000000),
             child: TableCalendar<CalendarTask>(
               firstDay: DateTime.utc(2000, 1, 1),
               lastDay: DateTime.utc(2100, 12, 31),
               focusedDay: _focusedDay,
               calendarFormat: _calendarFormat,
+              rowHeight: 90,
+              daysOfWeekHeight: 30,
               selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
               eventLoader: _getEventsForDay,
               startingDayOfWeek: StartingDayOfWeek.monday,
@@ -209,82 +304,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
               },
               onPageChanged: (focusedDay) => _focusedDay = focusedDay,
               calendarStyle: const CalendarStyle(
-                defaultTextStyle: TextStyle(color: Color(0xFFE0E0E0)),
-                weekendTextStyle: TextStyle(color: Color(0xFFE0E0E0)),
-                outsideTextStyle: TextStyle(color: Colors.grey),
-                selectedDecoration: BoxDecoration(
-                  color: Color(0xFF1E1E1E), // Just a background
-                  shape: BoxShape.rectangle,
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
-                ),
-                selectedTextStyle: TextStyle(
-                    color: Color(0xFFD4AF37), fontWeight: FontWeight.bold),
-                todayDecoration: BoxDecoration(
-                  color: Color(0xFFD4AF37),
-                  shape: BoxShape.circle,
-                ),
-                todayTextStyle: TextStyle(
-                    color: Color(0xFF121212), fontWeight: FontWeight.bold),
-                // Disable default markers, we will build custom ones
                 markersMaxCount: 0,
+                outsideDaysVisible: true,
               ),
-              calendarBuilders: CalendarBuilders(
-                markerBuilder: (context, day, events) {
-                  if (events.isEmpty) return const SizedBox();
-
-                  final tasks = events;
-                  final displayTasks = tasks.take(2).toList();
-                  final remainingCount = tasks.length - displayTasks.length;
-
-                  return Positioned(
-                    bottom: 1,
-                    left: 1,
-                    right: 1,
-                    child: ClipRect(
-                      child: Container(
-                        constraints: const BoxConstraints(maxHeight: 28), // Strict height
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            ...displayTasks.map((task) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 1.0, left: 1.0, right: 1.0),
-                                  child: Text(
-                                    task.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      color: task.isCompleted
-                                          ? Colors.grey.shade600
-                                          : Theme.of(context).colorScheme.primary,
-                                      decoration: task.isCompleted
-                                          ? TextDecoration.lineThrough
-                                          : null,
-                                    ),
-                                  ),
-                                )),
-                            if (remainingCount > 0)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 1.0),
-                                child: Text(
-                                  '+$remainingCount',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 8,
-                                    color: Colors.grey.shade400,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
+              calendarBuilders: CalendarBuilders<CalendarTask>(
+                defaultBuilder: (context, day, focusedDay) => _buildCalendarCell(day),
+                todayBuilder: (context, day, focusedDay) => _buildCalendarCell(day, isToday: true),
+                selectedBuilder: (context, day, focusedDay) => _buildCalendarCell(day, isSelected: true, isToday: isSameDay(day, DateTime.now())),
+                outsideBuilder: (context, day, focusedDay) => _buildCalendarCell(day, isOutside: true),
               ),
               headerStyle: const HeaderStyle(
                 formatButtonVisible: false,
