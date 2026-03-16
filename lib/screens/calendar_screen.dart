@@ -168,7 +168,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Widget _buildTaskPill(CalendarTask task) {
     return Container(
       margin: const EdgeInsets.only(bottom: 2, left: 2, right: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
       decoration: BoxDecoration(
         color: task.isCompleted ? Colors.grey[800] : const Color(0xFF1E88E5), // Blue background for tasks
         borderRadius: BorderRadius.circular(4),
@@ -178,7 +178,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          fontSize: 9,
+          fontSize: 8,
           color: task.isCompleted ? Colors.grey[400] : Colors.white,
           decoration: task.isCompleted ? TextDecoration.lineThrough : null,
         ),
@@ -195,6 +195,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final events = _getEventsForDay(day);
 
     TextStyle textStyle = TextStyle(
+      fontSize: 12, // Reduced font size
       color: isOutside ? Colors.grey[700] : const Color(0xFFE0E0E0),
       fontWeight: isToday || isSelected ? FontWeight.bold : FontWeight.normal,
     );
@@ -207,10 +208,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
           color: Color(0xFFD4AF37),
           shape: BoxShape.circle,
         ),
-        padding: const EdgeInsets.all(6),
+        padding: const EdgeInsets.all(4), // Reduced padding
         child: Text(
           '${day.day}',
-          style: const TextStyle(color: Color(0xFF121212), fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 12, color: Color(0xFF121212), fontWeight: FontWeight.bold),
         ),
       );
     } else if (isSelected) {
@@ -220,10 +221,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
           shape: BoxShape.rectangle,
           borderRadius: BorderRadius.circular(4),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2), // Reduced padding
         child: Text(
           '${day.day}',
-          style: const TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 12, color: Color(0xFFD4AF37), fontWeight: FontWeight.bold),
         ),
       );
     }
@@ -232,6 +233,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final remainingCount = events.length - displayTasks.length;
 
     return Container(
+      clipBehavior: Clip.hardEdge, // Prevent overflow bleed
       decoration: BoxDecoration(
         color: isOutside ? const Color(0xFF0C0C0C) : Colors.transparent,
         border: Border.all(color: Colors.grey[900]!, width: 0.5),
@@ -246,7 +248,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
           const Spacer(),
           Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min, // Do not artificialy expand
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ...displayTasks.map((task) => _buildTaskPill(task)),
@@ -255,7 +257,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   padding: const EdgeInsets.only(left: 4.0, bottom: 2.0),
                   child: Text(
                     '+$remainingCount more',
-                    style: TextStyle(fontSize: 9, color: Colors.grey[400]),
+                    style: TextStyle(fontSize: 8, color: Colors.grey[400]), // Reduced font size
                   ),
                 ),
             ],
