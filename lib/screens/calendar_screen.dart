@@ -289,7 +289,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               daysOfWeekHeight: 30,
               selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
               eventLoader: _getEventsForDay,
-              startingDayOfWeek: StartingDayOfWeek.monday,
+              startingDayOfWeek: StartingDayOfWeek.saturday,
               onDaySelected: (selectedDay, focusedDay) {
                 if (!isSameDay(_selectedDay, selectedDay)) {
                   setState(() {
