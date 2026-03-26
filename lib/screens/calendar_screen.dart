@@ -171,9 +171,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
         return StatefulBuilder(builder: (context, setState) {
           return AlertDialog(
             title: const Text('New Calendar Event'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 TextField(
                   controller: controller,
                   decoration: const InputDecoration(labelText: 'Task Title'),
@@ -275,7 +276,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ),
                   ],
                 ),
-              ],
+                ],
+              ),
             ),
             actions: [
               TextButton(

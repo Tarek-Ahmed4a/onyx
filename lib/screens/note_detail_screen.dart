@@ -79,17 +79,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                     icon: const Icon(Icons.arrow_back),
                     onPressed: _saveAndPop,
                   ),
-                  const Text('All notes', style: TextStyle(fontSize: 16)),
-                  const Icon(Icons.arrow_drop_down),
                   const Spacer(),
-                  IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-                  IconButton(icon: const Icon(Icons.calendar_today), onPressed: () {}),
-                  IconButton(icon: const Icon(Icons.check_circle_outline), onPressed: () {}),
-                  const CircleAvatar(
-                    radius: 14,
-                    child: Icon(Icons.person, size: 18),
-                  ),
-                  const SizedBox(width: 8),
                 ],
               ),
             ),
@@ -106,32 +96,15 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                 textCapitalization: TextCapitalization.sentences,
               ),
             ),
-            // Middle section (Date/Time and Category)
+            // Middle section (Date/Time)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Row(
-                children: [
-                  Text(
-                    '${DateTime.now().month}/${DateTime.now().day}/${DateTime.now().year}',
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[850],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(_category ?? 'No category', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-                        const SizedBox(width: 4),
-                        Icon(Icons.arrow_drop_down, color: Colors.grey.shade400, size: 16),
-                      ],
-                    ),
-                  )
-                ],
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${widget.note != null ? widget.note!.date.month : DateTime.now().month}/${widget.note != null ? widget.note!.date.day : DateTime.now().day}/${widget.note != null ? widget.note!.date.year : DateTime.now().year}',
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                ),
               ),
             ),
             // Main Body (TextField)
@@ -164,7 +137,6 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                    IconButton(icon: const Icon(Icons.check_box_outlined), onPressed: () {}),
                    IconButton(icon: const Icon(Icons.text_format), onPressed: () {}),
                    IconButton(icon: const Icon(Icons.image_outlined), onPressed: () {}),
-                   IconButton(icon: const Icon(Icons.edit), onPressed: () {}), 
                 ],
               ),
             ),

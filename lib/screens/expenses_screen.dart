@@ -169,53 +169,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
-  void _showWalletsBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text('Select Wallet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              ),
-              ..._wallets.map((wallet) {
-                final isSelected = wallet.id == _activeWalletId;
-                return ListTile(
-                  leading: Icon(Icons.account_balance_wallet, color: isSelected ? Colors.blue : Colors.grey),
-                  title: Text(wallet.name, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                  trailing: isSelected ? const Icon(Icons.check, color: Colors.blue) : null,
-                  onTap: () {
-                    setState(() {
-                      _activeWalletId = wallet.id;
-                    });
-                    _saveWallets();
-                    Navigator.pop(context);
-                  },
-                );
-              }).toList(),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.add, color: Colors.blue),
-                title: const Text('Add New Wallet', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showAddWalletDialog();
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   void _showWalletSettingsDialog(Wallet wallet) {
     final needsCtrl = TextEditingController(text: wallet.needsRatio.toStringAsFixed(0));
     final wantsCtrl = TextEditingController(text: wallet.wantsRatio.toStringAsFixed(0));
@@ -436,29 +389,74 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final wLimit = activeWallet.initialIncome * (activeWallet.wantsRatio / 100);
     final sLimit = activeWallet.initialIncome * (activeWallet.savingsRatio / 100);
 
+    final walletSelector = SizedBox(
+      height: 60,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: _wallets.length + 1,
+        itemBuilder: (context, index) {
+          if (index == _wallets.length) {
+            return Padding(
+              padding: const EdgeInsets.only(left: 8.0),
+              child: ActionChip(
+                label: const Text('+ New', style: TextStyle(color: Colors.blue)),
+                backgroundColor: Colors.transparent,
+                side: const BorderSide(color: Colors.blue),
+                onPressed: _showAddWalletDialog,
+              ),
+            );
+          }
+
+          final wallet = _wallets[index];
+          final isActive = wallet.id == _activeWalletId;
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: ChoiceChip(
+              label: Text(wallet.name),
+              selected: isActive,
+              selectedColor: Theme.of(context).colorScheme.primary.withAlpha(51),
+              backgroundColor: const Color(0xFF1E1E1E),
+              labelStyle: TextStyle(
+                color: isActive
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).textTheme.bodyMedium?.color,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              ),
+              side: BorderSide(
+                color: isActive
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.transparent,
+              ),
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() {
+                    _activeWalletId = wallet.id;
+                  });
+                  _saveWallets();
+                }
+              },
+            ),
+          );
+        },
+      ),
+    );
+
     return Scaffold(
       appBar: AppBar(
-        title: GestureDetector(
-          onTap: _showWalletsBottomSheet,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                activeWallet.name,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.keyboard_arrow_down, size: 20),
-            ],
-          ),
-        ),
+        title: const Text('Expenses', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF000000),
         elevation: 0,
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
+        child: Column(
           children: [
+            walletSelector,
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(16.0),
+                children: [
             Card(
               color: Theme.of(context).colorScheme.primaryContainer,
               child: Padding(
@@ -527,6 +525,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             _buildCategoryCard('Savings (${activeWallet.savingsRatio.toStringAsFixed(0)}%)', sSpent,
                 sLimit, Colors.green),
             const SizedBox(height: 100), // Prevent FAB overlap
+                ],
+              ),
+            ),
           ],
         ),
       ),
