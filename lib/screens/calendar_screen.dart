@@ -312,11 +312,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     Color bgColor = task.isCompleted
         ? Colors.grey[800]!
         : (task.colorCode != null ? Color(task.colorCode!) : const Color(0xFF1E88E5));
-        
-    String timeText = '';
-    if (task.scheduledTime != null) {
-      timeText = '${TimeOfDay.fromDateTime(task.scheduledTime!).format(context)} ';
-    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 2, left: 2, right: 2),
@@ -326,7 +321,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
-        timeText + task.title,
+        task.title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
