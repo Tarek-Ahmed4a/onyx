@@ -7,23 +7,33 @@ class CalendarTask {
   final String id;
   String title;
   bool isCompleted;
+  int? colorCode;
+  DateTime? scheduledTime;
 
   CalendarTask({
     required this.id,
     required this.title,
     this.isCompleted = false,
+    this.colorCode,
+    this.scheduledTime,
   });
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
         'isCompleted': isCompleted,
+        'colorCode': colorCode,
+        'scheduledTime': scheduledTime?.toIso8601String(),
       };
 
   factory CalendarTask.fromJson(Map<String, dynamic> json) => CalendarTask(
         id: json['id'],
         title: json['title'],
         isCompleted: json['isCompleted'] ?? false,
+        colorCode: json['colorCode'],
+        scheduledTime: json['scheduledTime'] != null
+            ? DateTime.parse(json['scheduledTime'])
+            : null,
       );
 }
 
@@ -74,18 +84,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final prefs = await SharedPreferences.getInstance();
     final String? dataJson = prefs.getString('calendar_daily_tasks');
     if (dataJson != null) {
-      final Map<String, dynamic> decoded = json.decode(dataJson);
-      setState(() {
-        _tasks = decoded.map((key, value) {
-          return MapEntry(
-            key,
-            (value as List<dynamic>)
-                .map((item) => CalendarTask.fromJson(item))
-                .toList(),
-          );
+      try {
+        final Map<String, dynamic> decoded = json.decode(dataJson);
+        setState(() {
+          _tasks = decoded.map((key, value) {
+            return MapEntry(
+              key,
+              (value as List<dynamic>)
+                  .map((item) => CalendarTask.fromJson(item))
+                  .toList(),
+            );
+          });
         });
-      });
-      _selectedEvents.value = _getEventsForDay(_selectedDay!);
+        _selectedEvents.value = _getEventsForDay(_selectedDay!);
+      } catch (e) {
+        debugPrint('Error parsing calendar tasks: $e');
+        _tasks = {};
+      }
     }
   }
 
@@ -98,12 +113,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
     await prefs.setString('calendar_daily_tasks', encoded);
   }
 
-  void _addTask(String title) {
+  void _addTask(String title, [int? colorCode, DateTime? scheduledTime]) {
     if (title.trim().isEmpty || _selectedDay == null) return;
     final key = _dateKey(_selectedDay!);
     final newTask = CalendarTask(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title.trim(),
+      colorCode: colorCode,
+      scheduledTime: scheduledTime,
     );
 
     setState(() {
@@ -138,43 +155,126 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _showAddTaskDialog() {
     final controller = TextEditingController();
+    int? selectedColor = 0xFF1E88E5; // Default Blue
+    TimeOfDay? selectedTime;
+
+    final List<int> presetColors = [
+      0xFF1E88E5, // Blue
+      0xFFE53935, // Red
+      0xFF43A047, // Green
+      0xFFFB8C00, // Orange
+      0xFF8E24AA, // Purple
+    ];
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('New Calendar Event'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: 'Task Title'),
-          autofocus: true,
-          textCapitalization: TextCapitalization.sentences,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              _addTask(controller.text);
-              Navigator.pop(context);
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('New Calendar Event'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(labelText: 'Task Title'),
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Text('Time: '),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () async {
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: selectedTime ?? TimeOfDay.now(),
+                          );
+                          if (time != null) {
+                            setState(() => selectedTime = time);
+                          }
+                        },
+                        child: Text(selectedTime == null
+                            ? 'Select Time'
+                            : selectedTime!.format(context)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Align(alignment: Alignment.centerLeft, child: Text('Color:')),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 12,
+                  children: presetColors.map((colorValue) {
+                    final isSelected = selectedColor == colorValue;
+                    return GestureDetector(
+                      onTap: () => setState(() => selectedColor = colorValue),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: Color(colorValue),
+                          shape: BoxShape.circle,
+                          border: isSelected ? Border.all(color: Colors.white, width: 2) : null,
+                        ),
+                        child: isSelected ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  DateTime? scheduledDateTime;
+                  if (selectedTime != null && _selectedDay != null) {
+                    scheduledDateTime = DateTime(
+                      _selectedDay!.year,
+                      _selectedDay!.month,
+                      _selectedDay!.day,
+                      selectedTime!.hour,
+                      selectedTime!.minute,
+                    );
+                  }
+                  _addTask(controller.text, selectedColor, scheduledDateTime);
+                  Navigator.pop(context);
+                },
+                child: const Text('Add'),
+              ),
+            ],
+          );
+        });
+      },
     );
   }
 
   Widget _buildTaskPill(CalendarTask task) {
+    Color bgColor = task.isCompleted
+        ? Colors.grey[800]!
+        : (task.colorCode != null ? Color(task.colorCode!) : const Color(0xFF1E88E5));
+        
+    String timeText = '';
+    if (task.scheduledTime != null) {
+      timeText = '${TimeOfDay.fromDateTime(task.scheduledTime!).format(context)} ';
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 2, left: 2, right: 2),
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
       decoration: BoxDecoration(
-        color: task.isCompleted ? Colors.grey[800] : const Color(0xFF1E88E5), // Blue background for tasks
+        color: bgColor,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
-        task.title,
+        timeText + task.title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
@@ -418,17 +518,46 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 ),
                               ),
                               Expanded(
-                                child: Text(
-                                  task.title,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    decoration: task.isCompleted
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                    color: task.isCompleted
-                                        ? Colors.grey.shade500
-                                        : Theme.of(context).textTheme.bodyLarge?.color,
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      task.title,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        decoration: task.isCompleted
+                                            ? TextDecoration.lineThrough
+                                            : null,
+                                        color: task.isCompleted
+                                            ? Colors.grey.shade500
+                                            : Theme.of(context).textTheme.bodyLarge?.color,
+                                      ),
+                                    ),
+                                    if (task.scheduledTime != null) ...[
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.access_time,
+                                            size: 14,
+                                            color: task.isCompleted
+                                                ? Colors.grey.shade500
+                                                : (task.colorCode != null ? Color(task.colorCode!) : Theme.of(context).colorScheme.primary),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            TimeOfDay.fromDateTime(task.scheduledTime!).format(context),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: task.isCompleted
+                                                  ? Colors.grey.shade500
+                                                  : (task.colorCode != null ? Color(task.colorCode!) : Theme.of(context).colorScheme.primary),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
                             ],

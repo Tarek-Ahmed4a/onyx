@@ -1,5 +1,74 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class ExpenseProfile {
+  final String id;
+  String name;
+  double monthlyIncome;
+  double needsPercentage;
+  double wantsPercentage;
+  double savingsPercentage;
+
+  ExpenseProfile({
+    required this.id,
+    required this.name,
+    this.monthlyIncome = 5000.0,
+    this.needsPercentage = 50.0,
+    this.wantsPercentage = 30.0,
+    this.savingsPercentage = 20.0,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'monthlyIncome': monthlyIncome,
+        'needsPercentage': needsPercentage,
+        'wantsPercentage': wantsPercentage,
+        'savingsPercentage': savingsPercentage,
+      };
+
+  factory ExpenseProfile.fromJson(Map<String, dynamic> json) => ExpenseProfile(
+        id: json['id'],
+        name: json['name'],
+        monthlyIncome: json['monthlyIncome']?.toDouble() ?? 5000.0,
+        needsPercentage: json['needsPercentage']?.toDouble() ?? 50.0,
+        wantsPercentage: json['wantsPercentage']?.toDouble() ?? 30.0,
+        savingsPercentage: json['savingsPercentage']?.toDouble() ?? 20.0,
+      );
+}
+
+class Expense {
+  final String id;
+  final String category; // 'Need', 'Want', 'Saving'
+  final double amount;
+  final String profileId;
+  final DateTime date;
+
+  Expense({
+    required this.id,
+    required this.category,
+    required this.amount,
+    required this.profileId,
+    required this.date,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'category': category,
+        'amount': amount,
+        'profileId': profileId,
+        'date': date.toIso8601String(),
+      };
+
+  factory Expense.fromJson(Map<String, dynamic> json) => Expense(
+        id: json['id'],
+        category: json['category'],
+        amount: json['amount']?.toDouble() ?? 0.0,
+        profileId: json['profileId'],
+        date: DateTime.parse(json['date']),
+      );
+}
 
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key});
@@ -9,13 +78,11 @@ class ExpensesScreen extends StatefulWidget {
 }
 
 class _ExpensesScreenState extends State<ExpensesScreen> {
-  // Mock data for tracking 50/30/20 rules
-  double _monthlyIncome = 5000.0;
   bool _isLoading = true;
 
-  double _needsSpent = 2100.0;
-  double _wantsSpent = 1600.0;
-  double _savingsSpent = 800.0;
+  List<ExpenseProfile> _profiles = [];
+  String? _activeProfileId;
+  List<Expense> _expenses = [];
 
   @override
   void initState() {
@@ -25,55 +92,123 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
-    final double? income = prefs.getDouble('monthly_income');
-    final double? needs = prefs.getDouble('needs_spent');
-    final double? wants = prefs.getDouble('wants_spent');
-    final double? savings = prefs.getDouble('savings_spent');
+    
+    // Load profiles
+    final String? profilesJson = prefs.getString('expense_profiles_data');
+    if (profilesJson != null) {
+      try {
+        final List<dynamic> decoded = json.decode(profilesJson);
+        _profiles = decoded.map((p) => ExpenseProfile.fromJson(p)).toList();
+      } catch (e) {
+        debugPrint('Error loading profiles: $e');
+      }
+    }
+    
+    if (_profiles.isEmpty) {
+      final defaultProfile = ExpenseProfile(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: 'Default Wallet',
+      );
+      _profiles = [defaultProfile];
+    }
+    
+    final savedActiveProfile = prefs.getString('active_profile_id');
+    if (savedActiveProfile != null && _profiles.any((p) => p.id == savedActiveProfile)) {
+      _activeProfileId = savedActiveProfile;
+    } else {
+      _activeProfileId = _profiles.first.id;
+    }
+
+    // Load expenses
+    final String? expensesJson = prefs.getString('expenses_data');
+    if (expensesJson != null) {
+      try {
+        final List<dynamic> decoded = json.decode(expensesJson);
+        _expenses = decoded.map((e) => Expense.fromJson(e)).toList();
+      } catch (e) {
+        debugPrint('Error loading expenses: $e');
+      }
+    } else {
+        // Try DB Migration from legacy schema to current _activeProfileId
+        final double? oldNeeds = prefs.getDouble('needs_spent');
+        final double? oldWants = prefs.getDouble('wants_spent');
+        final double? oldSavings = prefs.getDouble('savings_spent');
+        final double? oldIncome = prefs.getDouble('monthly_income');
+        
+        if (oldIncome != null) {
+            final activeProfile = _profiles.firstWhere((p) => p.id == _activeProfileId);
+            activeProfile.monthlyIncome = oldIncome;
+            _saveProfiles();
+        }
+
+        if (oldNeeds != null && oldNeeds > 0) {
+            _expenses.add(Expense(id: 'legacy_need', category: 'Need', amount: oldNeeds, profileId: _activeProfileId!, date: DateTime.now()));
+        }
+        if (oldWants != null && oldWants > 0) {
+            _expenses.add(Expense(id: 'legacy_want', category: 'Want', amount: oldWants, profileId: _activeProfileId!, date: DateTime.now()));
+        }
+        if (oldSavings != null && oldSavings > 0) {
+            _expenses.add(Expense(id: 'legacy_saving', category: 'Saving', amount: oldSavings, profileId: _activeProfileId!, date: DateTime.now()));
+        }
+        if (_expenses.isNotEmpty) {
+            _saveExpenses();
+        }
+    }
 
     if (mounted) {
       setState(() {
-        if (income != null) _monthlyIncome = income;
-        if (needs != null) _needsSpent = needs;
-        if (wants != null) _wantsSpent = wants;
-        if (savings != null) _savingsSpent = savings;
         _isLoading = false;
       });
     }
   }
 
-  Future<void> _saveIncome(double newIncome) async {
+  Future<void> _saveProfiles() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('monthly_income', newIncome);
+    await prefs.setString('expense_profiles_data', json.encode(_profiles.map((p) => p.toJson()).toList()));
+    if (_activeProfileId != null) {
+        await prefs.setString('active_profile_id', _activeProfileId!);
+    }
   }
 
   Future<void> _saveExpenses() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('needs_spent', _needsSpent);
-    await prefs.setDouble('wants_spent', _wantsSpent);
-    await prefs.setDouble('savings_spent', _savingsSpent);
+    await prefs.setString('expenses_data', json.encode(_expenses.map((e) => e.toJson()).toList()));
   }
 
   Future<void> _resetExpenses() async {
     setState(() {
-      _needsSpent = 0.0;
-      _wantsSpent = 0.0;
-      _savingsSpent = 0.0;
+      _expenses.removeWhere((e) => e.profileId == _activeProfileId);
     });
     await _saveExpenses();
   }
 
-  void _showEditIncomeDialog() {
-    final controller =
-        TextEditingController(text: _monthlyIncome.toStringAsFixed(2));
+  void _addExpense(String category, double amount) {
+    if (_activeProfileId == null) return;
+    
+    final newExpense = Expense(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      category: category,
+      amount: amount,
+      profileId: _activeProfileId!,
+      date: DateTime.now(),
+    );
+    
+    setState(() {
+      _expenses.add(newExpense);
+    });
+    _saveExpenses();
+  }
+
+  void _showAddProfileDialog() {
+    final controller = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Edit Monthly Income'),
+        title: const Text('New Wallet'),
         content: TextField(
           controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: 'Monthly Income (\$)'),
-          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Wallet Name'),
+          textCapitalization: TextCapitalization.words,
         ),
         actions: [
           TextButton(
@@ -82,14 +217,85 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           ),
           FilledButton(
             onPressed: () {
-              final double? amount = double.tryParse(controller.text);
-              if (amount != null && amount >= 0) {
-                setState(() {
-                  _monthlyIncome = amount;
-                });
-                _saveIncome(amount);
-                Navigator.pop(context);
+              if (controller.text.trim().isEmpty) return;
+              final newProf = ExpenseProfile(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  name: controller.text.trim(),
+              );
+              setState(() {
+                  _profiles.add(newProf);
+                  _activeProfileId = newProf.id;
+              });
+              _saveProfiles();
+              Navigator.pop(context);
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showProfileSettingsDialog(ExpenseProfile profile) {
+    final needsCtrl = TextEditingController(text: profile.needsPercentage.toStringAsFixed(0));
+    final wantsCtrl = TextEditingController(text: profile.wantsPercentage.toStringAsFixed(0));
+    final savingsCtrl = TextEditingController(text: profile.savingsPercentage.toStringAsFixed(0));
+    final incomeCtrl = TextEditingController(text: profile.monthlyIncome.toStringAsFixed(2));
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Wallet Settings'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: incomeCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Monthly Income (\$)'),
+              ),
+              const SizedBox(height: 16),
+              const Text('Rule Breakdown (%)', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(child: TextField(controller: needsCtrl, decoration: const InputDecoration(labelText: 'Needs'), keyboardType: TextInputType.number)),
+                  const SizedBox(width: 8),
+                  Expanded(child: TextField(controller: wantsCtrl, decoration: const InputDecoration(labelText: 'Wants'), keyboardType: TextInputType.number)),
+                  const SizedBox(width: 8),
+                  Expanded(child: TextField(controller: savingsCtrl, decoration: const InputDecoration(labelText: 'Savings'), keyboardType: TextInputType.number)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final n = double.tryParse(needsCtrl.text) ?? 0;
+              final w = double.tryParse(wantsCtrl.text) ?? 0;
+              final s = double.tryParse(savingsCtrl.text) ?? 0;
+              final inc = double.tryParse(incomeCtrl.text) ?? 0;
+              
+              if ((n + w + s) != 100.0) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Percentages must sum exactly to 100.')));
+                  return;
               }
+              
+              setState(() {
+                  profile.needsPercentage = n;
+                  profile.wantsPercentage = w;
+                  profile.savingsPercentage = s;
+                  profile.monthlyIncome = inc;
+              });
+              _saveProfiles();
+              Navigator.pop(context);
             },
             child: const Text('Save'),
           ),
@@ -98,105 +304,62 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
-  void _addExpense(String category, double amount) {
-    setState(() {
-      if (category == 'Need') {
-        _needsSpent += amount;
-      } else if (category == 'Want') {
-        _wantsSpent += amount;
-      } else if (category == 'Saving') {
-        _savingsSpent += amount;
-      }
-    });
-    _saveExpenses();
-  }
+  void _showAddExpenseDialog(BuildContext context) {
+    String selectedCategory = 'Need';
+    final amountController = TextEditingController();
 
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    final double needsLimit = _monthlyIncome * 0.5;
-    final double wantsLimit = _monthlyIncome * 0.3;
-    final double savingsLimit = _monthlyIncome * 0.2;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Monthly Expenses'),
-        backgroundColor: const Color(0xFF000000),
-        elevation: 0,
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
-          children: [
-            Card(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  children: [
-                    const Text('Monthly Income',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: _showEditIncomeDialog,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('\$${_monthlyIncome.toStringAsFixed(2)}',
-                                style: Theme.of(context).textTheme.titleLarge),
-                            const SizedBox(width: 8),
-                            Icon(Icons.edit, color: Theme.of(context).colorScheme.primary, size: 18),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Add Expense'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('50/30/20 Rule Breakdown',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                IconButton(
-                  icon: Icon(Icons.refresh,
-                      color: Theme.of(context).colorScheme.primary),
-                  onPressed: _resetExpenses,
-                  tooltip: 'Reset Expenses',
+                DropdownButtonFormField<String>(
+                  initialValue: selectedCategory,
+                  items: ['Need', 'Want', 'Saving'].map((String category) {
+                    return DropdownMenuItem(
+                        value: category, child: Text(category));
+                  }).toList(),
+                  onChanged: (val) {
+                    setDialogState(() {
+                      selectedCategory = val!;
+                    });
+                  },
+                  decoration: const InputDecoration(labelText: 'Category'),
+                ),
+                TextField(
+                  controller: amountController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Amount (\$)'),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            _buildCategoryCard(
-                'Needs (50%)', _needsSpent, needsLimit, Colors.blue),
-            const SizedBox(height: 12),
-            _buildCategoryCard(
-                'Wants (30%)', _wantsSpent, wantsLimit, Colors.orange),
-            const SizedBox(height: 12),
-            _buildCategoryCard('Savings/Investments (20%)', _savingsSpent,
-                savingsLimit, Colors.green),
-            const SizedBox(
-                height: 100), // Prevent FAB overlap, increased to 100
-          ],
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          _showAddExpenseDialog(context);
-        },
-        label: const Text('Add Expense'),
-        icon: const Icon(Icons.add),
-      ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  if (amountController.text.isNotEmpty) {
+                    final double? amount =
+                        double.tryParse(amountController.text);
+                    if (amount != null) {
+                      _addExpense(selectedCategory, amount);
+                      Navigator.pop(context);
+                    }
+                  }
+                },
+                child: const Text('Add'),
+              ),
+            ],
+          );
+        });
+      },
     );
   }
 
@@ -264,62 +427,147 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
-  void _showAddExpenseDialog(BuildContext context) {
-    String selectedCategory = 'Need';
-    final amountController = TextEditingController();
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(builder: (context, setDialogState) {
-          return AlertDialog(
-            title: const Text('Add Expense'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: selectedCategory,
-                  items: ['Need', 'Want', 'Saving'].map((String category) {
-                    return DropdownMenuItem(
-                        value: category, child: Text(category));
-                  }).toList(),
-                  onChanged: (val) {
-                    setDialogState(() {
-                      selectedCategory = val!;
-                    });
-                  },
-                  decoration: const InputDecoration(labelText: 'Category'),
+    final activeProfile = _profiles.firstWhere(
+      (p) => p.id == _activeProfileId,
+      orElse: () => _profiles.first,
+    );
+
+    final activeExpenses = _expenses.where((e) => e.profileId == activeProfile.id).toList();
+
+    double nSpent = 0;
+    double wSpent = 0;
+    double sSpent = 0;
+    for (var e in activeExpenses) {
+      if (e.category == 'Need') {
+        nSpent += e.amount;
+      } else if (e.category == 'Want') {
+        wSpent += e.amount;
+      } else if (e.category == 'Saving') {
+        sSpent += e.amount;
+      }
+    }
+
+    final nLimit = activeProfile.monthlyIncome * (activeProfile.needsPercentage / 100);
+    final wLimit = activeProfile.monthlyIncome * (activeProfile.wantsPercentage / 100);
+    final sLimit = activeProfile.monthlyIncome * (activeProfile.savingsPercentage / 100);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: _activeProfileId,
+            icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
+            dropdownColor: const Color(0xFF1E1E1E),
+            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            onChanged: (String? newValue) {
+              if (newValue == 'new_wallet') {
+                _showAddProfileDialog();
+              } else if (newValue != null) {
+                setState(() {
+                  _activeProfileId = newValue;
+                });
+                _saveProfiles();
+              }
+            },
+            items: [
+              ..._profiles.map<DropdownMenuItem<String>>((ExpenseProfile value) {
+                return DropdownMenuItem<String>(
+                  value: value.id,
+                  child: Text(value.name),
+                );
+              }),
+              const DropdownMenuItem<String>(
+                value: 'new_wallet',
+                child: Text('+ New Wallet', style: TextStyle(color: Colors.blue)),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => _showProfileSettingsDialog(activeProfile),
+          )
+        ],
+        backgroundColor: const Color(0xFF000000),
+        elevation: 0,
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            Card(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  children: [
+                    const Text('Monthly Income',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () => _showProfileSettingsDialog(activeProfile),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('\$${activeProfile.monthlyIncome.toStringAsFixed(2)}',
+                                style: Theme.of(context).textTheme.titleLarge),
+                            const SizedBox(width: 8),
+                            Icon(Icons.edit, color: Theme.of(context).colorScheme.primary, size: 18),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                TextField(
-                  controller: amountController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Amount (\$)'),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${activeProfile.needsPercentage.toStringAsFixed(0)}/${activeProfile.wantsPercentage.toStringAsFixed(0)}/${activeProfile.savingsPercentage.toStringAsFixed(0)} Rule Breakdown',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.primary),
+                  onPressed: _resetExpenses,
+                  tooltip: 'Reset Expenses',
                 ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  if (amountController.text.isNotEmpty) {
-                    final double? amount =
-                        double.tryParse(amountController.text);
-                    if (amount != null) {
-                      _addExpense(selectedCategory, amount);
-                      Navigator.pop(context);
-                    }
-                  }
-                },
-                child: const Text('Add'),
-              ),
-            ],
-          );
-        });
-      },
+            const SizedBox(height: 16),
+            _buildCategoryCard(
+                'Needs (${activeProfile.needsPercentage.toStringAsFixed(0)}%)', nSpent, nLimit, Colors.blue),
+            const SizedBox(height: 12),
+            _buildCategoryCard(
+                'Wants (${activeProfile.wantsPercentage.toStringAsFixed(0)}%)', wSpent, wLimit, Colors.orange),
+            const SizedBox(height: 12),
+            _buildCategoryCard('Savings (${activeProfile.savingsPercentage.toStringAsFixed(0)}%)', sSpent,
+                sLimit, Colors.green),
+            const SizedBox(
+                height: 100), // Prevent FAB overlap
+          ],
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          _showAddExpenseDialog(context);
+        },
+        label: const Text('Add Expense'),
+        icon: const Icon(Icons.add),
+      ),
     );
   }
 }

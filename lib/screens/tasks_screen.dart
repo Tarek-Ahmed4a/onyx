@@ -5,6 +5,34 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../main.dart';
 
+class Note {
+  final String id;
+  String title;
+  String content;
+  DateTime date;
+
+  Note({
+    required this.id,
+    required this.title,
+    required this.content,
+    required this.date,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'content': content,
+        'date': date.toIso8601String(),
+      };
+
+  factory Note.fromJson(Map<String, dynamic> json) => Note(
+        id: json['id'],
+        title: json['title'],
+        content: json['content'],
+        date: DateTime.parse(json['date']),
+      );
+}
+
 class TaskItem {
   final String id;
   String title;
@@ -71,6 +99,7 @@ class TasksScreen extends StatefulWidget {
 
 class _TasksScreenState extends State<TasksScreen> {
   List<TaskCategory> _categories = [];
+  List<Note> _notes = [];
   String? _activeCategoryId;
   bool _isLoading = true;
 
@@ -78,7 +107,7 @@ class _TasksScreenState extends State<TasksScreen> {
   void initState() {
     super.initState();
     _requestPermissions();
-    _loadTasks();
+    _loadData();
   }
 
   Future<void> _requestPermissions() async {
@@ -130,34 +159,52 @@ class _TasksScreenState extends State<TasksScreen> {
     await flutterLocalNotificationsPlugin.cancel(task.id.hashCode);
   }
 
-  Future<void> _loadTasks() async {
+  Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
+    
+    // Load Tasks
     final String? dataJson = prefs.getString('calendar_tasks_data');
-
     if (dataJson != null) {
-      final List<dynamic> decoded = json.decode(dataJson);
-      setState(() {
+      try {
+        final List<dynamic> decoded = json.decode(dataJson);
         _categories =
             decoded.map((item) => TaskCategory.fromJson(item)).toList();
         if (_categories.isNotEmpty) {
           _activeCategoryId = _categories.first.id;
         }
-        _isLoading = false;
-      });
-    } else {
+      } catch (e) {
+        debugPrint('Error parsing tasks: $e');
+        _categories = [];
+      }
+    }
+    
+    if (_categories.isEmpty) {
       // Initialize with a default category if empty
       final defaultCategory = TaskCategory(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: 'My Tasks',
         items: [],
       );
-      setState(() {
-        _categories = [defaultCategory];
-        _activeCategoryId = defaultCategory.id;
-        _isLoading = false;
-      });
+      _categories = [defaultCategory];
+      _activeCategoryId = defaultCategory.id;
       await _saveTasks();
     }
+    
+    // Load Notes
+    final String? notesJson = prefs.getString('notes_data');
+    if (notesJson != null) {
+      try {
+        final List<dynamic> decodedNotes = json.decode(notesJson);
+        _notes = decodedNotes.map((item) => Note.fromJson(item)).toList();
+      } catch (e) {
+        debugPrint('Error parsing notes: $e');
+        _notes = [];
+      }
+    }
+
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   Future<void> _saveTasks() async {
@@ -165,6 +212,12 @@ class _TasksScreenState extends State<TasksScreen> {
     final String encoded =
         json.encode(_categories.map((c) => c.toJson()).toList());
     await prefs.setString('calendar_tasks_data', encoded);
+  }
+  
+  Future<void> _saveNotes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String encoded = json.encode(_notes.map((n) => n.toJson()).toList());
+    await prefs.setString('notes_data', encoded);
   }
 
   void _addCategory(String name) {
@@ -264,6 +317,36 @@ class _TasksScreenState extends State<TasksScreen> {
       _scheduleNotification(task);
     }
     _saveTasks();
+  }
+  
+  void _addNote(String title, String content) {
+    if (title.trim().isEmpty && content.trim().isEmpty) return;
+    final newNote = Note(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: title.trim(),
+      content: content.trim(),
+      date: DateTime.now(),
+    );
+    setState(() {
+      _notes.insert(0, newNote);
+    });
+    _saveNotes();
+  }
+
+  void _updateNote(Note note, String title, String content) {
+    setState(() {
+      note.title = title.trim();
+      note.content = content.trim();
+      note.date = DateTime.now(); // update modified date
+    });
+    _saveNotes();
+  }
+
+  void _deleteNote(Note note) {
+    setState(() {
+      _notes.remove(note);
+    });
+    _saveNotes();
   }
 
   void _showAddCategoryDialog() {
@@ -432,6 +515,54 @@ class _TasksScreenState extends State<TasksScreen> {
       },
     );
   }
+  
+  void _showNoteDialog([Note? existingNote]) {
+    final titleController = TextEditingController(text: existingNote?.title ?? '');
+    final contentController = TextEditingController(text: existingNote?.content ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(existingNote == null ? 'New Note' : 'Edit Note'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(labelText: 'Title'),
+                textCapitalization: TextCapitalization.sentences,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: contentController,
+                decoration: const InputDecoration(labelText: 'Content'),
+                maxLines: 5,
+                textCapitalization: TextCapitalization.sentences,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (existingNote == null) {
+                _addNote(titleController.text, contentController.text);
+              } else {
+                _updateNote(existingNote, titleController.text, contentController.text);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -444,209 +575,319 @@ class _TasksScreenState extends State<TasksScreen> {
       orElse: () => _categories.first,
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        title:
-            const Text('Tasks', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: SizedBox(
-            height: 60,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: _categories.length + 1,
-              itemBuilder: (context, index) {
-                if (index == _categories.length) {
-                  return Padding(
-                    padding: const EdgeInsets.only(left: 8.0),
-                    child: ActionChip(
-                      label: const Text('+ New list'),
-                      backgroundColor: Colors.transparent,
-                      side: BorderSide(
-                          color: Theme.of(context).colorScheme.primary),
-                      onPressed: _showAddCategoryDialog,
-                    ),
-                  );
-                }
-
-                final category = _categories[index];
-                final isActive = category.id == _activeCategoryId;
-
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: GestureDetector(
-                    onLongPress: () => _deleteCategory(category),
-                    child: ChoiceChip(
-                      label: Text(category.name),
-                      selected: isActive,
-                      selectedColor:
-                          Theme.of(context).colorScheme.primary.withAlpha(51),
-                      backgroundColor: Theme.of(context).cardColor,
-                      labelStyle: TextStyle(
-                        color: isActive
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).textTheme.bodyMedium?.color,
-                        fontWeight:
-                            isActive ? FontWeight.bold : FontWeight.normal,
-                      ),
-                      side: BorderSide(
-                        color: isActive
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.transparent,
-                      ),
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() {
-                            _activeCategoryId = category.id;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-      body: activeCategory.items.isEmpty
-          ? Center(
-              child: Text(
-                'No tasks yet. Add one!',
-                style: TextStyle(color: Colors.grey.shade500),
+    final categorySelector = SizedBox(
+      height: 60,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: _categories.length + 1,
+        itemBuilder: (context, index) {
+          if (index == _categories.length) {
+            return Padding(
+              padding: const EdgeInsets.only(left: 8.0),
+              child: ActionChip(
+                label: const Text('+ New list'),
+                backgroundColor: Colors.transparent,
+                side: BorderSide(
+                    color: Theme.of(context).colorScheme.primary),
+                onPressed: _showAddCategoryDialog,
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.only(top: 8, bottom: 80),
-              itemCount: activeCategory.items.length,
-              itemBuilder: (context, index) {
-                final task = activeCategory.items[index];
-                return Dismissible(
-                  key: Key(task.id),
-                  direction: DismissDirection.endToStart,
-                  background: Container(
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade400,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: const Icon(Icons.delete, color: Colors.white),
+            );
+          }
+
+          final category = _categories[index];
+          final isActive = category.id == _activeCategoryId;
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: GestureDetector(
+              onLongPress: () => _deleteCategory(category),
+              child: ChoiceChip(
+                label: Text(category.name),
+                selected: isActive,
+                selectedColor:
+                    Theme.of(context).colorScheme.primary.withAlpha(51),
+                backgroundColor: Theme.of(context).cardColor,
+                labelStyle: TextStyle(
+                  color: isActive
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).textTheme.bodyMedium?.color,
+                  fontWeight:
+                      isActive ? FontWeight.bold : FontWeight.normal,
+                ),
+                side: BorderSide(
+                  color: isActive
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.transparent,
+                ),
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _activeCategoryId = category.id;
+                    });
+                  }
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    final tasksListView = activeCategory.items.isEmpty
+        ? Center(
+            child: Text(
+              'No tasks yet. Add one!',
+              style: TextStyle(color: Colors.grey.shade500),
+            ),
+          )
+        : ListView.builder(
+            padding: const EdgeInsets.only(top: 8, bottom: 80),
+            itemCount: activeCategory.items.length,
+            itemBuilder: (context, index) {
+              final task = activeCategory.items[index];
+              return Dismissible(
+                key: Key(task.id),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade400,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  onDismissed: (_) => _deleteTask(task),
-                  child: Card(
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 1,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8.0, vertical: 4.0),
-                      child: Row(
-                        children: [
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(24),
-                              onTap: () => _toggleTask(task),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: task.isCompleted
-                                          ? Theme.of(context)
-                                              .colorScheme
-                                              .primary
-                                          : Colors.grey.shade600,
-                                      width: 2,
-                                    ),
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: const Icon(Icons.delete, color: Colors.white),
+                ),
+                onDismissed: (_) => _deleteTask(task),
+                child: Card(
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 1,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8.0, vertical: 4.0),
+                    child: Row(
+                      children: [
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(24),
+                            onTap: () => _toggleTask(task),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
                                     color: task.isCompleted
-                                        ? Theme.of(context).colorScheme.primary
-                                        : Colors.transparent,
+                                        ? Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                        : Colors.grey.shade600,
+                                    width: 2,
                                   ),
-                                  child: task.isCompleted
-                                      ? const Icon(
-                                          Icons.check,
-                                          size: 16,
-                                          color: Color(0xFF1E1E1E),
-                                        )
-                                      : null,
+                                  color: task.isCompleted
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Colors.transparent,
                                 ),
+                                child: task.isCompleted
+                                    ? const Icon(
+                                        Icons.check,
+                                        size: 16,
+                                        color: Color(0xFF1E1E1E),
+                                      )
+                                    : null,
                               ),
                             ),
                           ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  task.title,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    decoration: task.isCompleted
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                    color: task.isCompleted
-                                        ? Colors.grey.shade500
-                                        : Theme.of(context)
-                                            .textTheme
-                                            .bodyLarge
-                                            ?.color,
-                                  ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                task.title,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  decoration: task.isCompleted
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                  color: task.isCompleted
+                                      ? Colors.grey.shade500
+                                      : Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.color,
                                 ),
-                                if (task.scheduledAt != null) ...[
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.alarm,
-                                        size: 14,
+                              ),
+                              if (task.scheduledAt != null) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.alarm,
+                                      size: 14,
+                                      color: task.isCompleted
+                                          ? Colors.grey.shade500
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .primary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${task.scheduledAt!.month}/${task.scheduledAt!.day} at ${TimeOfDay.fromDateTime(task.scheduledAt!).format(context)}',
+                                      style: TextStyle(
+                                        fontSize: 12,
                                         color: task.isCompleted
                                             ? Colors.grey.shade500
                                             : Theme.of(context)
                                                 .colorScheme
                                                 .primary,
                                       ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '${task.scheduledAt!.month}/${task.scheduledAt!.day} at ${TimeOfDay.fromDateTime(task.scheduledAt!).format(context)}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: task.isCompleted
-                                              ? Colors.grey.shade500
-                                              : Theme.of(context)
-                                                  .colorScheme
-                                                  .primary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                                    ),
+                                  ],
+                                ),
                               ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+
+    final tasksView = Column(
+      children: [
+        categorySelector,
+        Expanded(child: tasksListView),
+      ],
+    );
+
+    final notesView = _notes.isEmpty
+        ? Center(
+            child: Text(
+              'No notes yet. Add one!',
+              style: TextStyle(color: Colors.grey.shade500),
+            ),
+          )
+        : ListView.builder(
+            padding: const EdgeInsets.only(top: 8, bottom: 80),
+            itemCount: _notes.length,
+            itemBuilder: (context, index) {
+              final note = _notes[index];
+              return Dismissible(
+                key: Key(note.id),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade400,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: const Icon(Icons.delete, color: Colors.white),
+                ),
+                onDismissed: (_) => _deleteNote(note),
+                child: Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 1,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => _showNoteDialog(note),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (note.title.isNotEmpty)
+                            Text(
+                              note.title,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          if (note.title.isNotEmpty && note.content.isNotEmpty)
+                            const SizedBox(height: 8),
+                          if (note.content.isNotEmpty)
+                            Text(
+                              note.content,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(200),
+                              ),
+                            ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${note.date.month}/${note.date.day}/${note.date.year}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
+                ),
+              );
+            },
+          );
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Tasks & Notes', style: TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          bottom: const TabBar(
+            indicatorColor: Color(0xFFFFFFFF),
+            labelColor: Color(0xFFFFFFFF),
+            unselectedLabelColor: Color(0xFF888888),
+            tabs: [
+              Tab(text: 'To-Do'),
+              Tab(text: 'Notes'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            tasksView,
+            notesView,
+          ],
+        ),
+        floatingActionButton: Builder(
+          builder: (context) {
+            final tabController = DefaultTabController.of(context);
+            return AnimatedBuilder(
+              animation: tabController,
+              builder: (context, child) {
+                final isNotesTab = tabController.index == 1;
+                return FloatingActionButton(
+                  onPressed: isNotesTab ? () => _showNoteDialog() : _showAddTaskDialog,
+                  child: Icon(isNotesTab ? Icons.edit_note : Icons.add),
                 );
               },
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddTaskDialog,
-        child: const Icon(Icons.add),
+            );
+          },
+        ),
       ),
     );
   }
