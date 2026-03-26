@@ -124,22 +124,6 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                 ),
               ),
             ),
-            // Bottom Toolbar
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.grey[900],
-                border: Border(top: BorderSide(color: Colors.grey.shade800)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                   IconButton(icon: const Icon(Icons.check_box_outlined), onPressed: () {}),
-                   IconButton(icon: const Icon(Icons.text_format), onPressed: () {}),
-                   IconButton(icon: const Icon(Icons.image_outlined), onPressed: () {}),
-                ],
-              ),
-            ),
           ],
         ),
       ),

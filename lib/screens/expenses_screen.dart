@@ -115,6 +115,43 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     await _saveExpenses();
   }
 
+  void _deleteWallet(Wallet wallet) {
+    if (_wallets.length <= 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot delete the last wallet.')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Wallet?'),
+        content: Text('Are you sure you want to delete "${wallet.name}" and all its expenses?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              setState(() {
+                _wallets.remove(wallet);
+                if (_activeWalletId == wallet.id) {
+                  _activeWalletId = _wallets.first.id;
+                }
+              });
+              _saveWallets();
+              Navigator.pop(context);
+            },
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _addExpense(String category, double amount) {
     if (_activeWalletId == null) return;
     
@@ -400,9 +437,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             return Padding(
               padding: const EdgeInsets.only(left: 8.0),
               child: ActionChip(
-                label: const Text('+ New', style: TextStyle(color: Colors.blue)),
+                label: const Text('+ New', style: TextStyle(color: Colors.white)),
                 backgroundColor: Colors.transparent,
-                side: const BorderSide(color: Colors.blue),
+                side: BorderSide(color: Theme.of(context).colorScheme.primary),
                 onPressed: _showAddWalletDialog,
               ),
             );
@@ -413,30 +450,33 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
           return Padding(
             padding: const EdgeInsets.only(right: 8.0),
-            child: ChoiceChip(
-              label: Text(wallet.name),
-              selected: isActive,
-              selectedColor: Theme.of(context).colorScheme.primary.withAlpha(51),
-              backgroundColor: const Color(0xFF1E1E1E),
-              labelStyle: TextStyle(
-                color: isActive
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).textTheme.bodyMedium?.color,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            child: GestureDetector(
+              onLongPress: () => _deleteWallet(wallet),
+              child: ChoiceChip(
+                label: Text(wallet.name),
+                selected: isActive,
+                selectedColor: Theme.of(context).colorScheme.primary.withAlpha(51),
+                backgroundColor: const Color(0xFF1E1E1E),
+                labelStyle: TextStyle(
+                  color: isActive
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).textTheme.bodyMedium?.color,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                ),
+                side: BorderSide(
+                  color: isActive
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.transparent,
+                ),
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _activeWalletId = wallet.id;
+                    });
+                    _saveWallets();
+                  }
+                },
               ),
-              side: BorderSide(
-                color: isActive
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.transparent,
-              ),
-              onSelected: (selected) {
-                if (selected) {
-                  setState(() {
-                    _activeWalletId = wallet.id;
-                  });
-                  _saveWallets();
-                }
-              },
             ),
           );
         },

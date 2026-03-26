@@ -95,7 +95,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
     } else {
       final defaultPortfolio = Portfolio(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: 'Main Portfolio',
+        name: 'Main Profile',
       );
       setState(() {
         _portfolios = [defaultPortfolio];
@@ -348,7 +348,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                   return Padding(
                     padding: const EdgeInsets.only(left: 8.0),
                     child: ActionChip(
-                      label: const Text('+ New profile'),
+                      label: const Text('+ New', style: TextStyle(color: Colors.white)),
                       backgroundColor: Colors.transparent,
                       side: BorderSide(
                           color: Theme.of(context).colorScheme.primary),

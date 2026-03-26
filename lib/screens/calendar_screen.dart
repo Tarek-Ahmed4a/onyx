@@ -224,7 +224,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           child: isSelected ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
                         ),
                       );
-                    }).toList(),
+                    }),
                     GestureDetector(
                       onTap: () {
                         Color pickerColor = Color(selectedColor ?? 0xFF1E88E5);
@@ -246,7 +246,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 FilledButton(
                                   child: const Text('Got it'),
                                   onPressed: () {
-                                    setState(() => selectedColor = pickerColor.value);
+                                    setState(() => selectedColor = pickerColor.toARGB32());
                                     Navigator.of(ctx).pop();
                                   },
                                 ),

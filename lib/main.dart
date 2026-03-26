@@ -145,22 +145,10 @@ class _MainScaffoldState extends State<MainScaffold> {
             tabBackgroundColor: const Color(0xFF121212),
             color: const Color(0xFF555555), // Inactive icon color
             tabs: const [
-              GButton(
-                icon: Icons.check_circle_outline,
-                text: 'Tasks',
-              ),
-              GButton(
-                icon: Icons.calendar_today_outlined,
-                text: 'Calendar',
-              ),
-              GButton(
-                icon: Icons.trending_up_outlined,
-                text: 'Investments',
-              ),
-              GButton(
-                icon: Icons.account_balance_wallet_outlined,
-                text: 'Expenses',
-              ),
+              GButton(icon: Icons.check_circle_outline, text: 'Tasks'),
+              GButton(icon: Icons.calendar_today_outlined, text: 'Calendar'),
+              GButton(icon: Icons.trending_up_outlined, text: 'Investments'),
+              GButton(icon: Icons.account_balance_wallet_outlined, text: 'Expenses'),
             ],
             selectedIndex: _currentIndex,
             onTabChange: _onTabTapped,

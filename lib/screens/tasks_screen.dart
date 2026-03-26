@@ -505,7 +505,7 @@ class _TasksScreenState extends State<TasksScreen> {
             return Padding(
               padding: const EdgeInsets.only(left: 8.0),
               child: ActionChip(
-                label: const Text('+ New list'),
+                label: const Text('+ New', style: TextStyle(color: Colors.white)),
                 backgroundColor: Colors.transparent,
                 side: BorderSide(
                     color: Theme.of(context).colorScheme.primary),
