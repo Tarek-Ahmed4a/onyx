@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "179900082745",
+    "project_id": "onyx-c4702",
+    "storage_bucket": "onyx-c4702.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:179900082745:android:6a265e5fc36c4a3fb0bbe8",
+        "android_client_info": {
+          "package_name": "com.example.personal_finance_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCHHWjChNNFUMfhji1OnbesW0M5HO39YSw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

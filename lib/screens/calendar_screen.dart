@@ -1,8 +1,10 @@
-import 'dart:convert';
+
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class CalendarTask {
   final String id;
@@ -52,6 +54,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   DateTime? _selectedDay;
 
   Map<String, List<CalendarTask>> _tasks = {};
+  StreamSubscription? _calendarSub;
 
   @override
   void initState() {
@@ -63,6 +66,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   @override
   void dispose() {
+    _calendarSub?.cancel();
     _selectedEvents.dispose();
     super.dispose();
   }
@@ -82,39 +86,37 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _loadTasks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? dataJson = prefs.getString('calendar_daily_tasks');
-    if (dataJson != null) {
-      try {
-        final Map<String, dynamic> decoded = json.decode(dataJson);
-        setState(() {
-          _tasks = decoded.map((key, value) {
-            return MapEntry(
-              key,
-              (value as List<dynamic>)
-                  .map((item) => CalendarTask.fromJson(item))
-                  .toList(),
-            );
-          });
-        });
-        _selectedEvents.value = _getEventsForDay(_selectedDay!);
-      } catch (e) {
-        debugPrint('Error parsing calendar tasks: $e');
-        _tasks = {};
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    _calendarSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('calendar_days')
+        .snapshots()
+        .listen((snapshot) {
+      final newTasks = <String, List<CalendarTask>>{};
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        if (data['tasks'] != null) {
+          final tasks = (data['tasks'] as List<dynamic>)
+              .map((item) => CalendarTask.fromJson(item))
+              .toList();
+          newTasks[doc.id] = tasks;
+        }
       }
-    }
+      if (mounted) {
+        setState(() {
+          _tasks = newTasks;
+        });
+        if (_selectedDay != null) {
+            _selectedEvents.value = _getEventsForDay(_selectedDay!);
+        }
+      }
+    });
   }
 
-  Future<void> _saveTasks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String encoded = json.encode(
-      _tasks.map(
-          (key, value) => MapEntry(key, value.map((t) => t.toJson()).toList())),
-    );
-    await prefs.setString('calendar_daily_tasks', encoded);
-  }
-
-  void _addTask(String title, [int? colorCode, DateTime? scheduledTime]) {
+  void _addTask(String title, [int? colorCode, DateTime? scheduledTime]) async {
     if (title.trim().isEmpty || _selectedDay == null) return;
     final key = _dateKey(_selectedDay!);
     final newTask = CalendarTask(
@@ -124,34 +126,45 @@ class _CalendarScreenState extends State<CalendarScreen> {
       scheduledTime: scheduledTime,
     );
 
-    setState(() {
-      if (_tasks[key] != null) {
-        _tasks[key]!.add(newTask);
-      } else {
-        _tasks[key] = [newTask];
-      }
-    });
-
-    _selectedEvents.value = _getEventsForDay(_selectedDay!);
-    _saveTasks();
+    final currentList = _tasks[key] ?? [];
+    currentList.add(newTask);
+    
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await FirebaseFirestore.instance.collection('users').doc(uid).collection('calendar_days').doc(key).set({
+        'tasks': currentList.map((t) => t.toJson()).toList(),
+      });
+    }
   }
 
-  void _deleteTask(CalendarTask task) {
+  void _deleteTask(CalendarTask task) async {
     if (_selectedDay == null) return;
     final key = _dateKey(_selectedDay!);
-    setState(() {
-      _tasks[key]?.remove(task);
-    });
-    _selectedEvents.value = _getEventsForDay(_selectedDay!);
-    _saveTasks();
+    final currentList = _tasks[key] ?? [];
+    currentList.removeWhere((t) => t.id == task.id);
+    
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await FirebaseFirestore.instance.collection('users').doc(uid).collection('calendar_days').doc(key).set({
+        'tasks': currentList.map((t) => t.toJson()).toList(),
+      });
+    }
   }
 
-  void _toggleTask(CalendarTask task) {
-    setState(() {
-      task.isCompleted = !task.isCompleted;
-    });
-    _selectedEvents.value = _getEventsForDay(_selectedDay!);
-    _saveTasks();
+  void _toggleTask(CalendarTask task) async {
+    if (_selectedDay == null) return;
+    final key = _dateKey(_selectedDay!);
+    
+    task.isCompleted = !task.isCompleted;
+    
+    final currentList = _tasks[key] ?? [];
+    
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await FirebaseFirestore.instance.collection('users').doc(uid).collection('calendar_days').doc(key).set({
+        'tasks': currentList.map((t) => t.toJson()).toList(),
+      });
+    }
   }
 
   void _showAddTaskDialog() {

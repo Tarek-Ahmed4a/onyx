@@ -1,6 +1,7 @@
-import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/wallet_model.dart';
 
 class ExpensesScreen extends StatefulWidget {
@@ -16,6 +17,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   List<Wallet> _wallets = [];
   String? _activeWalletId;
   List<Expense> _expenses = [];
+  StreamSubscription? _walletsSub;
+  StreamSubscription? _expensesSub;
+
+  @override
+  void dispose() {
+    _walletsSub?.cancel();
+    _expensesSub?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -24,95 +34,69 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 
   Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    // Load wallets
-    final String? walletsJson = prefs.getString('expense_profiles_data'); // Keeping legacy key for compatibility
-    if (walletsJson != null) {
-      try {
-        final List<dynamic> decoded = json.decode(walletsJson);
-        _wallets = decoded.map((p) => Wallet.fromJson(p)).toList();
-      } catch (e) {
-        debugPrint('Error loading wallets: $e');
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
+    _walletsSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('profiles')
+        .snapshots()
+        .listen((snapshot) async {
+      final loadedWallets = snapshot.docs.map((doc) => Wallet.fromJson(doc.data())).toList();
+
+      if (loadedWallets.isEmpty) {
+        final defaultWallet = Wallet(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          name: 'Default Wallet',
+        );
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('profiles')
+            .doc(defaultWallet.id)
+            .set(defaultWallet.toJson());
+        return;
       }
-    }
-    
-    if (_wallets.isEmpty) {
-      final defaultWallet = Wallet(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: 'Default Wallet',
-      );
-      _wallets = [defaultWallet];
-    }
-    
-    final savedActiveWallet = prefs.getString('active_profile_id');
-    if (savedActiveWallet != null && _wallets.any((p) => p.id == savedActiveWallet)) {
-      _activeWalletId = savedActiveWallet;
-    } else {
-      _activeWalletId = _wallets.first.id;
-    }
 
-    // Load expenses
-    final String? expensesJson = prefs.getString('expenses_data');
-    if (expensesJson != null) {
-      try {
-        final List<dynamic> decoded = json.decode(expensesJson);
-        _expenses = decoded.map((e) => Expense.fromJson(e)).toList();
-      } catch (e) {
-        debugPrint('Error loading expenses: $e');
+      if (mounted) {
+        setState(() {
+          _wallets = loadedWallets;
+          if (_activeWalletId == null || !loadedWallets.any((p) => p.id == _activeWalletId)) {
+            _activeWalletId = loadedWallets.first.id;
+          }
+          _isLoading = false;
+        });
       }
-    } else {
-        // Try DB Migration from legacy schema to current _activeWalletId
-        final double? oldNeeds = prefs.getDouble('needs_spent');
-        final double? oldWants = prefs.getDouble('wants_spent');
-        final double? oldSavings = prefs.getDouble('savings_spent');
-        final double? oldIncome = prefs.getDouble('monthly_income');
-        
-        if (oldIncome != null) {
-            final activeWallet = _wallets.firstWhere((p) => p.id == _activeWalletId);
-            activeWallet.initialIncome = oldIncome;
-            _saveWallets();
-        }
+    });
 
-        if (oldNeeds != null && oldNeeds > 0) {
-            _expenses.add(Expense(id: 'legacy_need', category: 'Need', amount: oldNeeds, profileId: _activeWalletId!, date: DateTime.now()));
-        }
-        if (oldWants != null && oldWants > 0) {
-            _expenses.add(Expense(id: 'legacy_want', category: 'Want', amount: oldWants, profileId: _activeWalletId!, date: DateTime.now()));
-        }
-        if (oldSavings != null && oldSavings > 0) {
-            _expenses.add(Expense(id: 'legacy_saving', category: 'Saving', amount: oldSavings, profileId: _activeWalletId!, date: DateTime.now()));
-        }
-        if (_expenses.isNotEmpty) {
-            _saveExpenses();
-        }
-    }
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _saveWallets() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('expense_profiles_data', json.encode(_wallets.map((p) => p.toJson()).toList()));
-    if (_activeWalletId != null) {
-        await prefs.setString('active_profile_id', _activeWalletId!);
-    }
-  }
-
-  Future<void> _saveExpenses() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('expenses_data', json.encode(_expenses.map((e) => e.toJson()).toList()));
+    _expensesSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('expenses')
+        .snapshots()
+        .listen((snapshot) {
+      final loadedExpenses = snapshot.docs.map((doc) => Expense.fromJson(doc.data())).toList();
+      if (mounted) {
+        setState(() => _expenses = loadedExpenses);
+      }
+    });
   }
 
   Future<void> _resetExpenses() async {
-    setState(() {
-      _expenses.removeWhere((e) => e.profileId == _activeWalletId);
-    });
-    await _saveExpenses();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || _activeWalletId == null) return;
+    
+    final batch = FirebaseFirestore.instance.batch();
+    final activeExps = _expenses.where((e) => e.profileId == _activeWalletId);
+    for (var ex in activeExps) {
+        final docRef = FirebaseFirestore.instance.collection('users').doc(uid).collection('expenses').doc(ex.id);
+        batch.delete(docRef);
+    }
+    await batch.commit();
   }
 
   void _deleteWallet(Wallet wallet) {
@@ -134,15 +118,20 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
-              setState(() {
-                _wallets.remove(wallet);
-                if (_activeWalletId == wallet.id) {
-                  _activeWalletId = _wallets.first.id;
-                }
-              });
-              _saveWallets();
+            onPressed: () async {
+              final uid = FirebaseAuth.instance.currentUser?.uid;
+              if (uid != null) {
+                await FirebaseFirestore.instance.collection('users').doc(uid).collection('profiles').doc(wallet.id).delete();
+              }
+              if (!context.mounted) return;
               Navigator.pop(context);
+              if (mounted) {
+                  setState(() {
+                    if (_activeWalletId == wallet.id) {
+                      _activeWalletId = _wallets.firstWhere((p) => p.id != wallet.id).id;
+                    }
+                  });
+              }
             },
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete'),
@@ -152,9 +141,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
-  void _addExpense(String category, double amount) {
+  void _addExpense(String category, double amount) async {
     if (_activeWalletId == null) return;
     
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
     final newExpense = Expense(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       category: category,
@@ -163,10 +155,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       date: DateTime.now(),
     );
     
-    setState(() {
-      _expenses.add(newExpense);
-    });
-    _saveExpenses();
+    await FirebaseFirestore.instance.collection('users').doc(uid).collection('expenses').doc(newExpense.id).set(newExpense.toJson());
   }
 
   void _showAddWalletDialog() {
@@ -186,18 +175,25 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               if (controller.text.trim().isEmpty) return;
               final newWallet = Wallet(
                   id: DateTime.now().millisecondsSinceEpoch.toString(),
                   name: controller.text.trim(),
               );
-              setState(() {
-                  _wallets.add(newWallet);
-                  _activeWalletId = newWallet.id;
-              });
-              _saveWallets();
+              
+              final uid = FirebaseAuth.instance.currentUser?.uid;
+              if (uid != null) {
+                  await FirebaseFirestore.instance.collection('users').doc(uid).collection('profiles').doc(newWallet.id).set(newWallet.toJson());
+              }
+              
+              if (!context.mounted) return;
               Navigator.pop(context);
+              if (mounted) {
+                  setState(() {
+                      _activeWalletId = newWallet.id;
+                  });
+              }
             },
             child: const Text('Create'),
           ),
@@ -247,7 +243,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               final n = double.tryParse(needsCtrl.text) ?? 0;
               final w = double.tryParse(wantsCtrl.text) ?? 0;
               final s = double.tryParse(savingsCtrl.text) ?? 0;
@@ -258,13 +254,17 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   return;
               }
               
-              setState(() {
-                  wallet.needsRatio = n;
-                  wallet.wantsRatio = w;
-                  wallet.savingsRatio = s;
-                  wallet.initialIncome = inc;
-              });
-              _saveWallets();
+              wallet.needsRatio = n;
+              wallet.wantsRatio = w;
+              wallet.savingsRatio = s;
+              wallet.initialIncome = inc;
+
+              final uid = FirebaseAuth.instance.currentUser?.uid;
+              if (uid != null) {
+                  await FirebaseFirestore.instance.collection('users').doc(uid).collection('profiles').doc(wallet.id).set(wallet.toJson());
+              }
+              
+              if (!context.mounted) return;
               Navigator.pop(context);
             },
             child: const Text('Save'),
@@ -473,7 +473,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     setState(() {
                       _activeWalletId = wallet.id;
                     });
-                    _saveWallets();
                   }
                 },
               ),

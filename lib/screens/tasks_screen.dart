@@ -1,7 +1,9 @@
-import 'dart:convert';
+
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../main.dart';
@@ -78,6 +80,15 @@ class _TasksScreenState extends State<TasksScreen> {
   String? _activeCategoryId;
   bool _isLoading = true;
   String _searchQuery = '';
+  StreamSubscription? _categoriesSub;
+  StreamSubscription? _notesSub;
+
+  @override
+  void dispose() {
+    _categoriesSub?.cancel();
+    _notesSub?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -136,82 +147,76 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    // Load Tasks
-    final String? dataJson = prefs.getString('calendar_tasks_data');
-    if (dataJson != null) {
-      try {
-        final List<dynamic> decoded = json.decode(dataJson);
-        _categories =
-            decoded.map((item) => TaskCategory.fromJson(item)).toList();
-        if (_categories.isNotEmpty) {
-          _activeCategoryId = _categories.first.id;
-        }
-      } catch (e) {
-        debugPrint('Error parsing tasks: $e');
-        _categories = [];
-      }
-    }
-    
-    if (_categories.isEmpty) {
-      // Initialize with a default category if empty
-      final defaultCategory = TaskCategory(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: 'My Tasks',
-        items: [],
-      );
-      _categories = [defaultCategory];
-      _activeCategoryId = defaultCategory.id;
-      await _saveTasks();
-    }
-    
-    // Load Notes
-    final String? notesJson = prefs.getString('notes_data');
-    if (notesJson != null) {
-      try {
-        final List<dynamic> decodedNotes = json.decode(notesJson);
-        _notes = decodedNotes.map((item) => Note.fromJson(item)).toList();
-      } catch (e) {
-        debugPrint('Error parsing notes: $e');
-        _notes = [];
-      }
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
     }
 
-    setState(() {
-      _isLoading = false;
+    _categoriesSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('task_categories')
+        .snapshots()
+        .listen((snapshot) async {
+      final loadedCats = snapshot.docs.map((doc) => TaskCategory.fromJson(doc.data())).toList();
+
+      if (loadedCats.isEmpty) {
+        final defaultCategory = TaskCategory(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          name: 'My Tasks',
+          items: [],
+        );
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('task_categories')
+            .doc(defaultCategory.id)
+            .set(defaultCategory.toJson());
+        return; 
+      }
+
+      if (mounted) {
+        setState(() {
+          _categories = loadedCats;
+          if (_activeCategoryId == null || !loadedCats.any((c) => c.id == _activeCategoryId)) {
+            _activeCategoryId = loadedCats.first.id;
+          }
+          _isLoading = false;
+        });
+      }
+    });
+
+    _notesSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('notes')
+        .snapshots()
+        .listen((snapshot) {
+      final loadedNotes = snapshot.docs.map((doc) => Note.fromJson(doc.data())).toList();
+      loadedNotes.sort((a, b) => b.date.compareTo(a.date));
+      if (mounted) {
+        setState(() {
+          _notes = loadedNotes;
+        });
+      }
     });
   }
 
-  Future<void> _saveTasks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String encoded =
-        json.encode(_categories.map((c) => c.toJson()).toList());
-    await prefs.setString('calendar_tasks_data', encoded);
-  }
-  
-  Future<void> _saveNotes() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String encoded = json.encode(_notes.map((n) => n.toJson()).toList());
-    await prefs.setString('notes_data', encoded);
-  }
-
-  void _addCategory(String name) {
+  void _addCategory(String name) async {
     if (name.trim().isEmpty) return;
     final newCategory = TaskCategory(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name.trim(),
     );
-    setState(() {
-      _categories.add(newCategory);
-      _activeCategoryId = newCategory.id;
-    });
-    _saveTasks();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    await FirebaseFirestore.instance.collection('users').doc(uid).collection('task_categories').doc(newCategory.id).set(newCategory.toJson());
+    setState(() => _activeCategoryId = newCategory.id);
   }
 
   void _deleteCategory(TaskCategory category) {
     if (_categories.length <= 1) {
-      // Don't delete the last category
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cannot delete the last list.')),
       );
@@ -230,18 +235,23 @@ class _TasksScreenState extends State<TasksScreen> {
                   child: const Text('Cancel'),
                 ),
                 FilledButton(
-                  onPressed: () {
+                  onPressed: () async {
                     for (var task in category.items) {
                       _cancelNotification(task);
                     }
-                    setState(() {
-                      _categories.remove(category);
-                      if (_activeCategoryId == category.id) {
-                        _activeCategoryId = _categories.first.id;
-                      }
-                    });
-                    _saveTasks();
+                    final uid = FirebaseAuth.instance.currentUser?.uid;
+                    if (uid != null) {
+                      await FirebaseFirestore.instance.collection('users').doc(uid).collection('task_categories').doc(category.id).delete();
+                    }
+                    if (!context.mounted) return;
                     Navigator.pop(context);
+                    if (mounted) {
+                        setState(() {
+                            if (_activeCategoryId == category.id) {
+                                _activeCategoryId = _categories.firstWhere((c) => c.id != category.id).id;
+                            }
+                        });
+                    }
                   },
                   style: FilledButton.styleFrom(backgroundColor: Colors.red),
                   child: const Text('Delete'),
@@ -250,10 +260,9 @@ class _TasksScreenState extends State<TasksScreen> {
             ));
   }
 
-  void _addTask(String title, [DateTime? scheduledAt]) {
+  void _addTask(String title, [DateTime? scheduledAt]) async {
     if (title.trim().isEmpty || _activeCategoryId == null) return;
-    final activeCategory =
-        _categories.firstWhere((c) => c.id == _activeCategoryId);
+    final activeCategory = _categories.firstWhere((c) => c.id == _activeCategoryId);
 
     final newTask = TaskItem(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -261,59 +270,62 @@ class _TasksScreenState extends State<TasksScreen> {
       scheduledAt: scheduledAt,
     );
 
-    setState(() {
-      activeCategory.items.add(newTask);
-    });
-    _saveTasks();
+    activeCategory.items.add(newTask);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await FirebaseFirestore.instance.collection('users').doc(uid).collection('task_categories').doc(activeCategory.id).set(activeCategory.toJson());
+    }
+
     if (scheduledAt != null) {
       _scheduleNotification(newTask);
     }
   }
 
-  void _deleteTask(TaskItem task) {
+  void _deleteTask(TaskItem task) async {
     if (_activeCategoryId == null) return;
-    final activeCategory =
-        _categories.firstWhere((c) => c.id == _activeCategoryId);
+    final activeCategory = _categories.firstWhere((c) => c.id == _activeCategoryId);
 
-    setState(() {
-      activeCategory.items.remove(task);
-    });
+    activeCategory.items.remove(task);
     _cancelNotification(task);
-    _saveTasks();
+    
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await FirebaseFirestore.instance.collection('users').doc(uid).collection('task_categories').doc(activeCategory.id).set(activeCategory.toJson());
+    }
   }
 
-  void _toggleTask(TaskItem task) {
-    setState(() {
-      task.isCompleted = !task.isCompleted;
-    });
+  void _toggleTask(TaskItem task) async {
+    task.isCompleted = !task.isCompleted;
+
     if (task.isCompleted) {
       _cancelNotification(task);
-    } else if (task.scheduledAt != null &&
-        task.scheduledAt!.isAfter(DateTime.now())) {
+    } else if (task.scheduledAt != null && task.scheduledAt!.isAfter(DateTime.now())) {
       _scheduleNotification(task);
     }
-    _saveTasks();
-  }
-  
-  void _saveNoteFromDetail(Note note, bool isNew) {
-    setState(() {
-      if (isNew) {
-        _notes.insert(0, note);
-      } else {
-        final index = _notes.indexWhere((n) => n.id == note.id);
-        if (index != -1) {
-          _notes[index] = note;
-        }
-      }
-    });
-    _saveNotes();
+    
+    // Optimistic update for UI feel (wait, setState might not be needed when real-time snapshot is on its way, but keeping it ensures snap action, wait no, let's keep it clean since it's already an active object reference in _categories).
+    setState((){});
+    
+    if (_activeCategoryId == null) return;
+    final activeCategory = _categories.firstWhere((c) => c.id == _activeCategoryId);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await FirebaseFirestore.instance.collection('users').doc(uid).collection('task_categories').doc(activeCategory.id).set(activeCategory.toJson());
+    }
   }
 
-  void _deleteNote(Note note) {
-    setState(() {
-      _notes.remove(note);
-    });
-    _saveNotes();
+  void _saveNoteFromDetail(Note note, bool isNew) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await FirebaseFirestore.instance.collection('users').doc(uid).collection('notes').doc(note.id).set(note.toJson());
+    }
+  }
+
+  void _deleteNote(Note note) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await FirebaseFirestore.instance.collection('users').doc(uid).collection('notes').doc(note.id).delete();
+    }
   }
 
   void _showAddCategoryDialog() {

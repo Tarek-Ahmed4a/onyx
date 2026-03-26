@@ -1,6 +1,7 @@
-import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class Asset {
   final String id;
@@ -72,6 +73,13 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
   List<Portfolio> _portfolios = [];
   String? _activePortfolioId;
   bool _isLoading = true;
+  StreamSubscription? _portfoliosSub;
+
+  @override
+  void dispose() {
+    _portfoliosSub?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -80,50 +88,56 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
   }
 
   Future<void> _loadPortfolios() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? dataJson = prefs.getString('investments_portfolios_data');
-
-    if (dataJson != null) {
-      final List<dynamic> decoded = json.decode(dataJson);
-      setState(() {
-        _portfolios = decoded.map((item) => Portfolio.fromJson(item)).toList();
-        if (_portfolios.isNotEmpty) {
-          _activePortfolioId = _portfolios.first.id;
-        }
-        _isLoading = false;
-      });
-    } else {
-      final defaultPortfolio = Portfolio(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: 'Main Profile',
-      );
-      setState(() {
-        _portfolios = [defaultPortfolio];
-        _activePortfolioId = defaultPortfolio.id;
-        _isLoading = false;
-      });
-      await _savePortfolios();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
     }
+
+    _portfoliosSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('investments')
+        .snapshots()
+        .listen((snapshot) async {
+      final loadedPortfolios = snapshot.docs.map((doc) => Portfolio.fromJson(doc.data())).toList();
+
+      if (loadedPortfolios.isEmpty) {
+        final defaultPortfolio = Portfolio(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          name: 'Main Profile',
+        );
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('investments')
+            .doc(defaultPortfolio.id)
+            .set(defaultPortfolio.toJson());
+        return;
+      }
+
+      if (mounted) {
+        setState(() {
+          _portfolios = loadedPortfolios;
+          if (_activePortfolioId == null || !loadedPortfolios.any((p) => p.id == _activePortfolioId)) {
+            _activePortfolioId = loadedPortfolios.first.id;
+          }
+          _isLoading = false;
+        });
+      }
+    });
   }
 
-  Future<void> _savePortfolios() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String encoded =
-        json.encode(_portfolios.map((p) => p.toJson()).toList());
-    await prefs.setString('investments_portfolios_data', encoded);
-  }
-
-  void _addPortfolio(String name) {
+  void _addPortfolio(String name) async {
     if (name.trim().isEmpty) return;
     final newPortfolio = Portfolio(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name.trim(),
     );
-    setState(() {
-      _portfolios.add(newPortfolio);
-      _activePortfolioId = newPortfolio.id;
-    });
-    _savePortfolios();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    await FirebaseFirestore.instance.collection('users').doc(uid).collection('investments').doc(newPortfolio.id).set(newPortfolio.toJson());
+    setState(() => _activePortfolioId = newPortfolio.id);
   }
 
   void _deletePortfolio(Portfolio portfolio) {
@@ -146,15 +160,20 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
-              setState(() {
-                _portfolios.remove(portfolio);
-                if (_activePortfolioId == portfolio.id) {
-                  _activePortfolioId = _portfolios.first.id;
-                }
-              });
-              _savePortfolios();
+            onPressed: () async {
+              final uid = FirebaseAuth.instance.currentUser?.uid;
+              if (uid != null) {
+                await FirebaseFirestore.instance.collection('users').doc(uid).collection('investments').doc(portfolio.id).delete();
+              }
+              if (!context.mounted) return;
               Navigator.pop(context);
+              if (mounted) {
+                setState(() {
+                  if (_activePortfolioId == portfolio.id) {
+                    _activePortfolioId = _portfolios.firstWhere((p) => p.id != portfolio.id).id;
+                  }
+                });
+              }
             },
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete'),
@@ -164,7 +183,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
     );
   }
 
-  void _addAsset(String name, double buyPrice, double currentPrice, double quantity) {
+  void _addAsset(String name, double buyPrice, double currentPrice, double quantity) async {
     if (_activePortfolioId == null) return;
     final activePortfolio =
         _portfolios.firstWhere((p) => p.id == _activePortfolioId);
@@ -177,21 +196,25 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
       quantity: quantity,
     );
 
-    setState(() {
-      activePortfolio.assets.add(newAsset);
-    });
-    _savePortfolios();
+    activePortfolio.assets.add(newAsset);
+    
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await FirebaseFirestore.instance.collection('users').doc(uid).collection('investments').doc(activePortfolio.id).set(activePortfolio.toJson());
+    }
   }
 
-  void _deleteAsset(Asset asset) {
+  void _deleteAsset(Asset asset) async {
     if (_activePortfolioId == null) return;
     final activePortfolio =
         _portfolios.firstWhere((p) => p.id == _activePortfolioId);
 
-    setState(() {
-      activePortfolio.assets.remove(asset);
-    });
-    _savePortfolios();
+    activePortfolio.assets.remove(asset);
+    
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await FirebaseFirestore.instance.collection('users').doc(uid).collection('investments').doc(activePortfolio.id).set(activePortfolio.toJson());
+    }
   }
 
   void _showAddPortfolioDialog() {
