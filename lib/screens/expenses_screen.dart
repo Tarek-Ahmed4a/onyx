@@ -1,74 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-class ExpenseProfile {
-  final String id;
-  String name;
-  double monthlyIncome;
-  double needsPercentage;
-  double wantsPercentage;
-  double savingsPercentage;
-
-  ExpenseProfile({
-    required this.id,
-    required this.name,
-    this.monthlyIncome = 5000.0,
-    this.needsPercentage = 50.0,
-    this.wantsPercentage = 30.0,
-    this.savingsPercentage = 20.0,
-  });
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'monthlyIncome': monthlyIncome,
-        'needsPercentage': needsPercentage,
-        'wantsPercentage': wantsPercentage,
-        'savingsPercentage': savingsPercentage,
-      };
-
-  factory ExpenseProfile.fromJson(Map<String, dynamic> json) => ExpenseProfile(
-        id: json['id'],
-        name: json['name'],
-        monthlyIncome: json['monthlyIncome']?.toDouble() ?? 5000.0,
-        needsPercentage: json['needsPercentage']?.toDouble() ?? 50.0,
-        wantsPercentage: json['wantsPercentage']?.toDouble() ?? 30.0,
-        savingsPercentage: json['savingsPercentage']?.toDouble() ?? 20.0,
-      );
-}
-
-class Expense {
-  final String id;
-  final String category; // 'Need', 'Want', 'Saving'
-  final double amount;
-  final String profileId;
-  final DateTime date;
-
-  Expense({
-    required this.id,
-    required this.category,
-    required this.amount,
-    required this.profileId,
-    required this.date,
-  });
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'category': category,
-        'amount': amount,
-        'profileId': profileId,
-        'date': date.toIso8601String(),
-      };
-
-  factory Expense.fromJson(Map<String, dynamic> json) => Expense(
-        id: json['id'],
-        category: json['category'],
-        amount: json['amount']?.toDouble() ?? 0.0,
-        profileId: json['profileId'],
-        date: DateTime.parse(json['date']),
-      );
-}
+import '../models/wallet_model.dart';
 
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key});
@@ -80,8 +13,8 @@ class ExpensesScreen extends StatefulWidget {
 class _ExpensesScreenState extends State<ExpensesScreen> {
   bool _isLoading = true;
 
-  List<ExpenseProfile> _profiles = [];
-  String? _activeProfileId;
+  List<Wallet> _wallets = [];
+  String? _activeWalletId;
   List<Expense> _expenses = [];
 
   @override
@@ -93,30 +26,30 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     
-    // Load profiles
-    final String? profilesJson = prefs.getString('expense_profiles_data');
-    if (profilesJson != null) {
+    // Load wallets
+    final String? walletsJson = prefs.getString('expense_profiles_data'); // Keeping legacy key for compatibility
+    if (walletsJson != null) {
       try {
-        final List<dynamic> decoded = json.decode(profilesJson);
-        _profiles = decoded.map((p) => ExpenseProfile.fromJson(p)).toList();
+        final List<dynamic> decoded = json.decode(walletsJson);
+        _wallets = decoded.map((p) => Wallet.fromJson(p)).toList();
       } catch (e) {
-        debugPrint('Error loading profiles: $e');
+        debugPrint('Error loading wallets: $e');
       }
     }
     
-    if (_profiles.isEmpty) {
-      final defaultProfile = ExpenseProfile(
+    if (_wallets.isEmpty) {
+      final defaultWallet = Wallet(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: 'Default Wallet',
       );
-      _profiles = [defaultProfile];
+      _wallets = [defaultWallet];
     }
     
-    final savedActiveProfile = prefs.getString('active_profile_id');
-    if (savedActiveProfile != null && _profiles.any((p) => p.id == savedActiveProfile)) {
-      _activeProfileId = savedActiveProfile;
+    final savedActiveWallet = prefs.getString('active_profile_id');
+    if (savedActiveWallet != null && _wallets.any((p) => p.id == savedActiveWallet)) {
+      _activeWalletId = savedActiveWallet;
     } else {
-      _activeProfileId = _profiles.first.id;
+      _activeWalletId = _wallets.first.id;
     }
 
     // Load expenses
@@ -129,26 +62,26 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         debugPrint('Error loading expenses: $e');
       }
     } else {
-        // Try DB Migration from legacy schema to current _activeProfileId
+        // Try DB Migration from legacy schema to current _activeWalletId
         final double? oldNeeds = prefs.getDouble('needs_spent');
         final double? oldWants = prefs.getDouble('wants_spent');
         final double? oldSavings = prefs.getDouble('savings_spent');
         final double? oldIncome = prefs.getDouble('monthly_income');
         
         if (oldIncome != null) {
-            final activeProfile = _profiles.firstWhere((p) => p.id == _activeProfileId);
-            activeProfile.monthlyIncome = oldIncome;
-            _saveProfiles();
+            final activeWallet = _wallets.firstWhere((p) => p.id == _activeWalletId);
+            activeWallet.initialIncome = oldIncome;
+            _saveWallets();
         }
 
         if (oldNeeds != null && oldNeeds > 0) {
-            _expenses.add(Expense(id: 'legacy_need', category: 'Need', amount: oldNeeds, profileId: _activeProfileId!, date: DateTime.now()));
+            _expenses.add(Expense(id: 'legacy_need', category: 'Need', amount: oldNeeds, profileId: _activeWalletId!, date: DateTime.now()));
         }
         if (oldWants != null && oldWants > 0) {
-            _expenses.add(Expense(id: 'legacy_want', category: 'Want', amount: oldWants, profileId: _activeProfileId!, date: DateTime.now()));
+            _expenses.add(Expense(id: 'legacy_want', category: 'Want', amount: oldWants, profileId: _activeWalletId!, date: DateTime.now()));
         }
         if (oldSavings != null && oldSavings > 0) {
-            _expenses.add(Expense(id: 'legacy_saving', category: 'Saving', amount: oldSavings, profileId: _activeProfileId!, date: DateTime.now()));
+            _expenses.add(Expense(id: 'legacy_saving', category: 'Saving', amount: oldSavings, profileId: _activeWalletId!, date: DateTime.now()));
         }
         if (_expenses.isNotEmpty) {
             _saveExpenses();
@@ -162,11 +95,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }
   }
 
-  Future<void> _saveProfiles() async {
+  Future<void> _saveWallets() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('expense_profiles_data', json.encode(_profiles.map((p) => p.toJson()).toList()));
-    if (_activeProfileId != null) {
-        await prefs.setString('active_profile_id', _activeProfileId!);
+    await prefs.setString('expense_profiles_data', json.encode(_wallets.map((p) => p.toJson()).toList()));
+    if (_activeWalletId != null) {
+        await prefs.setString('active_profile_id', _activeWalletId!);
     }
   }
 
@@ -177,19 +110,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   Future<void> _resetExpenses() async {
     setState(() {
-      _expenses.removeWhere((e) => e.profileId == _activeProfileId);
+      _expenses.removeWhere((e) => e.profileId == _activeWalletId);
     });
     await _saveExpenses();
   }
 
   void _addExpense(String category, double amount) {
-    if (_activeProfileId == null) return;
+    if (_activeWalletId == null) return;
     
     final newExpense = Expense(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       category: category,
       amount: amount,
-      profileId: _activeProfileId!,
+      profileId: _activeWalletId!,
       date: DateTime.now(),
     );
     
@@ -199,7 +132,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     _saveExpenses();
   }
 
-  void _showAddProfileDialog() {
+  void _showAddWalletDialog() {
     final controller = TextEditingController();
     showDialog(
       context: context,
@@ -218,15 +151,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           FilledButton(
             onPressed: () {
               if (controller.text.trim().isEmpty) return;
-              final newProf = ExpenseProfile(
+              final newWallet = Wallet(
                   id: DateTime.now().millisecondsSinceEpoch.toString(),
                   name: controller.text.trim(),
               );
               setState(() {
-                  _profiles.add(newProf);
-                  _activeProfileId = newProf.id;
+                  _wallets.add(newWallet);
+                  _activeWalletId = newWallet.id;
               });
-              _saveProfiles();
+              _saveWallets();
               Navigator.pop(context);
             },
             child: const Text('Create'),
@@ -236,7 +169,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
-  void _showProfilesBottomSheet() {
+  void _showWalletsBottomSheet() {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -251,17 +184,17 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 padding: EdgeInsets.all(16.0),
                 child: Text('Select Wallet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ),
-              ..._profiles.map((profile) {
-                final isSelected = profile.id == _activeProfileId;
+              ..._wallets.map((wallet) {
+                final isSelected = wallet.id == _activeWalletId;
                 return ListTile(
                   leading: Icon(Icons.account_balance_wallet, color: isSelected ? Colors.blue : Colors.grey),
-                  title: Text(profile.name, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                  title: Text(wallet.name, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
                   trailing: isSelected ? const Icon(Icons.check, color: Colors.blue) : null,
                   onTap: () {
                     setState(() {
-                      _activeProfileId = profile.id;
+                      _activeWalletId = wallet.id;
                     });
-                    _saveProfiles();
+                    _saveWallets();
                     Navigator.pop(context);
                   },
                 );
@@ -272,7 +205,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 title: const Text('Add New Wallet', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
                 onTap: () {
                   Navigator.pop(context);
-                  _showAddProfileDialog();
+                  _showAddWalletDialog();
                 },
               ),
               const SizedBox(height: 8),
@@ -283,11 +216,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
-  void _showProfileSettingsDialog(ExpenseProfile profile) {
-    final needsCtrl = TextEditingController(text: profile.needsPercentage.toStringAsFixed(0));
-    final wantsCtrl = TextEditingController(text: profile.wantsPercentage.toStringAsFixed(0));
-    final savingsCtrl = TextEditingController(text: profile.savingsPercentage.toStringAsFixed(0));
-    final incomeCtrl = TextEditingController(text: profile.monthlyIncome.toStringAsFixed(2));
+  void _showWalletSettingsDialog(Wallet wallet) {
+    final needsCtrl = TextEditingController(text: wallet.needsRatio.toStringAsFixed(0));
+    final wantsCtrl = TextEditingController(text: wallet.wantsRatio.toStringAsFixed(0));
+    final savingsCtrl = TextEditingController(text: wallet.savingsRatio.toStringAsFixed(0));
+    final incomeCtrl = TextEditingController(text: wallet.initialIncome.toStringAsFixed(2));
 
     showDialog(
       context: context,
@@ -336,12 +269,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               }
               
               setState(() {
-                  profile.needsPercentage = n;
-                  profile.wantsPercentage = w;
-                  profile.savingsPercentage = s;
-                  profile.monthlyIncome = inc;
+                  wallet.needsRatio = n;
+                  wallet.wantsRatio = w;
+                  wallet.savingsRatio = s;
+                  wallet.initialIncome = inc;
               });
-              _saveProfiles();
+              _saveWallets();
               Navigator.pop(context);
             },
             child: const Text('Save'),
@@ -421,7 +354,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min, // Make card height dynamic
+          mainAxisSize: MainAxisSize.min, 
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -451,8 +384,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             ),
             const SizedBox(height: 12),
             Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 4.0), // Padding for progress bar
+              padding: const EdgeInsets.symmetric(horizontal: 4.0), 
               child: LinearProgressIndicator(
                 value: progress,
                 color: overBudget ? Colors.red : color,
@@ -480,12 +412,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final activeProfile = _profiles.firstWhere(
-      (p) => p.id == _activeProfileId,
-      orElse: () => _profiles.first,
+    final activeWallet = _wallets.firstWhere(
+      (p) => p.id == _activeWalletId,
+      orElse: () => _wallets.first,
     );
 
-    final activeExpenses = _expenses.where((e) => e.profileId == activeProfile.id).toList();
+    final activeExpenses = _expenses.where((e) => e.profileId == activeWallet.id).toList();
 
     double nSpent = 0;
     double wSpent = 0;
@@ -500,19 +432,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       }
     }
 
-    final nLimit = activeProfile.monthlyIncome * (activeProfile.needsPercentage / 100);
-    final wLimit = activeProfile.monthlyIncome * (activeProfile.wantsPercentage / 100);
-    final sLimit = activeProfile.monthlyIncome * (activeProfile.savingsPercentage / 100);
+    final nLimit = activeWallet.initialIncome * (activeWallet.needsRatio / 100);
+    final wLimit = activeWallet.initialIncome * (activeWallet.wantsRatio / 100);
+    final sLimit = activeWallet.initialIncome * (activeWallet.savingsRatio / 100);
 
     return Scaffold(
       appBar: AppBar(
         title: GestureDetector(
-          onTap: _showProfilesBottomSheet,
+          onTap: _showWalletsBottomSheet,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                activeProfile.name,
+                activeWallet.name,
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
               ),
               const SizedBox(width: 8),
@@ -537,14 +469,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                     const SizedBox(height: 8),
                     InkWell(
-                      onTap: () => _showProfileSettingsDialog(activeProfile),
+                      onTap: () => _showWalletSettingsDialog(activeWallet),
                       borderRadius: BorderRadius.circular(8),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('\$${activeProfile.monthlyIncome.toStringAsFixed(2)}',
+                            Text('\$${activeWallet.initialIncome.toStringAsFixed(2)}',
                                 style: Theme.of(context).textTheme.titleLarge),
                             const SizedBox(width: 8),
                             Icon(Icons.edit, color: Theme.of(context).colorScheme.primary, size: 18),
@@ -561,7 +493,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 InkWell(
-                  onTap: () => _showProfileSettingsDialog(activeProfile),
+                  onTap: () => _showWalletSettingsDialog(activeWallet),
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
@@ -569,7 +501,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '${activeProfile.needsPercentage.toStringAsFixed(0)}/${activeProfile.wantsPercentage.toStringAsFixed(0)}/${activeProfile.savingsPercentage.toStringAsFixed(0)} Breakdown',
+                          '${activeWallet.needsRatio.toStringAsFixed(0)}/${activeWallet.wantsRatio.toStringAsFixed(0)}/${activeWallet.savingsRatio.toStringAsFixed(0)} Breakdown',
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(width: 8),
@@ -587,15 +519,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             ),
             const SizedBox(height: 16),
             _buildCategoryCard(
-                'Needs (${activeProfile.needsPercentage.toStringAsFixed(0)}%)', nSpent, nLimit, Colors.blue),
+                'Needs (${activeWallet.needsRatio.toStringAsFixed(0)}%)', nSpent, nLimit, Colors.blue),
             const SizedBox(height: 12),
             _buildCategoryCard(
-                'Wants (${activeProfile.wantsPercentage.toStringAsFixed(0)}%)', wSpent, wLimit, Colors.orange),
+                'Wants (${activeWallet.wantsRatio.toStringAsFixed(0)}%)', wSpent, wLimit, Colors.orange),
             const SizedBox(height: 12),
-            _buildCategoryCard('Savings (${activeProfile.savingsPercentage.toStringAsFixed(0)}%)', sSpent,
+            _buildCategoryCard('Savings (${activeWallet.savingsRatio.toStringAsFixed(0)}%)', sSpent,
                 sLimit, Colors.green),
-            const SizedBox(
-                height: 100), // Prevent FAB overlap
+            const SizedBox(height: 100), // Prevent FAB overlap
           ],
         ),
       ),

@@ -5,34 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../main.dart';
-
-class Note {
-  final String id;
-  String title;
-  String content;
-  DateTime date;
-
-  Note({
-    required this.id,
-    required this.title,
-    required this.content,
-    required this.date,
-  });
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'content': content,
-        'date': date.toIso8601String(),
-      };
-
-  factory Note.fromJson(Map<String, dynamic> json) => Note(
-        id: json['id'],
-        title: json['title'],
-        content: json['content'],
-        date: DateTime.parse(json['date']),
-      );
-}
+import '../models/note_model.dart';
+import 'note_detail_screen.dart';
 
 class TaskItem {
   final String id;
@@ -103,6 +77,7 @@ class _TasksScreenState extends State<TasksScreen> {
   List<Note> _notes = [];
   String? _activeCategoryId;
   bool _isLoading = true;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -320,25 +295,16 @@ class _TasksScreenState extends State<TasksScreen> {
     _saveTasks();
   }
   
-  void _addNote(String title, String content) {
-    if (title.trim().isEmpty && content.trim().isEmpty) return;
-    final newNote = Note(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: title.trim(),
-      content: content.trim(),
-      date: DateTime.now(),
-    );
+  void _saveNoteFromDetail(Note note, bool isNew) {
     setState(() {
-      _notes.insert(0, newNote);
-    });
-    _saveNotes();
-  }
-
-  void _updateNote(Note note, String title, String content) {
-    setState(() {
-      note.title = title.trim();
-      note.content = content.trim();
-      note.date = DateTime.now(); // update modified date
+      if (isNew) {
+        _notes.insert(0, note);
+      } else {
+        final index = _notes.indexWhere((n) => n.id == note.id);
+        if (index != -1) {
+          _notes[index] = note;
+        }
+      }
     });
     _saveNotes();
   }
@@ -514,54 +480,6 @@ class _TasksScreenState extends State<TasksScreen> {
           );
         });
       },
-    );
-  }
-  
-  void _showNoteDialog([Note? existingNote]) {
-    final titleController = TextEditingController(text: existingNote?.title ?? '');
-    final contentController = TextEditingController(text: existingNote?.content ?? '');
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(existingNote == null ? 'New Note' : 'Edit Note'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(labelText: 'Title'),
-                textCapitalization: TextCapitalization.sentences,
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: contentController,
-                decoration: const InputDecoration(labelText: 'Content'),
-                maxLines: 5,
-                textCapitalization: TextCapitalization.sentences,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (existingNote == null) {
-                _addNote(titleController.text, contentController.text);
-              } else {
-                _updateNote(existingNote, titleController.text, contentController.text);
-              }
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -775,10 +693,15 @@ class _TasksScreenState extends State<TasksScreen> {
       ],
     );
 
-    final notesView = _notes.isEmpty
+    final filteredNotes = _notes.where((n) => 
+      n.title.toLowerCase().contains(_searchQuery.toLowerCase()) || 
+      n.content.toLowerCase().contains(_searchQuery.toLowerCase())
+    ).toList();
+
+    final notesGrid = filteredNotes.isEmpty
         ? Center(
             child: Text(
-              'No notes yet. Add one!',
+              'No notes found.',
               style: TextStyle(color: Colors.grey.shade500),
             ),
           )
@@ -789,9 +712,9 @@ class _TasksScreenState extends State<TasksScreen> {
             ),
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
-            itemCount: _notes.length,
+            itemCount: filteredNotes.length,
             itemBuilder: (context, index) {
-              final note = _notes[index];
+              final note = filteredNotes[index];
               return Dismissible(
                 key: Key(note.id),
                 direction: DismissDirection.endToStart,
@@ -814,7 +737,15 @@ class _TasksScreenState extends State<TasksScreen> {
                   elevation: 2,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
-                    onTap: () => _showNoteDialog(note),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => NoteDetailScreen(
+                          note: note,
+                          onSave: _saveNoteFromDetail,
+                        ),
+                      ),
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
                       child: Column(
@@ -862,6 +793,32 @@ class _TasksScreenState extends State<TasksScreen> {
             },
           );
 
+    final notesView = Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'Search notes',
+              prefixIcon: const Icon(Icons.search),
+              filled: true,
+              fillColor: Colors.grey[850],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: (val) {
+              setState(() {
+                _searchQuery = val;
+              });
+            },
+          ),
+        ),
+        Expanded(child: notesGrid),
+      ],
+    );
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -893,7 +850,14 @@ class _TasksScreenState extends State<TasksScreen> {
               builder: (context, child) {
                 final isNotesTab = tabController.index == 1;
                 return FloatingActionButton(
-                  onPressed: isNotesTab ? () => _showNoteDialog() : _showAddTaskDialog,
+                  onPressed: isNotesTab ? () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => NoteDetailScreen(
+                          onSave: _saveNoteFromDetail,
+                        ),
+                      ),
+                    ) : _showAddTaskDialog,
                   child: Icon(isNotesTab ? Icons.edit_note : Icons.add),
                 );
               },
