@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -781,8 +782,13 @@ class _TasksScreenState extends State<TasksScreen> {
               style: TextStyle(color: Colors.grey.shade500),
             ),
           )
-        : ListView.builder(
-            padding: const EdgeInsets.only(top: 8, bottom: 80),
+        : MasonryGridView.builder(
+            padding: const EdgeInsets.only(top: 8, bottom: 80, left: 16, right: 16),
+            gridDelegate: const SliverSimpleGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+            ),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
             itemCount: _notes.length,
             itemBuilder: (context, index) {
               final note = _notes[index];
@@ -790,33 +796,35 @@ class _TasksScreenState extends State<TasksScreen> {
                 key: Key(note.id),
                 direction: DismissDirection.endToStart,
                 background: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.red.shade400,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: const Icon(Icons.delete, color: Colors.white),
                 ),
                 onDismissed: (_) => _deleteNote(note),
                 child: Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  margin: EdgeInsets.zero,
+                  color: Colors.grey[850],
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  elevation: 1,
+                  elevation: 2,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
                     onTap: () => _showNoteDialog(note),
                     child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(12.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           if (note.title.isNotEmpty)
                             Text(
                               note.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -827,18 +835,22 @@ class _TasksScreenState extends State<TasksScreen> {
                           if (note.content.isNotEmpty)
                             Text(
                               note.content,
-                              maxLines: 3,
+                              maxLines: 4,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
+                                fontSize: 14,
                                 color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(200),
                               ),
                             ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '${note.date.month}/${note.date.day}/${note.date.year}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.bottomRight,
+                            child: Text(
+                              '${note.date.month}/${note.date.day}/${note.date.year}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey.shade500,
+                              ),
                             ),
                           ),
                         ],

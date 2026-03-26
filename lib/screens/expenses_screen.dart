@@ -236,6 +236,53 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
+  void _showProfilesBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text('Select Wallet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              ..._profiles.map((profile) {
+                final isSelected = profile.id == _activeProfileId;
+                return ListTile(
+                  leading: Icon(Icons.account_balance_wallet, color: isSelected ? Colors.blue : Colors.grey),
+                  title: Text(profile.name, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                  trailing: isSelected ? const Icon(Icons.check, color: Colors.blue) : null,
+                  onTap: () {
+                    setState(() {
+                      _activeProfileId = profile.id;
+                    });
+                    _saveProfiles();
+                    Navigator.pop(context);
+                  },
+                );
+              }).toList(),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.add, color: Colors.blue),
+                title: const Text('Add New Wallet', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showAddProfileDialog();
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showProfileSettingsDialog(ExpenseProfile profile) {
     final needsCtrl = TextEditingController(text: profile.needsPercentage.toStringAsFixed(0));
     final wantsCtrl = TextEditingController(text: profile.wantsPercentage.toStringAsFixed(0));
@@ -459,42 +506,20 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            value: _activeProfileId,
-            icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
-            dropdownColor: const Color(0xFF1E1E1E),
-            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-            onChanged: (String? newValue) {
-              if (newValue == 'new_wallet') {
-                _showAddProfileDialog();
-              } else if (newValue != null) {
-                setState(() {
-                  _activeProfileId = newValue;
-                });
-                _saveProfiles();
-              }
-            },
-            items: [
-              ..._profiles.map<DropdownMenuItem<String>>((ExpenseProfile value) {
-                return DropdownMenuItem<String>(
-                  value: value.id,
-                  child: Text(value.name),
-                );
-              }),
-              const DropdownMenuItem<String>(
-                value: 'new_wallet',
-                child: Text('+ New Wallet', style: TextStyle(color: Colors.blue)),
+        title: GestureDetector(
+          onTap: _showProfilesBottomSheet,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                activeProfile.name,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
               ),
+              const SizedBox(width: 8),
+              const Icon(Icons.keyboard_arrow_down, size: 20),
             ],
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => _showProfileSettingsDialog(activeProfile),
-          )
-        ],
         backgroundColor: const Color(0xFF000000),
         elevation: 0,
       ),
@@ -535,9 +560,23 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '${activeProfile.needsPercentage.toStringAsFixed(0)}/${activeProfile.wantsPercentage.toStringAsFixed(0)}/${activeProfile.savingsPercentage.toStringAsFixed(0)} Rule Breakdown',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                InkWell(
+                  onTap: () => _showProfileSettingsDialog(activeProfile),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${activeProfile.needsPercentage.toStringAsFixed(0)}/${activeProfile.wantsPercentage.toStringAsFixed(0)}/${activeProfile.savingsPercentage.toStringAsFixed(0)} Breakdown',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.edit, size: 16, color: Theme.of(context).colorScheme.primary),
+                      ],
+                    ),
+                  ),
                 ),
                 IconButton(
                   icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.primary),

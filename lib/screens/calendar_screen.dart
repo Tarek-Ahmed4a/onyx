@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -162,8 +163,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
       0xFF1E88E5, // Blue
       0xFFE53935, // Red
       0xFF43A047, // Green
-      0xFFFB8C00, // Orange
-      0xFF8E24AA, // Purple
     ];
 
     showDialog(
@@ -206,24 +205,75 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 const SizedBox(height: 16),
                 const Align(alignment: Alignment.centerLeft, child: Text('Color:')),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 12,
-                  children: presetColors.map((colorValue) {
-                    final isSelected = selectedColor == colorValue;
-                    return GestureDetector(
-                      onTap: () => setState(() => selectedColor = colorValue),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ...presetColors.map((colorValue) {
+                      final isSelected = selectedColor == colorValue;
+                      return GestureDetector(
+                        onTap: () => setState(() => selectedColor = colorValue),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: Color(colorValue),
+                            shape: BoxShape.circle,
+                            border: isSelected ? Border.all(color: Colors.white, width: 2) : null,
+                          ),
+                          child: isSelected ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
+                        ),
+                      );
+                    }).toList(),
+                    GestureDetector(
+                      onTap: () {
+                        Color pickerColor = Color(selectedColor ?? 0xFF1E88E5);
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext ctx) {
+                            return AlertDialog(
+                              title: const Text('Pick a color!'),
+                              content: SingleChildScrollView(
+                                child: ColorPicker(
+                                  pickerColor: pickerColor,
+                                  onColorChanged: (Color color) {
+                                    pickerColor = color;
+                                  },
+                                  pickerAreaHeightPercent: 0.8,
+                                ),
+                              ),
+                              actions: <Widget>[
+                                FilledButton(
+                                  child: const Text('Got it'),
+                                  onPressed: () {
+                                    setState(() => selectedColor = pickerColor.value);
+                                    Navigator.of(ctx).pop();
+                                  },
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
                       child: Container(
                         width: 32,
                         height: 32,
-                        decoration: BoxDecoration(
-                          color: Color(colorValue),
+                        decoration: const BoxDecoration(
                           shape: BoxShape.circle,
-                          border: isSelected ? Border.all(color: Colors.white, width: 2) : null,
+                          gradient: SweepGradient(
+                            colors: [
+                              Colors.red,
+                              Colors.yellow,
+                              Colors.green,
+                              Colors.blue,
+                              Colors.purple,
+                              Colors.red,
+                            ],
+                          ),
                         ),
-                        child: isSelected ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
+                        child: const Icon(Icons.add, size: 16, color: Colors.white),
                       ),
-                    );
-                  }).toList(),
+                    ),
+                  ],
                 ),
               ],
             ),
