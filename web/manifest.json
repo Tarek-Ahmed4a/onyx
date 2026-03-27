@@ -1,6 +1,6 @@
 {
-    "name": "personal_finance_app",
-    "short_name": "personal_finance_app",
+    "name": "Onyx",
+    "short_name": "Onyx",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
