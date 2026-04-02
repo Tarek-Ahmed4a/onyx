@@ -2,8 +2,8 @@ name: Onyx Stock Monitor
 
 on:
   schedule:
-    - cron: '*/15 * * * *' # التشغيل أوتوماتيك كل 15 دقيقة
-  workflow_dispatch: # زرار يدوي عشان تجرب السكريبت في أي وقت
+    - cron: '*/15 * * * *' # تشغيل كل ربع ساعة
+  workflow_dispatch: # تشغيل يدوي
 
 jobs:
   run-monitor:
@@ -20,9 +20,14 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: Create Firebase Key File from Secret
-        run: |
-          echo '${{ secrets.FIREBASE_JSON }}' > firebase-key.json
+      # الطريقة الأضمن لإنشاء ملف مفتاح فايربيز من غير مشاكل الرموز
+      - name: Create Firebase Key File
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_JSON }}
+        run: echo "$FIREBASE_CREDENTIALS" > firebase-key.json
 
+      # تشغيل السكريبت مع تمرير مفتاح Gemini كمتغير بيئة (Environment Variable)
       - name: Run Monitor Script
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python monitor.py
