@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class Asset {
   final String id;
@@ -9,6 +10,9 @@ class Asset {
   double buyPrice;
   double currentPrice;
   double quantity;
+  String? fcmToken;
+  double? takeProfit;
+  double? stopLoss;
 
   Asset({
     required this.id,
@@ -16,6 +20,9 @@ class Asset {
     required this.buyPrice,
     required this.currentPrice,
     required this.quantity,
+    this.fcmToken,
+    this.takeProfit,
+    this.stopLoss,
   });
 
   Map<String, dynamic> toJson() => {
@@ -24,6 +31,9 @@ class Asset {
         'buyPrice': buyPrice,
         'currentPrice': currentPrice,
         'quantity': quantity,
+        'fcmToken': fcmToken,
+        'takeProfit': takeProfit,
+        'stopLoss': stopLoss,
       };
 
   factory Asset.fromJson(Map<String, dynamic> json) => Asset(
@@ -32,6 +42,9 @@ class Asset {
         buyPrice: (json['buyPrice'] as num).toDouble(),
         currentPrice: (json['currentPrice'] as num).toDouble(),
         quantity: (json['quantity'] as num).toDouble(),
+        fcmToken: json['fcmToken'] as String?,
+        takeProfit: (json['takeProfit'] as num?)?.toDouble(),
+        stopLoss: (json['stopLoss'] as num?)?.toDouble(),
       );
 }
 
@@ -183,10 +196,17 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
     );
   }
 
-  void _addAsset(String name, double buyPrice, double currentPrice, double quantity) async {
+  void _addAsset(String name, double buyPrice, double currentPrice, double quantity, double? takeProfit, double? stopLoss) async {
     if (_activePortfolioId == null) return;
     final activePortfolio =
         _portfolios.firstWhere((p) => p.id == _activePortfolioId);
+
+    String? token;
+    try {
+      token = await FirebaseMessaging.instance.getToken();
+    } catch (e) {
+      debugPrint('Error getting token for asset: $e');
+    }
 
     final newAsset = Asset(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -194,6 +214,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
       buyPrice: buyPrice,
       currentPrice: currentPrice,
       quantity: quantity,
+      fcmToken: token,
+      takeProfit: takeProfit,
+      stopLoss: stopLoss,
     );
 
     activePortfolio.assets.add(newAsset);
@@ -251,6 +274,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
     final buyPriceController = TextEditingController();
     final currentPriceController = TextEditingController();
     final quantityController = TextEditingController();
+    final takeProfitController = TextEditingController();
+    final stopLossController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
     showDialog(
@@ -300,6 +325,29 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                     return null;
                   },
                 ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: takeProfitController,
+                  decoration: const InputDecoration(labelText: 'Target Price (Take Profit)'),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  validator: (value) {
+                    if (value != null && value.isNotEmpty && double.tryParse(value) == null) {
+                      return 'Invalid number';
+                    }
+                    return null;
+                  },
+                ),
+                TextFormField(
+                  controller: stopLossController,
+                  decoration: const InputDecoration(labelText: 'Stop Loss Price'),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  validator: (value) {
+                    if (value != null && value.isNotEmpty && double.tryParse(value) == null) {
+                      return 'Invalid number';
+                    }
+                    return null;
+                  },
+                ),
               ],
             ),
           ),
@@ -317,6 +365,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                   double.parse(buyPriceController.text),
                   double.parse(currentPriceController.text),
                   double.parse(quantityController.text),
+                  takeProfitController.text.isNotEmpty ? double.parse(takeProfitController.text) : null,
+                  stopLossController.text.isNotEmpty ? double.parse(stopLossController.text) : null,
                 );
                 Navigator.pop(context);
               }
@@ -596,6 +646,14 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.end,
                                         children: [
+                                          if (asset.takeProfit != null) ...[
+                                            const Icon(Icons.track_changes, size: 12, color: Colors.greenAccent),
+                                            const SizedBox(width: 2),
+                                          ],
+                                          if (asset.stopLoss != null) ...[
+                                            const Icon(Icons.security, size: 12, color: Colors.redAccent),
+                                            const SizedBox(width: 2),
+                                          ],
                                           Text('Cur: \$${asset.currentPrice.toStringAsFixed(2)}',
                                               style: TextStyle(fontSize: 11, color: Theme.of(context).textTheme.bodyMedium?.color)),
                                         ],
