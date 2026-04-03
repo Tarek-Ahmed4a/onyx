@@ -5,6 +5,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'screens/tasks_screen.dart';
 import 'screens/calendar_screen.dart';
@@ -37,7 +38,21 @@ void main() async {
   
   try {
     String? token = await messaging.getToken();
-    debugPrint("FCM_TOKEN: $token");
+    if (token != null) {
+      debugPrint("🚀 FCM TOKEN: $token");
+      
+      if (FirebaseAuth.instance.currentUser != null) {
+        String uid = FirebaseAuth.instance.currentUser!.uid;
+        await FirebaseFirestore.instance.collection('users').doc(uid).set({
+          'fcmToken': token,
+        }, SetOptions(merge: true));
+        debugPrint("🚀 FCM TOKEN synced to Firestore: $token");
+      } else {
+        debugPrint("User not logged in, FCM token not synced to Firestore.");
+      }
+    } else {
+      debugPrint("FCM token is null.");
+    }
   } catch (e) {
     debugPrint("Could not get FCM token: $e");
   }
