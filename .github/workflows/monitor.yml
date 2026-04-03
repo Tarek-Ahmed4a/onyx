@@ -20,7 +20,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip wheel setuptools
-          pip install --upgrade yfinance pandas firebase-admin google-genai
+          pip install --upgrade yfinance pandas firebase-admin google-genai tvdatafeed
 
       - name: Create Firebase Key File
         env:

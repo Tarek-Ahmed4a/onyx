@@ -6,20 +6,26 @@ from google import genai
 from datetime import datetime
 import os
 import time
+from tvDatafeed import TvDatafeed, Interval
+import logging
+
+# كتم رسائل التحذير الخاصة بمكتبة TradingView عشان اللوج يكون نظيف
+logging.getLogger('tvDatafeed').setLevel(logging.ERROR)
 
 # --- الإعدادات ---
-# ربط Gemini بالمكتبة الجديدة
 try:
     ai_client = genai.Client(api_key=os.environ.get('GEMINI_API_KEY'))
 except Exception as e:
     print(f"⚠️ خطأ في تهيئة Gemini: {e}")
     ai_client = None
 
-# ربط Firebase
 cred = credentials.Certificate('firebase-key.json')
 if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
 db = firestore.client()
+
+# تهيئة الاتصال بـ TradingView كضيف (بدون حساب)
+tv_client = TvDatafeed()
 
 EGX_30 = [
     'COMI.CA', 'FWRY.CA', 'TMGH.CA', 'HRHO.CA', 'EKHO.CA', 'ABUK.CA', 'MFPC.CA', 
@@ -28,6 +34,28 @@ EGX_30 = [
     'QNBA.CA', 'CIRA.CA', 'EAST.CA', 'AMER.CA', 'CCAP.CA', 'BTEL.CA', 'EKHOA.CA', 
     'ALCN.CA', 'EMFD.CA'
 ]
+
+def get_price_data(ticker):
+    """دالة لجلب البيانات من مصادر متعددة وتجنب أخطاء النقص"""
+    # 1. المحاولة الأولى: Yahoo Finance
+    try:
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period='1mo')
+        if not hist.empty and len(hist) >= 14:
+            return hist['Close'], "Yahoo"
+    except:
+        pass
+
+    # 2. المحاولة الثانية: TradingView (إذا فشل ياهو)
+    try:
+        tv_ticker = ticker.replace('.CA', '') # TradingView بيستخدم الرمز بدون .CA للسوق المصري
+        hist = tv_client.get_hist(symbol=tv_ticker, exchange='EGX', interval=Interval.in_daily, n_bars=30)
+        if hist is not None and not hist.empty:
+            return hist['close'], "TradingView"
+    except Exception as e:
+        print(f"⚠️ خطأ في جلب {ticker} من TradingView: {e}")
+
+    return None, None
 
 def calculate_rsi(prices, window=14):
     delta = prices.diff()
@@ -45,7 +73,7 @@ def get_ai_insight(ticker, price, rsi, trend):
     prompt = f"أنت محلل مالي خبير في البورصة المصرية. سهم {ticker} سعره الآن {price:.2f} ومؤشر الـ RSI هو {rsi:.0f}. اتجاه السهم حالياً هو {trend}. اعطني نصيحة سريعة جداً (جملة واحدة فقط) بالعامية المصرية بلهجة ذكية ومختصرة، هل نشتري أم ننتظر؟ ولماذا؟ ابدأ النصيحة فوراً بدون مقدمات."
     try:
         response = ai_client.models.generate_content(
-            model='gemini-1.5-pro',
+            model='gemini-2.0-flash', # التحديث لأحدث نسخة مستقرة في الـ API
             contents=prompt
         )
         return response.text.strip()
@@ -88,21 +116,25 @@ def send_push(token, title, body):
 def scan_market():
     token = get_fcm_token()
     if not token:
-        print("⚠️ لم يتم العثور على FCM Token في قاعدة البيانات. السكريبت سيتوقف.")
+        print("⚠️ لم يتم العثور على FCM Token.")
         return
 
-    print("🚀 بدء مسح السوق...")
+    print("🚀 بدء مسح السوق بمصادر بيانات متعددة...")
     
     for ticker in EGX_30:
+        prices, source = get_price_data(ticker)
+
+        if prices is None:
+            print(f"❌ فشل جلب بيانات {ticker} من جميع المصادر المتاحة.")
+            continue
+
         try:
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period='1mo')
-            if hist.empty:
-                continue
-                
-            current_price = hist['Close'].iloc[-1]
-            rsi = calculate_rsi(hist['Close']).iloc[-1]
-            trend = "صاعد" if current_price > hist['Close'].iloc[-5] else "هابط"
+            current_price = prices.iloc[-1]
+            rsi = calculate_rsi(prices).iloc[-1]
+            trend = "صاعد" if current_price > prices.iloc[-5] else "هابط"
+
+            # طباعة السهم ومصدر الداتا بتاعه في اللوج للتأكيد
+            print(f"📊 {ticker} | المصدر: {source} | السعر: {current_price:.2f} | RSI: {rsi:.0f}")
 
             alert_type = None
             if rsi < 35 and not already_sent_today(ticker, 'BUY'):
@@ -119,7 +151,7 @@ def scan_market():
             
             time.sleep(1)
         except Exception as e:
-            print(f"⚠️ خطأ عام في {ticker}: {e}")
+            print(f"⚠️ خطأ أثناء تحليل {ticker}: {e}")
 
 if __name__ == '__main__':
     scan_market()
