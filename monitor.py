@@ -101,27 +101,29 @@ def mark_as_sent(ticker, alert_type):
     })
 
 def get_fcm_token():
-    print("🔍 جاري البحث عن FCM Token في كل مستخدمين النظام...")
+    print("🔍 جاري البحث عن FCM Token في قاعدة البيانات...")
     try:
-        # البحث في كل الوثائق داخل كوليكشن users
         users_ref = db.collection('users').stream()
         for user in users_ref:
             user_data = user.to_dict()
             
-            # 1. فحص إذا كان التوكين في وثيقة المستخدم مباشرة
+            # 1. البحث في وثيقة اليوزر مباشرة
             if 'fcmToken' in user_data and user_data['fcmToken']:
-                print(f"✅ تم العثور على التوكين في وثيقة اليوزر: {user.id}")
                 return user_data['fcmToken']
             
-            # 2. فحص كوليكشن investments الفرعي داخل كل يوزر
+            # 2. البحث داخل كوليكشن investments
             invs_ref = db.collection('users').document(user.id).collection('investments').stream()
             for inv in invs_ref:
                 inv_data = inv.to_dict()
-                if 'fcmToken' in inv_data and inv_data['fcmToken']:
-                    print(f"✅ تم العثور على التوكين داخل استثمارات اليوزر: {user.id}")
-                    return inv_data['fcmToken']
-                    
-        print("⚠️ لم يتم العثور على أي fcmToken في قاعدة البيانات.")
+                
+                # الدخول داخل مصفوفة assets (ده التعديل اللي هيحل المشكلة بناءً على صورتك)
+                if 'assets' in inv_data and isinstance(inv_data['assets'], list):
+                    for asset in inv_data['assets']:
+                        if 'fcmToken' in asset and asset['fcmToken']:
+                            print(f"✅ تم العثور على التوكين داخل مصفوفة assets لليوزر: {user.id}")
+                            return asset['fcmToken']
+                            
+        print("⚠️ لم يتم العثور على أي fcmToken.")
     except Exception as e:
         print(f"❌ خطأ أثناء البحث عن التوكين: {e}")
     return None
