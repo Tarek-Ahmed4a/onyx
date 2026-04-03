@@ -101,22 +101,29 @@ def mark_as_sent(ticker, alert_type):
     })
 
 def get_fcm_token():
-    # محاولة 1: البحث في كوليكشن users مباشرة
-    users = db.collection('users').stream()
-    for user in users:
-        user_data = user.to_dict()
-        # لو التوكين متسجل في الدوكومنت بتاع اليوزر نفسه
-        if 'fcmToken' in user_data:
-            print(f"✅ تم العثور على التوكين في اليوزر: {user.id}")
-            return user_data['fcmToken']
-        
-        # محاولة 2: البحث في sub-collections (investments)
-        invs = db.collection('users').document(user.id).collection('investments').stream()
-        for inv in invs:
-            token = inv.to_dict().get('fcmToken')
-            if token:
-                print(f"✅ تم العثور على التوكين في استثمارات: {user.id}")
-                return token
+    print("🔍 جاري البحث عن FCM Token في كل مستخدمين النظام...")
+    try:
+        # البحث في كل الوثائق داخل كوليكشن users
+        users_ref = db.collection('users').stream()
+        for user in users_ref:
+            user_data = user.to_dict()
+            
+            # 1. فحص إذا كان التوكين في وثيقة المستخدم مباشرة
+            if 'fcmToken' in user_data and user_data['fcmToken']:
+                print(f"✅ تم العثور على التوكين في وثيقة اليوزر: {user.id}")
+                return user_data['fcmToken']
+            
+            # 2. فحص كوليكشن investments الفرعي داخل كل يوزر
+            invs_ref = db.collection('users').document(user.id).collection('investments').stream()
+            for inv in invs_ref:
+                inv_data = inv.to_dict()
+                if 'fcmToken' in inv_data and inv_data['fcmToken']:
+                    print(f"✅ تم العثور على التوكين داخل استثمارات اليوزر: {user.id}")
+                    return inv_data['fcmToken']
+                    
+        print("⚠️ لم يتم العثور على أي fcmToken في قاعدة البيانات.")
+    except Exception as e:
+        print(f"❌ خطأ أثناء البحث عن التوكين: {e}")
     return None
 
 def send_push(token, title, body):
