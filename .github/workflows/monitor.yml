@@ -7,7 +7,7 @@ on:
 
 jobs:
   run-monitor:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04 # تثبيت نسخة مستقرة لضمان وجود الـ Wheels
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -17,11 +17,13 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Dependencies
+      - name: Install Dependencies Directly
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install numpy pandas --only-binary :all:
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip wheel setuptools
+          # تسطيب نسخ محددة ومستقرة إجبارياً
+          pip install numpy==1.26.4 pandas==2.2.1
+          # تسطيب باقي المكتبات الخاصة بالمشروع
+          pip install firebase-admin yfinance google-generativeai
 
       - name: Create Firebase Key File
         env:
