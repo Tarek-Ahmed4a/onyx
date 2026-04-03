@@ -45,7 +45,7 @@ def get_ai_insight(ticker, price, rsi, trend):
     prompt = f"أنت محلل مالي خبير في البورصة المصرية. سهم {ticker} سعره الآن {price:.2f} ومؤشر الـ RSI هو {rsi:.0f}. اتجاه السهم حالياً هو {trend}. اعطني نصيحة سريعة جداً (جملة واحدة فقط) بالعامية المصرية بلهجة ذكية ومختصرة، هل نشتري أم ننتظر؟ ولماذا؟ ابدأ النصيحة فوراً بدون مقدمات."
     try:
         response = ai_client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-1.5-pro',
             contents=prompt
         )
         return response.text.strip()

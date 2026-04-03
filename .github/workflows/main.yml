@@ -3,8 +3,16 @@ name: Build APK
 on:
   push:
     branches: [ "main", "master" ]
+    paths-ignore:
+      - 'monitor.py'
+      - 'requirements.txt'
+      - '.github/workflows/monitor.yml'
   pull_request:
     branches: [ "main", "master" ]
+    paths-ignore:
+      - 'monitor.py'
+      - 'requirements.txt'
+      - '.github/workflows/monitor.yml'
   workflow_dispatch:
 
 jobs:
