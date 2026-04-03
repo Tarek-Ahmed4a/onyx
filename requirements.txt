@@ -1,4 +1,5 @@
 firebase-admin
 yfinance
 pandas
-google-generativeai
+google-genai
+git+https://github.com/rongardF/tvdatafeed.git

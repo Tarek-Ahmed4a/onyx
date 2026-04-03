@@ -6,6 +6,12 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'web/**'
+      - 'lib/**'
+  pull_request:
+    paths:
+      - 'web/**'
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
