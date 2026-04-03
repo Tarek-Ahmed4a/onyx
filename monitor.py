@@ -101,12 +101,22 @@ def mark_as_sent(ticker, alert_type):
     })
 
 def get_fcm_token():
-    docs = list(db.collection_group('investments').stream())
-    for doc in docs:
-        assets = doc.to_dict().get('assets', [])
-        for asset in assets:
-            token = asset.get('fcmToken')
-            if token: return token
+    # محاولة 1: البحث في كوليكشن users مباشرة
+    users = db.collection('users').stream()
+    for user in users:
+        user_data = user.to_dict()
+        # لو التوكين متسجل في الدوكومنت بتاع اليوزر نفسه
+        if 'fcmToken' in user_data:
+            print(f"✅ تم العثور على التوكين في اليوزر: {user.id}")
+            return user_data['fcmToken']
+        
+        # محاولة 2: البحث في sub-collections (investments)
+        invs = db.collection('users').document(user.id).collection('investments').stream()
+        for inv in invs:
+            token = inv.to_dict().get('fcmToken')
+            if token:
+                print(f"✅ تم العثور على التوكين في استثمارات: {user.id}")
+                return token
     return None
 
 def send_push(token, title, body):
