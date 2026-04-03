@@ -1,4 +1,5 @@
 import firebase_admin
+import json
 from firebase_admin import credentials, firestore, messaging
 import yfinance as yf
 import pandas as pd
@@ -100,32 +101,54 @@ def mark_as_sent(ticker, alert_type):
         'ticker': ticker, 'type': alert_type, 'date': today, 'timestamp': firestore.SERVER_TIMESTAMP
     })
 
+
+def deep_search_token(data):
+    """دالة بحث عميق بتلف جوه أي نوع بيانات لحد ما تلاقي التوكين"""
+    if isinstance(data, dict):
+        if 'fcmToken' in data and data['fcmToken']:
+            return str(data['fcmToken']).strip()
+        for v in data.values():
+            res = deep_search_token(v)
+            if res: return res
+            
+    elif isinstance(data, list):
+        for item in data:
+            res = deep_search_token(item)
+            if res: return res
+            
+    elif isinstance(data, str):
+        # لو فلاتر حفظ الداتا كنص، البايثون هيعملها Decode ويدور جواها
+        if 'fcmToken' in data:
+            try:
+                parsed = json.loads(data)
+                res = deep_search_token(parsed)
+                if res: return res
+            except:
+                pass
+    return None
+
 def get_fcm_token():
-    print("🔍 جاري البحث عن FCM Token في قاعدة البيانات...")
+    print("🔍 تفعيل البحث العميق (Deep Search) عن التوكين...")
     try:
         users_ref = db.collection('users').stream()
         for user in users_ref:
-            user_data = user.to_dict()
+            # 1. فحص اليوزر نفسه
+            token = deep_search_token(user.to_dict())
+            if token: 
+                print("✅ تم العثور على التوكين في اليوزر!")
+                return token
             
-            # 1. البحث في وثيقة اليوزر مباشرة
-            if 'fcmToken' in user_data and user_data['fcmToken']:
-                return user_data['fcmToken']
-            
-            # 2. البحث داخل كوليكشن investments
+            # 2. فحص الاستثمارات (حتى لو كانت نصوص)
             invs_ref = db.collection('users').document(user.id).collection('investments').stream()
             for inv in invs_ref:
-                inv_data = inv.to_dict()
-                
-                # الدخول داخل مصفوفة assets (ده التعديل اللي هيحل المشكلة بناءً على صورتك)
-                if 'assets' in inv_data and isinstance(inv_data['assets'], list):
-                    for asset in inv_data['assets']:
-                        if 'fcmToken' in asset and asset['fcmToken']:
-                            print(f"✅ تم العثور على التوكين داخل مصفوفة assets لليوزر: {user.id}")
-                            return asset['fcmToken']
-                            
-        print("⚠️ لم يتم العثور على أي fcmToken.")
+                token = deep_search_token(inv.to_dict())
+                if token:
+                    print(f"✅ تم العثور أخيراً على التوكين من داخل الـ Investments!")
+                    return token
     except Exception as e:
-        print(f"❌ خطأ أثناء البحث عن التوكين: {e}")
+        print(f"❌ خطأ أثناء البحث: {e}")
+        
+    print("⚠️ لم يتم العثور على أي fcmToken.")
     return None
 
 def send_push(token, title, body):
