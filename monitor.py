@@ -1,35 +1,47 @@
-import firebase_admin
+import os
+import sys
 import json
+import time
+import logging
+import firebase_admin
 from firebase_admin import credentials, firestore, messaging
 import yfinance as yf
 import pandas as pd
 from google import genai
 from datetime import datetime
-import os
-import time
 from tvDatafeed import TvDatafeed, Interval
-import logging
 
+# 1. Strict Initialization Sequence
+firebase_creds_str = os.environ.get('FIREBASE_CREDENTIALS')
+if not firebase_creds_str:
+    print("❌ خطأ: متغير البيئة FIREBASE_CREDENTIALS غير موجود.")
+    sys.exit(1)
 
-def check_db_connection():
-    print("📡 جاري فحص الاتصال بقاعدة البيانات...")
-    try:
-        users = list(db.collection('users').stream())
-        print(f"👥 عدد المستخدمين اللي السكريبت شايفهم: {len(users)}")
-        
-        for u in users:
-            print(f" 👤 يوزر ID: {u.id}")
-            invs = list(db.collection('users').document(u.id).collection('investments').stream())
-            print(f"   💰 عدد وثائق الاستثمارات جواه: {len(invs)}")
-            
-            # طباعة كل المفاتيح اللي جوه اليوزر عشان نشوف السكريبت قاري إيه
-            print(f"   🔑 الحقول الموجودة في اليوزر: {list(u.to_dict().keys())}")
-            
-    except Exception as e:
-        print(f"❌ مصيبة في الاتصال بالفايربيز: {e}")
+try:
+    creds_dict = json.loads(firebase_creds_str)
+    print(f"🔑 جاري الاتصال بمشروع Firebase: {creds_dict.get('project_id')}")
+except json.JSONDecodeError as e:
+    print(f"❌ خطأ في تحليل JSON الخاص ببيانات الاعتماد: {e}")
+    sys.exit(1)
 
-# حط السطر ده أول حاجة في الكود التنفيذي تحت خالص قبل ما يعمل أي حاجة
-check_db_connection()
+cred = credentials.Certificate(creds_dict)
+if not firebase_admin._apps:
+    firebase_admin.initialize_app(cred)
+
+db = firestore.client()
+
+# 2. Diagnostic Radar
+try:
+    print("📡 جاري فحص الاتصال بقاعدة البيانات (Diagnostic Radar)...")
+    users_docs = list(db.collection('users').stream())
+    users_count = len(users_docs)
+    print(f"👥 إجمالي عدد المستخدمين في مجموعة 'users': {users_count}")
+    
+    if users_count == 0:
+        print("⚠️ تحذير حرج: قاعدة البيانات فارغة أو أن بيانات الاعتماد تشير إلى المشروع الخاطئ!")
+except Exception as e:
+    print(f"❌ خطأ أثناء الاتصال بقاعدة البيانات: {e}")
+
 # كتم رسائل التحذير الخاصة بمكتبة TradingView عشان اللوج يكون نظيف
 logging.getLogger('tvDatafeed').setLevel(logging.ERROR)
 
@@ -39,11 +51,6 @@ try:
 except Exception as e:
     print(f"⚠️ خطأ في تهيئة Gemini: {e}")
     ai_client = None
-
-cred = credentials.Certificate('firebase-key.json')
-if not firebase_admin._apps:
-    firebase_admin.initialize_app(cred)
-db = firestore.client()
 
 # تهيئة الاتصال بـ TradingView كضيف (بدون حساب)
 tv_client = TvDatafeed()
