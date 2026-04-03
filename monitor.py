@@ -10,6 +10,26 @@ import time
 from tvDatafeed import TvDatafeed, Interval
 import logging
 
+
+def check_db_connection():
+    print("📡 جاري فحص الاتصال بقاعدة البيانات...")
+    try:
+        users = list(db.collection('users').stream())
+        print(f"👥 عدد المستخدمين اللي السكريبت شايفهم: {len(users)}")
+        
+        for u in users:
+            print(f" 👤 يوزر ID: {u.id}")
+            invs = list(db.collection('users').document(u.id).collection('investments').stream())
+            print(f"   💰 عدد وثائق الاستثمارات جواه: {len(invs)}")
+            
+            # طباعة كل المفاتيح اللي جوه اليوزر عشان نشوف السكريبت قاري إيه
+            print(f"   🔑 الحقول الموجودة في اليوزر: {list(u.to_dict().keys())}")
+            
+    except Exception as e:
+        print(f"❌ مصيبة في الاتصال بالفايربيز: {e}")
+
+# حط السطر ده أول حاجة في الكود التنفيذي تحت خالص قبل ما يعمل أي حاجة
+check_db_connection()
 # كتم رسائل التحذير الخاصة بمكتبة TradingView عشان اللوج يكون نظيف
 logging.getLogger('tvDatafeed').setLevel(logging.ERROR)
 
