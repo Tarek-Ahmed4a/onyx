@@ -36,35 +36,42 @@ EGX_30 = [
 ]
 
 def get_price_data(ticker):
-    """دالة لجلب البيانات من مصادر متعددة وتجنب أخطاء النقص"""
-    # 1. المحاولة الأولى: Yahoo Finance
+    # 1. المحاولة الأولى: Yahoo Finance (الأدق للبيانات التاريخية)
     try:
         stock = yf.Ticker(ticker)
-        hist = stock.history(period='1mo')
-        if not hist.empty and len(hist) >= 14:
+        hist = stock.history(period='1mo', interval='1d')
+        if not hist.empty and len(hist) > 10:
             return hist['Close'], "Yahoo"
     except:
         pass
 
-    # 2. المحاولة الثانية: TradingView (إذا فشل ياهو)
+    # 2. المحاولة الثانية: TradingView مع زيادة وقت الانتظار (Timeout)
     try:
-        tv_ticker = ticker.replace('.CA', '') # TradingView بيستخدم الرمز بدون .CA للسوق المصري
-        hist = tv_client.get_hist(symbol=tv_ticker, exchange='EGX', interval=Interval.in_daily, n_bars=30)
-        if hist is not None and not hist.empty:
-            return hist['close'], "TradingView"
-    except Exception as e:
-        print(f"⚠️ خطأ في جلب {ticker} من TradingView: {e}")
+        tv_ticker = ticker.replace('.CA', '')
+        # محاولة الاتصال بـ TradingView بحد أقصى 3 مرات في حالة الـ Timeout
+        for _ in range(3):
+            hist = tv_client.get_hist(symbol=tv_ticker, exchange='EGX', interval=Interval.in_daily, n_bars=30)
+            if hist is not None and not hist.empty:
+                return hist['close'], "TradingView"
+            time.sleep(2)
+    except:
+        pass
 
     return None, None
 
 def calculate_rsi(prices, window=14):
+    # تنظيف البيانات من أي قيم فارغة قبل الحساب
+    prices = prices.dropna()
+    if len(prices) < window: return pd.Series([float('nan')] * len(prices))
+    
     delta = prices.diff()
     up = delta.clip(lower=0)
     down = -1 * delta.clip(upper=0)
     ema_up = up.ewm(com=window-1, adjust=False).mean()
     ema_down = down.ewm(com=window-1, adjust=False).mean()
     rs = ema_up / ema_down
-    return 100 - (100 / (1 + rs))
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
 
 def get_ai_insight(ticker, price, rsi, trend):
     if not ai_client:
