@@ -2,15 +2,18 @@ import firebase_admin
 from firebase_admin import credentials, firestore, messaging
 import yfinance as yf
 import pandas as pd
-import google.generativeai as genai
+from google import genai
 from datetime import datetime
 import os
 import time
 
 # --- الإعدادات ---
-# ربط Gemini (بيسحب المفتاح من Secrets)
-genai.configure(api_key=os.environ.get('GEMINI_API_KEY'))
-ai_model = genai.GenerativeModel('gemini-1.5-flash')
+# ربط Gemini بالمكتبة الجديدة
+try:
+    ai_client = genai.Client(api_key=os.environ.get('GEMINI_API_KEY'))
+except Exception as e:
+    print(f"⚠️ خطأ في تهيئة Gemini: {e}")
+    ai_client = None
 
 # ربط Firebase
 cred = credentials.Certificate('firebase-key.json')
@@ -18,7 +21,6 @@ if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-# قائمة الـ 30 سهم (البورصة المصرية)
 EGX_30 = [
     'COMI.CA', 'FWRY.CA', 'TMGH.CA', 'HRHO.CA', 'EKHO.CA', 'ABUK.CA', 'MFPC.CA', 
     'SWDY.CA', 'ETEL.CA', 'EFIH.CA', 'SKPC.CA', 'AMOC.CA', 'PHDC.CA', 'MASR.CA', 
@@ -26,8 +28,6 @@ EGX_30 = [
     'QNBA.CA', 'CIRA.CA', 'EAST.CA', 'AMER.CA', 'CCAP.CA', 'BTEL.CA', 'EKHOA.CA', 
     'ALCN.CA', 'EMFD.CA'
 ]
-
-# --- الدوال المساعدة ---
 
 def calculate_rsi(prices, window=14):
     delta = prices.diff()
@@ -39,18 +39,19 @@ def calculate_rsi(prices, window=14):
     return 100 - (100 / (1 + rs))
 
 def get_ai_insight(ticker, price, rsi, trend):
-    """بيسأل Gemini عن رأيه في الفرصة"""
-    prompt = f"""
-    أنت محلل مالي خبير في البورصة المصرية. سهم {ticker} سعره الآن {price:.2f} ومؤشر الـ RSI هو {rsi:.0f}. 
-    اتجاه السهم حالياً هو {trend}. 
-    اعطني نصيحة سريعة جداً (جملة واحدة فقط) بالعامية المصرية بلهجة ذكية ومختصرة، هل نشتري أم ننتظر؟ ولماذا؟
-    ابدأ النصيحة فوراً بدون مقدمات.
-    """
+    if not ai_client:
+        return "المؤشرات الفنية قوية، راقب السهم."
+    
+    prompt = f"أنت محلل مالي خبير في البورصة المصرية. سهم {ticker} سعره الآن {price:.2f} ومؤشر الـ RSI هو {rsi:.0f}. اتجاه السهم حالياً هو {trend}. اعطني نصيحة سريعة جداً (جملة واحدة فقط) بالعامية المصرية بلهجة ذكية ومختصرة، هل نشتري أم ننتظر؟ ولماذا؟ ابدأ النصيحة فوراً بدون مقدمات."
     try:
-        response = ai_model.generate_content(prompt)
+        response = ai_client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=prompt
+        )
         return response.text.strip()
-    except:
-        return "المؤشرات الفنية بتقول إن فيه حركة قوية، راقب السهم كويس."
+    except Exception as e:
+        print(f"⚠️ خطأ Gemini مع {ticker}: {e}")
+        return "تحليل فني بناءً على المؤشرات الحالية."
 
 def already_sent_today(ticker, alert_type):
     today = datetime.now().strftime('%Y-%m-%d')
@@ -73,46 +74,52 @@ def get_fcm_token():
             if token: return token
     return None
 
-# --- المحرك الرئيسي ---
+def send_push(token, title, body):
+    try:
+        message = messaging.Message(
+            notification=messaging.Notification(title=title, body=body),
+            token=token,
+        )
+        messaging.send(message)
+        print(f"✅ تم إرسال الإشعار بنجاح: {title}")
+    except Exception as e:
+        print(f"⚠️ خطأ Firebase في إرسال الإشعار: {e}")
 
 def scan_market():
     token = get_fcm_token()
-    if not token: return
+    if not token:
+        print("⚠️ لم يتم العثور على FCM Token في قاعدة البيانات. السكريبت سيتوقف.")
+        return
 
-    print(f"🚀 بدء مسح السوق بذكاء Gemini...")
+    print("🚀 بدء مسح السوق...")
     
     for ticker in EGX_30:
         try:
             stock = yf.Ticker(ticker)
             hist = stock.history(period='1mo')
-            if hist.empty: continue
+            if hist.empty:
+                continue
                 
             current_price = hist['Close'].iloc[-1]
             rsi = calculate_rsi(hist['Close']).iloc[-1]
-            
-            # تحديد الاتجاه ببساطة
             trend = "صاعد" if current_price > hist['Close'].iloc[-5] else "هابط"
 
+            alert_type = None
             if rsi < 35 and not already_sent_today(ticker, 'BUY'):
-                ai_advice = get_ai_insight(ticker, current_price, rsi, trend)
-                send_push(token, f"💡 فرصة شراء: {ticker}", ai_advice)
-                mark_as_sent(ticker, 'BUY')
-                
+                alert_type = 'BUY'
+                title = f"💡 فرصة شراء: {ticker}"
             elif rsi > 65 and not already_sent_today(ticker, 'SELL'):
-                ai_advice = get_ai_insight(ticker, current_price, rsi, trend)
-                send_push(token, f"⚠️ جني أرباح: {ticker}", ai_advice)
-                mark_as_sent(ticker, 'SELL')
-            
-            time.sleep(1) # حماية من الحظر
-        except Exception as e:
-            print(f"⚠️ خطأ في {ticker}: {e}")
+                alert_type = 'SELL'
+                title = f"⚠️ جني أرباح: {ticker}"
 
-def send_push(token, title, body):
-    message = messaging.Message(
-        notification=messaging.Notification(title=title, body=body),
-        token=token,
-    )
-    messaging.send(message)
+            if alert_type:
+                ai_advice = get_ai_insight(ticker, current_price, rsi, trend)
+                send_push(token, title, ai_advice)
+                mark_as_sent(ticker, alert_type)
+            
+            time.sleep(1)
+        except Exception as e:
+            print(f"⚠️ خطأ عام في {ticker}: {e}")
 
 if __name__ == '__main__':
     scan_market()
