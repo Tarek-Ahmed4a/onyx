@@ -20,6 +20,7 @@ android {
     }
 
     kotlinOptions {
+        @Suppress("DEPRECATION")
         jvmTarget = "17"
     }
 
@@ -30,8 +31,12 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 21
         targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        val vCode = flutter.versionCode()
+        versionCode = vCode?.toInt() ?: 1
+
+        val vName = flutter.versionName()
+        versionName = vName ?: "1.0.0"
+}
     }
 
     buildTypes {
