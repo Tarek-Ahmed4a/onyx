@@ -288,7 +288,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  initialValue: selectedCategory,
+                  // ignore: deprecated_member_use
+                  value: selectedCategory,
                   items: ['Need', 'Want', 'Saving'].map((String category) {
                     return DropdownMenuItem(
                         value: category, child: Text(category));

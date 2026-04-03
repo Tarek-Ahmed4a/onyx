@@ -259,7 +259,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 FilledButton(
                                   child: const Text('Got it'),
                                   onPressed: () {
-                                    setState(() => selectedColor = pickerColor.toARGB32());
+                                    // ignore: deprecated_member_use
+                                    setState(() => selectedColor = pickerColor.value);
                                     Navigator.of(ctx).pop();
                                   },
                                 ),
