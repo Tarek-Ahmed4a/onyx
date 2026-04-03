@@ -155,28 +155,32 @@ def deep_search_token(data):
     return None
 
 def get_fcm_token():
-    print("🔍 تفعيل البحث العميق (Deep Search) عن التوكين...")
+    print("🔍 جاري البحث المباشر بـ Collection Group...")
     try:
-        users_ref = db.collection('users').stream()
-        for user in users_ref:
-            # 1. فحص اليوزر نفسه
-            token = deep_search_token(user.to_dict())
-            if token: 
-                print("✅ تم العثور على التوكين في اليوزر!")
-                return token
-            
-            # 2. فحص الاستثمارات (حتى لو كانت نصوص)
-            invs_ref = db.collection('users').document(user.id).collection('investments').stream()
-            for inv in invs_ref:
-                token = deep_search_token(inv.to_dict())
-                if token:
-                    print(f"✅ تم العثور أخيراً على التوكين من داخل الـ Investments!")
-                    return token
-    except Exception as e:
-        print(f"❌ خطأ أثناء البحث: {e}")
+        # السر هنا: استخدام collection_group عشان نتخطى الوثائق الوهمية
+        invs_ref = db.collection_group('investments').stream()
+        count = 0
         
-    print("⚠️ لم يتم العثور على أي fcmToken.")
+        for inv in invs_ref:
+            count += 1
+            # بنبعت الداتا لدالة البحث العميق اللي عملناها
+            token = deep_search_token(inv.to_dict())
+            if token:
+                print("✅ تم العثور على التوكين بنجاح!")
+                return token
+                
+        print(f"⚠️ تم فحص {count} وثيقة استثمار، التوكين مش موجود جواهم.")
+    except Exception as e:
+        print(f"❌ خطأ أثناء البحث عن التوكين: {e}")
     return None
+
+# -- استبدل جزء الرادار اللي تحت خالص بده --
+print("📡 (Diagnostic Radar) جاري فحص الاتصال بقاعدة البيانات...")
+try:
+    all_invs = list(db.collection_group('investments').stream())
+    print(f"📊 إجمالي وثائق الاستثمار المكتشفة: {len(all_invs)}")
+except Exception as e:
+    print(f"❌ خطأ في الاتصال: {e}")
 
 def send_push(token, title, body):
     try:
