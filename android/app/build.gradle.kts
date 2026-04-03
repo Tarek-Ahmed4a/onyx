@@ -20,7 +20,6 @@ android {
     }
 
     kotlinOptions {
-        @Suppress("DEPRECATION")
         jvmTarget = "17"
     }
 
@@ -29,14 +28,14 @@ android {
         applicationId = "com.example.personal_finance_app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 21
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
+
         val vCode = flutter.versionCode()
         versionCode = vCode?.toInt() ?: 1
 
         val vName = flutter.versionName()
         versionName = vName ?: "1.0.0"
-}
     }
 
     buildTypes {
@@ -44,7 +43,10 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
