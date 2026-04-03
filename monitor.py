@@ -58,8 +58,8 @@ tv_client = TvDatafeed()
 EGX_30 = [
     'COMI.CA', 'FWRY.CA', 'TMGH.CA', 'HRHO.CA', 'EKHO.CA', 'ABUK.CA', 'MFPC.CA', 
     'SWDY.CA', 'ETEL.CA', 'EFIH.CA', 'SKPC.CA', 'AMOC.CA', 'PHDC.CA', 'MASR.CA', 
-    'ORWE.CA', 'HELI.CA', 'ESRS.CA', 'JUFO.CA', 'CLHO.CA', 'ISPH.CA', 'ADIB.CA', 
-    'QNBA.CA', 'CIRA.CA', 'EAST.CA', 'AMER.CA', 'CCAP.CA', 'BTEL.CA', 'EKHOA.CA', 
+    'ORWE.CA', 'HELI.CA', 'JUFO.CA', 'CLHO.CA', 'ISPH.CA', 'ADIB.CA', 
+    'CIRA.CA', 'EAST.CA', 'AMER.CA', 'CCAP.CA', 'EKHOA.CA', 
     'ALCN.CA', 'EMFD.CA'
 ]
 
@@ -106,15 +106,23 @@ def get_ai_insight(ticker, price, rsi, trend):
         return "المؤشرات الفنية قوية، راقب السهم."
     
     prompt = f"أنت محلل مالي خبير في البورصة المصرية. سهم {ticker} سعره الآن {price:.2f} ومؤشر الـ RSI هو {rsi:.0f}. اتجاه السهم حالياً هو {trend}. اعطني نصيحة سريعة جداً (جملة واحدة فقط) بالعامية المصرية بلهجة ذكية ومختصرة، هل نشتري أم ننتظر؟ ولماذا؟ ابدأ النصيحة فوراً بدون مقدمات."
-    try:
-        response = ai_client.models.generate_content(
-            model='gemini-2.0-flash', # التحديث لأحدث نسخة مستقرة في الـ API
-            contents=prompt
-        )
-        return response.text.strip()
-    except Exception as e:
-        print(f"⚠️ خطأ Gemini مع {ticker}: {e}")
-        return "تحليل فني بناءً على المؤشرات الحالية."
+    for attempt in range(2):
+        try:
+            response = ai_client.models.generate_content(
+                model='gemini-2.0-flash', # التحديث لأحدث نسخة مستقرة في الـ API
+                contents=prompt
+            )
+            return response.text.strip()
+        except Exception as e:
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                if attempt == 0:
+                    print(f"⏳ وصول للحد الأقصى لطلبات Gemini (429). سننتظر 10 ثوانٍ والمحاولة مرة أخرى...")
+                    time.sleep(10)
+                    continue
+            print(f"⚠️ خطأ Gemini مع {ticker}: {e}")
+            break
+            
+    return "تحليل فني بناءً على المؤشرات الحالية."
 
 def already_sent_today(ticker, alert_type):
     today = datetime.now().strftime('%Y-%m-%d')
@@ -191,7 +199,10 @@ def send_push(token, title, body):
         messaging.send(message)
         print(f"✅ تم إرسال الإشعار بنجاح: {title}")
     except Exception as e:
-        print(f"⚠️ خطأ Firebase في إرسال الإشعار: {e}")
+        if "Requested entity was not found" in str(e):
+            print("⚠️ التوكين الحالي غير صالح أو منتهي الصلاحية. برجاء فتح التطبيق من الموبايل لتحديث التوكين.")
+        else:
+            print(f"⚠️ خطأ Firebase في إرسال الإشعار: {e}")
 
 def scan_market():
     token = get_fcm_token()
@@ -228,10 +239,15 @@ def scan_market():
                 ai_advice = get_ai_insight(ticker, current_price, rsi, trend)
                 send_push(token, title, ai_advice)
                 mark_as_sent(ticker, alert_type)
+                # الانتظار 5 ثواني بعد استدعاء Gemini لتجنب تجاوز الحد المسموح
+                time.sleep(5)
             
             time.sleep(1)
         except Exception as e:
             print(f"⚠️ خطأ أثناء تحليل {ticker}: {e}")
+
+    # إرسال إشعار حالة نهائي بعد الانتهاء من فحص جميع الأسهم
+    send_push(token, "نظام ONYX", "✅ تم فحص السوق بالكامل بنجاح")
 
 if __name__ == '__main__':
     scan_market()
