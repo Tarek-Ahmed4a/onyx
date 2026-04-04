@@ -13,19 +13,8 @@ from datetime import datetime
 from tvDatafeed import TvDatafeed, Interval
 
 # 1. Strict Initialization Sequence
-firebase_creds_str = os.environ.get('FIREBASE_CREDENTIALS')
-if not firebase_creds_str:
-    print("❌ خطأ: متغير البيئة FIREBASE_CREDENTIALS غير موجود.")
-    sys.exit(1)
-
-try:
-    creds_dict = json.loads(firebase_creds_str)
-    print(f"🔑 جاري الاتصال بمشروع Firebase: {creds_dict.get('project_id')}")
-except json.JSONDecodeError as e:
-    print(f"❌ خطأ في تحليل JSON الخاص ببيانات الاعتماد: {e}")
-    sys.exit(1)
-
-cred = credentials.Certificate(creds_dict)
+cert_dict = json.loads(os.environ.get('FIREBASE_CREDENTIALS'))
+cred = credentials.Certificate(cert_dict)
 if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
 
