@@ -8,6 +8,7 @@ from firebase_admin import credentials, firestore, messaging
 import yfinance as yf
 import pandas as pd
 from google import genai
+from google.genai import types
 from datetime import datetime
 from tvDatafeed import TvDatafeed, Interval
 
@@ -105,12 +106,19 @@ def get_ai_insight(ticker, price, rsi, trend):
     if not ai_client:
         return "المؤشرات الفنية قوية، راقب السهم."
     
-    prompt = f"أنت محلل مالي خبير في البورصة المصرية. سهم {ticker} سعره الآن {price:.2f} ومؤشر الـ RSI هو {rsi:.0f}. اتجاه السهم حالياً هو {trend}. اعطني نصيحة سريعة جداً (جملة واحدة فقط) بالعامية المصرية بلهجة ذكية ومختصرة، هل نشتري أم ننتظر؟ ولماذا؟ ابدأ النصيحة فوراً بدون مقدمات."
+    prompt = f"سهم {ticker} سعره الآن {price:.2f} ومؤشر الـ RSI هو {rsi:.0f}. اتجاه السهم حالياً هو {trend}. اعطني نصيحة سريعة جداً (جملة واحدة فقط) بالعامية المصرية بلهجة ذكية ومختصرة، هل نشتري أم ننتظر؟ ولماذا؟ ابدأ النصيحة فوراً بدون مقدمات."
+    system_instruction = "You are a senior technical analyst for the Egyptian Exchange (EGX). Analyze the provided Price and RSI. Provide a concise, professional 'Buy/Sell/Hold' recommendation based on oversold/overbought conditions (RSI < 30 is oversold, > 70 is overbought)."
+    
     for attempt in range(2):
         try:
             response = ai_client.models.generate_content(
-                model='gemini-2.0-flash', # التحديث لأحدث نسخة مستقرة في الـ API
-                contents=prompt
+                model='gemini-3.1-pro',
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    temperature=0.4,
+                    top_p=0.9
+                )
             )
             return response.text.strip()
         except Exception as e:
@@ -123,19 +131,6 @@ def get_ai_insight(ticker, price, rsi, trend):
             break
             
     return "تحليل فني بناءً على المؤشرات الحالية."
-
-def already_sent_today(ticker, alert_type):
-    today = datetime.now().strftime('%Y-%m-%d')
-    doc_id = f"{ticker}_{alert_type}_{today}"
-    return db.collection('alerts_history').document(doc_id).get().exists
-
-def mark_as_sent(ticker, alert_type):
-    today = datetime.now().strftime('%Y-%m-%d')
-    doc_id = f"{ticker}_{alert_type}_{today}"
-    db.collection('alerts_history').document(doc_id).set({
-        'ticker': ticker, 'type': alert_type, 'date': today, 'timestamp': firestore.SERVER_TIMESTAMP
-    })
-
 
 def deep_search_token(data):
     """دالة بحث عميق بتلف جوه أي نوع بيانات لحد ما تلاقي التوكين"""
@@ -211,7 +206,8 @@ def scan_market():
         return
 
     print("🚀 بدء مسح السوق بمصادر بيانات متعددة...")
-    
+    market_summary = {}
+
     for ticker in EGX_30:
         prices, source = get_price_data(ticker)
 
@@ -227,24 +223,73 @@ def scan_market():
             # طباعة السهم ومصدر الداتا بتاعه في اللوج للتأكيد
             print(f"📊 {ticker} | المصدر: {source} | السعر: {current_price:.2f} | RSI: {rsi:.0f}")
 
+            market_summary[ticker] = {
+                "price": round(float(current_price), 2),
+                "rsi": round(float(rsi), 0)
+            }
+
             alert_type = None
-            if rsi < 35 and not already_sent_today(ticker, 'BUY'):
+            if rsi < 30:
                 alert_type = 'BUY'
                 title = f"💡 فرصة شراء: {ticker}"
-            elif rsi > 65 and not already_sent_today(ticker, 'SELL'):
+            elif rsi > 70:
                 alert_type = 'SELL'
                 title = f"⚠️ جني أرباح: {ticker}"
 
             if alert_type:
+                # Smart Deduplication Check
+                history_docs = db.collection('alerts_history').where('ticker', '==', ticker).stream()
+                
+                last_record = None
+                latest_time = None
+                for doc in history_docs:
+                    data = doc.to_dict()
+                    ts = data.get('timestamp')
+                    if ts is not None:
+                        if latest_time is None:
+                            latest_time = ts
+                            last_record = data
+                        else:
+                            try:
+                                if ts > latest_time:
+                                    latest_time = ts
+                                    last_record = data
+                            except TypeError:
+                                pass
+
+                # Compare with last record
+                if last_record and 'price' in last_record and 'rsi' in last_record:
+                    if round(last_record['price'], 2) == round(current_price, 2) and round(last_record['rsi'], 0) == round(rsi, 0):
+                        print(f"ℹ️ لم يتغير السعر أو RSI لـ {ticker}، لن يتم إرسال إشعار مكرر.")
+                        continue
+                        
                 ai_advice = get_ai_insight(ticker, current_price, rsi, trend)
                 send_push(token, title, ai_advice)
-                mark_as_sent(ticker, alert_type)
-                # الانتظار 5 ثواني بعد استدعاء Gemini لتجنب تجاوز الحد المسموح
-                time.sleep(5)
+                
+                # IMMEDIATELY AFTER: Save the new state
+                db.collection('alerts_history').add({
+                    'ticker': ticker,
+                    'type': alert_type,
+                    'price': round(current_price, 2),
+                    'rsi': round(rsi, 0),
+                    'timestamp': firestore.SERVER_TIMESTAMP
+                })
+                
+                # Strict rate limiting for Gemini-3.1-pro
+                time.sleep(10)
             
             time.sleep(1)
         except Exception as e:
             print(f"⚠️ خطأ أثناء تحليل {ticker}: {e}")
+
+    try:
+        db.collection('market_status').document('latest').set({
+            "stocks": market_summary,
+            "last_updated": firestore.SERVER_TIMESTAMP
+        })
+        print("✅ تم رفع حالة السوق (Market Status) بنجاح.")
+    except Exception as e:
+        print(f"⚠️ فشل تحديث حالة السوق: {e}")
 
     # إرسال إشعار حالة نهائي بعد الانتهاء من فحص جميع الأسهم
     send_push(token, "نظام ONYX", "✅ تم فحص السوق بالكامل بنجاح")

@@ -402,79 +402,70 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
       totalRoiPercentage = ((currentValue - totalSpent) / totalSpent) * 100;
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Investments',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF000000),
-        elevation: 0,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: SizedBox(
-            height: 60,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: _portfolios.length + 1,
-              itemBuilder: (context, index) {
-                if (index == _portfolios.length) {
-                  return Padding(
-                    padding: const EdgeInsets.only(left: 8.0),
-                    child: ActionChip(
-                      label: const Text('+ New', style: TextStyle(color: Colors.white)),
-                      backgroundColor: Colors.transparent,
-                      side: BorderSide(
-                          color: Theme.of(context).colorScheme.primary),
-                      onPressed: _showAddPortfolioDialog,
-                    ),
-                  );
-                }
+    final portfolioSelector = SizedBox(
+      height: 60,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: _portfolios.length + 1,
+        itemBuilder: (context, index) {
+          if (index == _portfolios.length) {
+            return Padding(
+              padding: const EdgeInsets.only(left: 8.0),
+              child: ActionChip(
+                label: const Text('+ New', style: TextStyle(color: Colors.white)),
+                backgroundColor: Colors.transparent,
+                side: BorderSide(
+                    color: Theme.of(context).colorScheme.primary),
+                onPressed: _showAddPortfolioDialog,
+              ),
+            );
+          }
 
-                final portfolio = _portfolios[index];
-                final isActive = portfolio.id == _activePortfolioId;
+          final portfolio = _portfolios[index];
+          final isActive = portfolio.id == _activePortfolioId;
 
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: GestureDetector(
-                    onLongPress: () => _deletePortfolio(portfolio),
-                    child: ChoiceChip(
-                      label: Text(portfolio.name),
-                      selected: isActive,
-                      selectedColor: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withAlpha(51),
-                      backgroundColor: Theme.of(context).cardColor,
-                      labelStyle: TextStyle(
-                        color: isActive
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).textTheme.bodyMedium?.color,
-                        fontWeight:
-                            isActive ? FontWeight.bold : FontWeight.normal,
-                      ),
-                      side: BorderSide(
-                        color: isActive
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.transparent,
-                      ),
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() {
-                            _activePortfolioId = portfolio.id;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                );
-              },
+          return Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: GestureDetector(
+              onLongPress: () => _deletePortfolio(portfolio),
+              child: ChoiceChip(
+                label: Text(portfolio.name),
+                selected: isActive,
+                selectedColor: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withAlpha(51),
+                backgroundColor: Theme.of(context).cardColor,
+                labelStyle: TextStyle(
+                  color: isActive
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).textTheme.bodyMedium?.color,
+                  fontWeight:
+                      isActive ? FontWeight.bold : FontWeight.normal,
+                ),
+                side: BorderSide(
+                  color: isActive
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.transparent,
+                ),
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _activePortfolioId = portfolio.id;
+                    });
+                  }
+                },
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
+    );
+
+    final myPortfolioView = Column(
+      children: [
+        portfolioSelector,
           // Dashboard Summary Card
           Card(
             margin: const EdgeInsets.all(16),
@@ -689,12 +680,117 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                   ),
           ),
         ],
-      ),
-    ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddAssetDialog,
-        child: const Icon(Icons.add),
+      );
+
+    final marketStatusView = StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('market_status').doc('latest').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return Center(child: Text('No market data available', style: TextStyle(color: Colors.grey.shade500)));
+        }
+        final rawData = snapshot.data!.data() as Map<String, dynamic>?;
+        if (rawData == null || !rawData.containsKey('stocks')) {
+          return Center(child: Text('No market data available', style: TextStyle(color: Colors.grey.shade500)));
+        }
+        final Map<String, dynamic> stocksData = rawData['stocks'] as Map<String, dynamic>;
+        
+        if (stocksData.isEmpty) {
+          return Center(child: Text('No market data available', style: TextStyle(color: Colors.grey.shade500)));
+        }
+
+        final stockEntries = stocksData.entries.toList();
+        stockEntries.sort((a, b) => a.key.compareTo(b.key));
+
+        return ListView.builder(
+          padding: const EdgeInsets.only(top: 8, bottom: 80),
+          itemCount: stockEntries.length,
+          itemBuilder: (context, index) {
+            final ticker = stockEntries[index].key;
+            final data = stockEntries[index].value as Map<String, dynamic>;
+            final price = (data['price'] as num).toDouble();
+            final rsi = (data['rsi'] as num).toDouble();
+
+            Color rsiColor;
+            Color rsiBgColor;
+            if (rsi < 30) {
+              rsiColor = Colors.greenAccent;
+              rsiBgColor = Colors.greenAccent.withAlpha(26);
+            } else if (rsi > 70) {
+              rsiColor = Colors.redAccent;
+              rsiBgColor = Colors.redAccent.withAlpha(26);
+            } else {
+              rsiColor = Colors.grey.shade400;
+              rsiBgColor = Colors.grey.shade800;
+            }
+
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              color: Theme.of(context).cardColor,
+              elevation: 1,
+              child: ListTile(
+                title: Text(ticker, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                subtitle: Text('Price: \$${price.toStringAsFixed(2)}', style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color)),
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: rsiBgColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'RSI: ${rsi.toStringAsFixed(0)}',
+                    style: TextStyle(color: rsiColor, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Investments', style: TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          bottom: const TabBar(
+            indicatorColor: Color(0xFFFFFFFF),
+            labelColor: Color(0xFFFFFFFF),
+            unselectedLabelColor: Color(0xFF888888),
+            tabs: [
+              Tab(text: 'My Portfolio'),
+              Tab(text: 'Market Status'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            myPortfolioView,
+            marketStatusView,
+          ],
+        ),
+        floatingActionButton: Builder(
+          builder: (context) {
+            final tabController = DefaultTabController.of(context);
+            return AnimatedBuilder(
+              animation: tabController,
+              builder: (context, child) {
+                final isPortfolioTab = tabController.index == 0;
+                if (!isPortfolioTab) return const SizedBox.shrink();
+                return FloatingActionButton(
+                  onPressed: _showAddAssetDialog,
+                  child: const Icon(Icons.add),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
