@@ -112,7 +112,7 @@ def get_ai_insight(ticker, price, rsi, trend):
     for attempt in range(2):
         try:
             response = ai_client.models.generate_content(
-                model='gemini-3.1-pro',
+                model='gemini-3.1-pro-preview',
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,

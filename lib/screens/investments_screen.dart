@@ -685,10 +685,25 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
     final marketStatusView = StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance.collection('market_status').doc('latest').snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          print('Error: ${snapshot.error}');
+          return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
+        }
+
+        print('Connection State: ${snapshot.connectionState}');
+
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (!snapshot.hasData || !snapshot.data!.exists) {
+
+        if (!snapshot.hasData) {
+          print('Snapshot has no data.');
+          return Center(child: Text('No market data available', style: TextStyle(color: Colors.grey.shade500)));
+        }
+
+        print('Snapshot has data. Document exists: ${snapshot.data!.exists}');
+
+        if (!snapshot.data!.exists) {
           return Center(child: Text('No market data available', style: TextStyle(color: Colors.grey.shade500)));
         }
         final rawData = snapshot.data!.data() as Map<String, dynamic>?;
