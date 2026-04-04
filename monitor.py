@@ -147,21 +147,17 @@ def deep_search_token(data):
     return None
 
 def get_fcm_token():
-    print("🔍 جاري البحث المباشر بـ Collection Group...")
+    print("🔍 جاري جلب التوكين من مجموعة المستخدمين (users)...")
     try:
-        # السر هنا: استخدام collection_group عشان نتخطى الوثائق الوهمية
-        invs_ref = db.collection_group('investments').stream()
-        count = 0
+        users_ref = db.collection('users').stream()
         
-        for inv in invs_ref:
-            count += 1
-            # بنبعت الداتا لدالة البحث العميق اللي عملناها
-            token = deep_search_token(inv.to_dict())
-            if token:
-                print("✅ تم العثور على التوكين بنجاح!")
-                return token
+        for user_doc in users_ref:
+            data = user_doc.to_dict()
+            if data and 'fcmToken' in data and data['fcmToken']:
+                print("✅ تم العثور على التوكين في حساب المستخدم بنجاح!")
+                return str(data['fcmToken']).strip()
                 
-        print(f"⚠️ تم فحص {count} وثيقة استثمار، التوكين مش موجود جواهم.")
+        print("⚠️ لم يتم العثور على أي توكين فعال في مجموعة users.")
     except Exception as e:
         print(f"❌ خطأ أثناء البحث عن التوكين: {e}")
     return None
