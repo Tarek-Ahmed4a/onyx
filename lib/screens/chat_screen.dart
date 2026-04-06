@@ -232,10 +232,12 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _sendToGeminiRest(String userText, MarketDataService service) async {
+  Future<void> _sendToGeminiRest(
+      String userText, MarketDataService service) async {
     final apiKey = _apiKeys[_currentKeyIndex];
     final modelName = _models[_currentModelIndex];
-    final url = 'https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey';
+    final url =
+        'https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey';
 
     // 1. Prepare dynamic context
     final marketScan = _buildOptimizedMarketScan(service);
@@ -247,7 +249,8 @@ class _ChatScreenState extends State<ChatScreen> {
     if (ticker != null) {
       final stockData = service.getStockData(ticker);
       if (stockData != null) {
-        tickerContext = "\n[LIVE_DATA_SNIPPET: $ticker is trading at ${stockData['price']}, RSI is ${stockData['rsi']}, MACD is ${stockData['macd']}]\n";
+        tickerContext =
+            "\n[LIVE_DATA_SNIPPET: $ticker is trading at ${stockData['price']}, RSI is ${stockData['rsi']}, MACD is ${stockData['macd']}]\n";
       }
     }
 
@@ -267,13 +270,17 @@ $marketScan
     for (var msg in _messages) {
       contents.add({
         'role': msg.isUser ? 'user' : 'model',
-        'parts': [{'text': msg.text}]
+        'parts': [
+          {'text': msg.text}
+        ]
       });
     }
 
     final body = {
       'systemInstruction': {
-        'parts': [{'text': fullSystemInstruction}]
+        'parts': [
+          {'text': fullSystemInstruction}
+        ]
       },
       'contents': contents,
       'tools': [
@@ -297,7 +304,7 @@ $marketScan
       if (candidates != null && candidates.isNotEmpty) {
         final candidate = candidates[0];
         final aiText = candidate['content']['parts'][0]['text'] as String?;
-        
+
         List<Map<String, String>>? aiSources;
         final groundingMetadata = candidate['groundingMetadata'];
         if (groundingMetadata != null) {
@@ -357,25 +364,35 @@ $marketScan
 
       if (_isQuotaError(errorString)) {
         if (_attemptFallback()) {
-          setState(() { _statusMessage = '🚀 Optimizing connection (switching keys)...'; });
+          setState(() {
+            _statusMessage = '🚀 Optimizing connection (switching keys)...';
+          });
           _sendMessageInner(text, service);
           return;
         } else {
           setState(() {
-            _messages.add(Message(text: '⚠️ Servers busy. My brain is overloaded (Quota reached). Please try again in 5 mins.', isUser: false));
+            _messages.add(Message(
+                text:
+                    '⚠️ Servers busy. My brain is overloaded (Quota reached). Please try again in 5 mins.',
+                isUser: false));
             _isLoading = false;
             _statusMessage = null;
           });
         }
       } else if (_isServerError(errorString)) {
         setState(() {
-          _messages.add(Message(text: 'السيرفر عليه ضغط حالياً من جوجل، جرب تسأل تاني كمان دقيقة.', isUser: false));
+          _messages.add(Message(
+              text:
+                  'السيرفر عليه ضغط حالياً من جوجل، جرب تسأل تاني كمان دقيقة.',
+              isUser: false));
           _isLoading = false;
           _statusMessage = null;
         });
       } else {
         setState(() {
-          _messages.add(Message(text: 'عذراً يا هندسة، حصلت مشكلة تقنية. جرب تاني كمان شوية.', isUser: false));
+          _messages.add(Message(
+              text: 'عذراً يا هندسة، حصلت مشكلة تقنية. جرب تاني كمان شوية.',
+              isUser: false));
           _isLoading = false;
           _statusMessage = null;
         });
@@ -393,7 +410,8 @@ $marketScan
         _sendMessageInner(text, service);
       } else {
         setState(() {
-          _messages.add(Message(text: '⚠️ Still having trouble reaching Gemini.', isUser: false));
+          _messages.add(Message(
+              text: '⚠️ Still having trouble reaching Gemini.', isUser: false));
           _isLoading = false;
           _statusMessage = null;
         });
