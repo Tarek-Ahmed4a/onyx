@@ -348,6 +348,220 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
     }
   }
 
+  void _updateAsset(Asset oldAsset, String name, double buyPrice, double currentPrice,
+      double quantity, double? takeProfit, double? stopLoss) async {
+    if (_activePortfolioId == null) return;
+    final activePortfolio =
+        _portfolios.firstWhere((p) => p.id == _activePortfolioId);
+
+    final index = activePortfolio.assets.indexWhere((a) => a.id == oldAsset.id);
+    if (index == -1) return;
+
+    activePortfolio.assets[index] = Asset(
+      id: oldAsset.id,
+      name: name.trim(),
+      buyPrice: buyPrice,
+      currentPrice: currentPrice,
+      quantity: quantity,
+      fcmToken: oldAsset.fcmToken,
+      takeProfit: takeProfit,
+      stopLoss: stopLoss,
+    );
+
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('investments')
+            .doc(activePortfolio.id)
+            .set(activePortfolio.toJson());
+
+        // Update local asset cache for alerts
+        if (mounted) {
+          context.read<MarketDataService>().fetchUserAssets();
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Asset "${name.trim()}" updated')),
+          );
+        }
+      } catch (e) {
+        debugPrint('Error updating asset: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to update asset: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  void _showEditAssetDialog(Asset asset) {
+    final nameController = TextEditingController(text: asset.name);
+    final buyPriceController =
+        TextEditingController(text: asset.buyPrice.toString());
+    final currentPriceController =
+        TextEditingController(text: asset.currentPrice.toString());
+    final quantityController =
+        TextEditingController(text: asset.quantity.toString());
+    final takeProfitController =
+        TextEditingController(text: asset.takeProfit?.toString() ?? '');
+    final stopLossController =
+        TextEditingController(text: asset.stopLoss?.toString() ?? '');
+    final formKey = GlobalKey<FormState>();
+
+    final marketData = context.read<MarketDataService>().stocksData;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Asset'),
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Autocomplete<String>(
+                  initialValue: TextEditingValue(text: asset.name),
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text == '') {
+                      return const Iterable<String>.empty();
+                    }
+                    return marketData.keys.where((String option) {
+                      return option
+                          .contains(textEditingValue.text.toUpperCase());
+                    });
+                  },
+                  onSelected: (String selection) {
+                    nameController.text = selection;
+                    final price = marketData[selection]?['price'];
+                    if (price != null) {
+                      currentPriceController.text = price.toString();
+                    }
+                  },
+                  fieldViewBuilder:
+                      (context, controller, focusNode, onFieldSubmitted) {
+                    controller.addListener(() {
+                      nameController.text = controller.text;
+                    });
+                    return TextFormField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      onFieldSubmitted: (value) => onFieldSubmitted(),
+                      decoration: const InputDecoration(
+                        labelText: 'Asset Name (e.g., COMI.CA)',
+                      ),
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                              ? 'Required'
+                              : null,
+                      textCapitalization: TextCapitalization.characters,
+                    );
+                  },
+                ),
+                TextFormField(
+                  controller: buyPriceController,
+                  decoration: const InputDecoration(labelText: 'Buy Price'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Required';
+                    if (double.tryParse(value) == null) return 'Invalid number';
+                    return null;
+                  },
+                ),
+                TextFormField(
+                  controller: currentPriceController,
+                  decoration: const InputDecoration(labelText: 'Current Price'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Required';
+                    if (double.tryParse(value) == null) return 'Invalid number';
+                    return null;
+                  },
+                ),
+                TextFormField(
+                  controller: quantityController,
+                  decoration: const InputDecoration(labelText: 'Quantity'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Required';
+                    if (double.tryParse(value) == null) return 'Invalid number';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: takeProfitController,
+                  decoration: const InputDecoration(
+                      labelText: 'Target Price (Take Profit)'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  validator: (value) {
+                    if (value != null &&
+                        value.isNotEmpty &&
+                        double.tryParse(value) == null) {
+                      return 'Invalid number';
+                    }
+                    return null;
+                  },
+                ),
+                TextFormField(
+                  controller: stopLossController,
+                  decoration:
+                      const InputDecoration(labelText: 'Stop Loss Price'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  validator: (value) {
+                    if (value != null &&
+                        value.isNotEmpty &&
+                        double.tryParse(value) == null) {
+                      return 'Invalid number';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                _updateAsset(
+                  asset,
+                  nameController.text,
+                  double.parse(buyPriceController.text),
+                  double.parse(currentPriceController.text),
+                  double.parse(quantityController.text),
+                  takeProfitController.text.isNotEmpty
+                      ? double.parse(takeProfitController.text)
+                      : null,
+                  stopLossController.text.isNotEmpty
+                      ? double.parse(stopLossController.text)
+                      : null,
+                );
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _deleteAsset(Asset asset) async {
     if (_activePortfolioId == null) return;
     final activePortfolio =
@@ -916,24 +1130,24 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
                                                     .textTheme
                                                     .bodyMedium
                                                     ?.color)),
+                                        if (asset.takeProfit != null) ...[
+                                          const SizedBox(width: 8),
+                                          const Text('🎯',
+                                              style: TextStyle(fontSize: 11)),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                              '\$${asset.takeProfit!.toStringAsFixed(2)}',
+                                              style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.greenAccent,
+                                                  fontWeight: FontWeight.bold)),
+                                        ],
                                       ],
                                     ),
                                     const SizedBox(height: 4),
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.end,
                                       children: [
-                                        if (asset.takeProfit != null) ...[
-                                          const Icon(Icons.track_changes,
-                                              size: 12,
-                                              color: Colors.greenAccent),
-                                          const SizedBox(width: 2),
-                                        ],
-                                        if (asset.stopLoss != null) ...[
-                                          const Icon(Icons.security,
-                                              size: 12,
-                                              color: Colors.redAccent),
-                                          const SizedBox(width: 2),
-                                        ],
                                         Text(
                                             'Cur: \$${livePrice.toStringAsFixed(2)}',
                                             style: TextStyle(
@@ -942,10 +1156,30 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
                                                     .textTheme
                                                     .bodyMedium
                                                     ?.color)),
+                                        if (asset.stopLoss != null) ...[
+                                          const SizedBox(width: 8),
+                                          const Text('🛑',
+                                              style: TextStyle(fontSize: 11)),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                              '\$${asset.stopLoss!.toStringAsFixed(2)}',
+                                              style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.redAccent,
+                                                  fontWeight: FontWeight.bold)),
+                                        ],
                                       ],
                                     ),
                                   ],
                                 ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.edit_outlined,
+                                    size: 18, color: Colors.grey),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () => _showEditAssetDialog(asset),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
