@@ -138,7 +138,7 @@ Future<void> _showNotification(FlutterLocalNotificationsPlugin plugin,
 
 class BackgroundService {
   static Future<void> init() async {
-    await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
+    await Workmanager().initialize(callbackDispatcher);
   }
 
   static Future<void> registerPeriodicTask() async {
@@ -147,7 +147,7 @@ class BackgroundService {
       kTaskScanner,
       frequency: const Duration(minutes: 15),
       constraints: Constraints(networkType: NetworkType.connected),
-      existingWorkPolicy: ExistingWorkPolicy.replace,
+      existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
     );
   }
 
