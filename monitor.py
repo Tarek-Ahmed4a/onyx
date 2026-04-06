@@ -46,11 +46,12 @@ except Exception as e:
 tv_client = TvDatafeed()
 
 EGX_30 = [
-    'COMI.CA', 'FWRY.CA', 'TMGH.CA', 'HRHO.CA', 'EKHO.CA', 'ABUK.CA', 'MFPC.CA', 
-    'SWDY.CA', 'ETEL.CA', 'EFIH.CA', 'SKPC.CA', 'AMOC.CA', 'PHDC.CA', 'MASR.CA', 
-    'ORWE.CA', 'HELI.CA', 'JUFO.CA', 'CLHO.CA', 'ISPH.CA', 'ADIB.CA', 
-    'CIRA.CA', 'EAST.CA', 'AMER.CA', 'CCAP.CA', 'EKHOA.CA', 
-    'ALCN.CA', 'EMFD.CA'
+    'ABUK.CA', 'ADIB.CA', 'AMOC.CA', 'ARCC.CA', 'BTFH.CA', 
+    'CCAP.CA', 'COMI.CA', 'EAST.CA', 'EFID.CA', 'EFIH.CA', 
+    'EGAL.CA', 'EGCH.CA', 'EMFD.CA', 'ETEL.CA', 'FWRY.CA', 
+    'GBCO.CA', 'HELI.CA', 'HRHO.CA', 'ISPH.CA', 'JUFO.CA', 
+    'MCQE.CA', 'ORAS.CA', 'ORHD.CA', 'OIH.CA', 'ORWE.CA', 
+    'PHDC.CA', 'RAYA.CA', 'RMDA.CA', 'TMGH.CA', 'VLMR.CA'
 ]
 
 def get_price_data(ticker):
@@ -90,6 +91,24 @@ def calculate_rsi(prices, window=14):
     rs = ema_up / ema_down
     rsi = 100 - (100 / (1 + rs))
     return rsi
+
+def calculate_macd(prices, fast=12, slow=26, signal=9):
+    # تنظيف البيانات
+    prices = prices.dropna()
+    if len(prices) < slow: return None
+    
+    ema_fast = prices.ewm(span=fast, adjust=False).mean()
+    ema_slow = prices.ewm(span=slow, adjust=False).mean()
+    macd_line = ema_fast - ema_slow
+    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+    
+    macd_val = macd_line.iloc[-1]
+    signal_val = signal_line.iloc[-1]
+    
+    if macd_val > signal_val:
+        return "Bullish"
+    else:
+        return "Bearish"
 
 def get_ai_insight(ticker, price, rsi, trend):
     if not ai_client:
@@ -203,14 +222,16 @@ def scan_market():
         try:
             current_price = prices.iloc[-1]
             rsi = calculate_rsi(prices).iloc[-1]
+            macd = calculate_macd(prices)
             trend = "صاعد" if current_price > prices.iloc[-5] else "هابط"
 
             # طباعة السهم ومصدر الداتا بتاعه في اللوج للتأكيد
-            print(f"📊 {ticker} | المصدر: {source} | السعر: {current_price:.2f} | RSI: {rsi:.0f}")
+            print(f"📊 {ticker} | المصدر: {source} | السعر: {current_price:.2f} | RSI: {rsi:.0f} | MACD: {macd}")
 
             market_summary[ticker] = {
                 "price": round(float(current_price), 2),
-                "rsi": round(float(rsi), 0)
+                "rsi": round(float(rsi), 0),
+                "macd": macd
             }
 
             alert_type = None

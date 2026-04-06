@@ -1,9 +1,9 @@
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'profile_screen.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../main.dart';
@@ -159,7 +159,9 @@ class _TasksScreenState extends State<TasksScreen> {
         .collection('task_categories')
         .snapshots()
         .listen((snapshot) async {
-      final loadedCats = snapshot.docs.map((doc) => TaskCategory.fromJson(doc.data())).toList();
+      final loadedCats = snapshot.docs
+          .map((doc) => TaskCategory.fromJson(doc.data()))
+          .toList();
 
       if (loadedCats.isEmpty) {
         final defaultCategory = TaskCategory(
@@ -173,13 +175,14 @@ class _TasksScreenState extends State<TasksScreen> {
             .collection('task_categories')
             .doc(defaultCategory.id)
             .set(defaultCategory.toJson());
-        return; 
+        return;
       }
 
       if (mounted) {
         setState(() {
           _categories = loadedCats;
-          if (_activeCategoryId == null || !loadedCats.any((c) => c.id == _activeCategoryId)) {
+          if (_activeCategoryId == null ||
+              !loadedCats.any((c) => c.id == _activeCategoryId)) {
             _activeCategoryId = loadedCats.first.id;
           }
           _isLoading = false;
@@ -193,7 +196,8 @@ class _TasksScreenState extends State<TasksScreen> {
         .collection('notes')
         .snapshots()
         .listen((snapshot) {
-      final loadedNotes = snapshot.docs.map((doc) => Note.fromJson(doc.data())).toList();
+      final loadedNotes =
+          snapshot.docs.map((doc) => Note.fromJson(doc.data())).toList();
       loadedNotes.sort((a, b) => b.date.compareTo(a.date));
       if (mounted) {
         setState(() {
@@ -211,7 +215,12 @@ class _TasksScreenState extends State<TasksScreen> {
     );
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    await FirebaseFirestore.instance.collection('users').doc(uid).collection('task_categories').doc(newCategory.id).set(newCategory.toJson());
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('task_categories')
+        .doc(newCategory.id)
+        .set(newCategory.toJson());
     setState(() => _activeCategoryId = newCategory.id);
   }
 
@@ -241,16 +250,23 @@ class _TasksScreenState extends State<TasksScreen> {
                     }
                     final uid = FirebaseAuth.instance.currentUser?.uid;
                     if (uid != null) {
-                      await FirebaseFirestore.instance.collection('users').doc(uid).collection('task_categories').doc(category.id).delete();
+                      await FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(uid)
+                          .collection('task_categories')
+                          .doc(category.id)
+                          .delete();
                     }
                     if (!context.mounted) return;
                     Navigator.pop(context);
                     if (mounted) {
-                        setState(() {
-                            if (_activeCategoryId == category.id) {
-                                _activeCategoryId = _categories.firstWhere((c) => c.id != category.id).id;
-                            }
-                        });
+                      setState(() {
+                        if (_activeCategoryId == category.id) {
+                          _activeCategoryId = _categories
+                              .firstWhere((c) => c.id != category.id)
+                              .id;
+                        }
+                      });
                     }
                   },
                   style: FilledButton.styleFrom(backgroundColor: Colors.red),
@@ -262,7 +278,8 @@ class _TasksScreenState extends State<TasksScreen> {
 
   void _addTask(String title, [DateTime? scheduledAt]) async {
     if (title.trim().isEmpty || _activeCategoryId == null) return;
-    final activeCategory = _categories.firstWhere((c) => c.id == _activeCategoryId);
+    final activeCategory =
+        _categories.firstWhere((c) => c.id == _activeCategoryId);
 
     final newTask = TaskItem(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -273,7 +290,12 @@ class _TasksScreenState extends State<TasksScreen> {
     activeCategory.items.add(newTask);
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
-      await FirebaseFirestore.instance.collection('users').doc(uid).collection('task_categories').doc(activeCategory.id).set(activeCategory.toJson());
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('task_categories')
+          .doc(activeCategory.id)
+          .set(activeCategory.toJson());
     }
 
     if (scheduledAt != null) {
@@ -283,14 +305,20 @@ class _TasksScreenState extends State<TasksScreen> {
 
   void _deleteTask(TaskItem task) async {
     if (_activeCategoryId == null) return;
-    final activeCategory = _categories.firstWhere((c) => c.id == _activeCategoryId);
+    final activeCategory =
+        _categories.firstWhere((c) => c.id == _activeCategoryId);
 
     activeCategory.items.remove(task);
     _cancelNotification(task);
-    
+
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
-      await FirebaseFirestore.instance.collection('users').doc(uid).collection('task_categories').doc(activeCategory.id).set(activeCategory.toJson());
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('task_categories')
+          .doc(activeCategory.id)
+          .set(activeCategory.toJson());
     }
   }
 
@@ -299,32 +327,48 @@ class _TasksScreenState extends State<TasksScreen> {
 
     if (task.isCompleted) {
       _cancelNotification(task);
-    } else if (task.scheduledAt != null && task.scheduledAt!.isAfter(DateTime.now())) {
+    } else if (task.scheduledAt != null &&
+        task.scheduledAt!.isAfter(DateTime.now())) {
       _scheduleNotification(task);
     }
-    
-    // Optimistic update for UI feel (wait, setState might not be needed when real-time snapshot is on its way, but keeping it ensures snap action, wait no, let's keep it clean since it's already an active object reference in _categories).
-    setState((){});
-    
+
+    setState(() {});
+
     if (_activeCategoryId == null) return;
-    final activeCategory = _categories.firstWhere((c) => c.id == _activeCategoryId);
+    final activeCategory =
+        _categories.firstWhere((c) => c.id == _activeCategoryId);
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
-      await FirebaseFirestore.instance.collection('users').doc(uid).collection('task_categories').doc(activeCategory.id).set(activeCategory.toJson());
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('task_categories')
+          .doc(activeCategory.id)
+          .set(activeCategory.toJson());
     }
   }
 
   void _saveNoteFromDetail(Note note, bool isNew) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
-      await FirebaseFirestore.instance.collection('users').doc(uid).collection('notes').doc(note.id).set(note.toJson());
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('notes')
+          .doc(note.id)
+          .set(note.toJson());
     }
   }
 
   void _deleteNote(Note note) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
-      await FirebaseFirestore.instance.collection('users').doc(uid).collection('notes').doc(note.id).delete();
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('notes')
+          .doc(note.id)
+          .delete();
     }
   }
 
@@ -476,14 +520,17 @@ class _TasksScreenState extends State<TasksScreen> {
                     );
                   }
                   _addTask(controller.text, finalDateTime);
-                  
+
                   if (finalDateTime != null) {
-                    final timeString = TimeOfDay.fromDateTime(finalDateTime).format(context);
+                    final timeString =
+                        TimeOfDay.fromDateTime(finalDateTime).format(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Task saved. Alarm set for $timeString')),
+                      SnackBar(
+                          content:
+                              Text('Task saved. Alarm set for $timeString')),
                     );
                   }
-                  
+
                   Navigator.pop(context);
                 },
                 child: const Text('Save'),
@@ -497,8 +544,45 @@ class _TasksScreenState extends State<TasksScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.lock_outline, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              const Text(
+                'Tasks Locked',
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Please sign in to manage your tasks and notes.',
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () async {
+                  await FirebaseAuth.instance.signOut();
+                },
+                child: const Text('Sign In'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+          child: CircularProgressIndicator(color: Colors.white));
     }
 
     final activeCategory = _categories.firstWhere(
@@ -517,10 +601,10 @@ class _TasksScreenState extends State<TasksScreen> {
             return Padding(
               padding: const EdgeInsets.only(left: 8.0),
               child: ActionChip(
-                label: const Text('+ New', style: TextStyle(color: Colors.white)),
+                label:
+                    const Text('+ New', style: TextStyle(color: Colors.white)),
                 backgroundColor: Colors.transparent,
-                side: BorderSide(
-                    color: Theme.of(context).colorScheme.primary),
+                side: BorderSide(color: Theme.of(context).colorScheme.primary),
                 onPressed: _showAddCategoryDialog,
               ),
             );
@@ -543,8 +627,7 @@ class _TasksScreenState extends State<TasksScreen> {
                   color: isActive
                       ? Theme.of(context).colorScheme.primary
                       : Theme.of(context).textTheme.bodyMedium?.color,
-                  fontWeight:
-                      isActive ? FontWeight.bold : FontWeight.normal,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
                 ),
                 side: BorderSide(
                   color: isActive
@@ -619,9 +702,7 @@ class _TasksScreenState extends State<TasksScreen> {
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: task.isCompleted
-                                        ? Theme.of(context)
-                                            .colorScheme
-                                            .primary
+                                        ? Theme.of(context).colorScheme.primary
                                         : Colors.grey.shade600,
                                     width: 2,
                                   ),
@@ -705,10 +786,11 @@ class _TasksScreenState extends State<TasksScreen> {
       ],
     );
 
-    final filteredNotes = _notes.where((n) => 
-      n.title.toLowerCase().contains(_searchQuery.toLowerCase()) || 
-      n.content.toLowerCase().contains(_searchQuery.toLowerCase())
-    ).toList();
+    final filteredNotes = _notes
+        .where((n) =>
+            n.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            n.content.toLowerCase().contains(_searchQuery.toLowerCase()))
+        .toList();
 
     final notesGrid = filteredNotes.isEmpty
         ? Center(
@@ -718,7 +800,8 @@ class _TasksScreenState extends State<TasksScreen> {
             ),
           )
         : MasonryGridView.builder(
-            padding: const EdgeInsets.only(top: 8, bottom: 80, left: 16, right: 16),
+            padding:
+                const EdgeInsets.only(top: 8, bottom: 80, left: 16, right: 16),
             gridDelegate: const SliverSimpleGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
             ),
@@ -782,7 +865,11 @@ class _TasksScreenState extends State<TasksScreen> {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(200),
+                                color: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.color
+                                    ?.withAlpha(200),
                               ),
                             ),
                           const SizedBox(height: 12),
@@ -835,9 +922,21 @@ class _TasksScreenState extends State<TasksScreen> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Tasks & Notes', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: const Text('Tasks & Notes',
+              style: TextStyle(fontWeight: FontWeight.bold)),
           backgroundColor: Colors.transparent,
           elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.account_circle_outlined, color: Colors.white),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                );
+              },
+            ),
+          ],
           bottom: const TabBar(
             indicatorColor: Color(0xFFFFFFFF),
             labelColor: Color(0xFFFFFFFF),
@@ -862,14 +961,16 @@ class _TasksScreenState extends State<TasksScreen> {
               builder: (context, child) {
                 final isNotesTab = tabController.index == 1;
                 return FloatingActionButton(
-                  onPressed: isNotesTab ? () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => NoteDetailScreen(
-                          onSave: _saveNoteFromDetail,
-                        ),
-                      ),
-                    ) : _showAddTaskDialog,
+                  onPressed: isNotesTab
+                      ? () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => NoteDetailScreen(
+                                onSave: _saveNoteFromDetail,
+                              ),
+                            ),
+                          )
+                      : _showAddTaskDialog,
                   child: Icon(isNotesTab ? Icons.edit_note : Icons.add),
                 );
               },

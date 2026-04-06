@@ -1,9 +1,49 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/background_service.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  bool _backgroundAlertsEnabled = true;
+  bool _isLoadingPrefs = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _backgroundAlertsEnabled = prefs.getBool('background_alerts_enabled') ?? true;
+      _isLoadingPrefs = false;
+    });
+  }
+
+  Future<void> _toggleBackgroundAlerts(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('background_alerts_enabled', value);
+    setState(() {
+      _backgroundAlertsEnabled = value;
+    });
+
+    if (!kIsWeb) {
+      if (value) {
+        await BackgroundService.registerPeriodicTask();
+      } else {
+        await BackgroundService.cancelAll();
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,106 +51,150 @@ class ProfileScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Profile & Settings', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.black,
         elevation: 0,
       ),
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: uid == null
-            ? const Center(child: Text("Not logged in"))
-            : StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance.collection('users').doc(uid).collection('tasks').snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (snapshot.hasError) {
-                    return const Center(child: Text('Error loading tasks'));
-                  }
-
-                  final tasks = snapshot.data?.docs ?? [];
-                  final totalTasks = tasks.length;
-                  int completedTasks = 0;
-                  
-                  for (var doc in tasks) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    if (data['isCompleted'] == true) {
-                      completedTasks++;
-                    }
-                  }
-
-                  final double completionPercentage = totalTasks > 0 
-                      ? (completedTasks / totalTasks) * 100 
-                      : 0.0;
-
-                  return Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Center(
-                          child: CircleAvatar(
-                            radius: 40,
-                            backgroundColor: Color(0xFF1E1E1E),
-                            child: Icon(Icons.person, size: 40, color: Colors.white),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        const Center(
-                          child: Text(
-                            'My Profile',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E1E1E),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade800),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                'Task Completion: ${completionPercentage.toStringAsFixed(0)}%',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              LinearProgressIndicator(
-                                value: totalTasks > 0 ? (completedTasks / totalTasks) : 0,
-                                minHeight: 8,
-                                backgroundColor: const Color(0xFF121212),
-                                color: Theme.of(context).colorScheme.primary,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                '$completedTasks of $totalTasks tasks completed',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade400,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+            ? _buildAccessRestricted()
+            : _buildProfileContent(),
       ),
     );
+  }
+
+  Widget _buildAccessRestricted() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.lock_outline, size: 64, color: Colors.grey),
+          const SizedBox(height: 16),
+          const Text(
+            'Access Restricted',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Please sign in to view your profile.',
+            style: TextStyle(color: Colors.grey),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: () => FirebaseAuth.instance.signOut(),
+            child: const Text('Sign In'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Center(
+            child: CircleAvatar(
+              radius: 40,
+              backgroundColor: Color(0xFF1E1E1E),
+              child: Icon(Icons.person, size: 40, color: Colors.white),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Center(
+            child: Text(
+              'My Profile',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+          
+          // Settings Section
+          const Text(
+            'SETTINGS',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade800),
+            ),
+            child: SwitchListTile(
+              title: const Text('Background Scanner'),
+              subtitle: const Text(kIsWeb 
+                ? 'Not supported on Web' 
+                : 'RSI/MACD signals & Portfolio alerts'),
+              value: _backgroundAlertsEnabled && !kIsWeb,
+              onChanged: (_isLoadingPrefs || kIsWeb) ? null : _toggleBackgroundAlerts,
+              secondary: const Icon(Icons.notifications_active_outlined),
+              activeThumbColor: Colors.white,
+            ),
+          ),
+          
+          const SizedBox(height: 48),
+          
+          // Sign Out Button
+          ElevatedButton(
+            onPressed: () => _confirmSignOut(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              foregroundColor: Colors.redAccent,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.5)),
+              ),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.logout_rounded),
+                SizedBox(width: 12),
+                Text('Sign Out', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmSignOut() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sign Out', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm == true) {
+      await FirebaseAuth.instance.signOut();
+    }
   }
 }

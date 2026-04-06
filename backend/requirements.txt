@@ -1,0 +1,9 @@
+flask==3.1.3
+flask-cors
+yfinance==0.2.37
+pandas==2.2.1
+gunicorn==23.0.0
+beautifulsoup4==4.12.3
+requests==2.32.3
+apscheduler==3.10.4
+lxml

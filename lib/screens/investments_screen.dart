@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:provider/provider.dart';
+import '../services/market_data_service.dart';
+import 'profile_screen.dart';
 
 class Asset {
   final String id;
@@ -40,7 +43,8 @@ class Asset {
         id: json['id'],
         name: json['name'],
         buyPrice: (json['buyPrice'] as num).toDouble(),
-        currentPrice: (json['currentPrice'] as num).toDouble(),
+        currentPrice: (json['currentPrice'] as num?)?.toDouble() ??
+            (json['buyPrice'] as num).toDouble(),
         quantity: (json['quantity'] as num).toDouble(),
         fcmToken: json['fcmToken'] as String?,
         takeProfit: (json['takeProfit'] as num?)?.toDouble(),
@@ -82,22 +86,70 @@ class InvestmentsScreen extends StatefulWidget {
   State<InvestmentsScreen> createState() => _InvestmentsScreenState();
 }
 
-class _InvestmentsScreenState extends State<InvestmentsScreen> {
+class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProviderStateMixin {
   List<Portfolio> _portfolios = [];
   String? _activePortfolioId;
   bool _isLoading = true;
   StreamSubscription? _portfoliosSub;
+  late TabController _tabController;
 
   @override
   void dispose() {
     _portfoliosSub?.cancel();
+    _tabController.dispose();
     super.dispose();
   }
 
   @override
   void initState() {
     super.initState();
-    _loadPortfolios();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    try {
+      await _createDefaultPortfolioIfMissing();
+      _loadPortfolios();
+      
+      // Fetch initial market data if not already loaded
+      if (mounted) {
+        final marketDataService = context.read<MarketDataService>();
+        if (!marketDataService.hasData) {
+          marketDataService.fetchAllMarketData();
+        }
+      }
+    } catch (e) {
+      debugPrint('Investment Init Error: $e');
+    } finally {
+      if (mounted) setState(() { _isLoading = false; });
+    }
+  }
+
+  Future<void> _createDefaultPortfolioIfMissing() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final collection = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('investments');
+
+    try {
+      final snapshot = await collection.get();
+      if (snapshot.docs.isEmpty) {
+        final defaultPortfolio = Portfolio(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          name: 'Main Profile',
+        );
+        await collection.doc(defaultPortfolio.id).set(defaultPortfolio.toJson());
+      }
+    } catch (e) {
+      debugPrint('Error creating default portfolio: $e');
+    }
   }
 
   Future<void> _loadPortfolios() async {
@@ -107,38 +159,44 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
       return;
     }
 
-    _portfoliosSub = FirebaseFirestore.instance
+    final collection = FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
-        .collection('investments')
-        .snapshots()
-        .listen((snapshot) async {
-      final loadedPortfolios = snapshot.docs.map((doc) => Portfolio.fromJson(doc.data())).toList();
+        .collection('investments');
 
-      if (loadedPortfolios.isEmpty) {
-        final defaultPortfolio = Portfolio(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          name: 'Main Profile',
-        );
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .collection('investments')
-            .doc(defaultPortfolio.id)
-            .set(defaultPortfolio.toJson());
-        return;
-      }
+    try {
+      // 2. Start reactive stream (Stream) for live updates
+      _portfoliosSub = collection.snapshots().listen(
+        (QuerySnapshot<Map<String, dynamic>> snapshot) {
+          final loadedPortfolios = snapshot.docs
+              .map((doc) => Portfolio.fromJson(doc.data()))
+              .toList();
 
-      if (mounted) {
-        setState(() {
-          _portfolios = loadedPortfolios;
-          if (_activePortfolioId == null || !loadedPortfolios.any((p) => p.id == _activePortfolioId)) {
-            _activePortfolioId = loadedPortfolios.first.id;
+          if (mounted) {
+            setState(() {
+              _portfolios = loadedPortfolios;
+              if (loadedPortfolios.isNotEmpty) {
+                if (_activePortfolioId == null ||
+                    !loadedPortfolios.any((p) => p.id == _activePortfolioId)) {
+                  _activePortfolioId = loadedPortfolios.first.id;
+                }
+              }
+            });
           }
-          _isLoading = false;
+        },
+        onError: (e) {
+          debugPrint('Firestore Error loading portfolios: $e');
+          if (mounted) setState(() => _isLoading = false);
+        },
+      )..onError((error) {
+          if (mounted) setState(() => _isLoading = false);
         });
+    } catch (e) {
+      debugPrint('Error initializing portfolios: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
-    });
+    }
   }
 
   void _addPortfolio(String name) async {
@@ -149,8 +207,34 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
     );
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    await FirebaseFirestore.instance.collection('users').doc(uid).collection('investments').doc(newPortfolio.id).set(newPortfolio.toJson());
-    setState(() => _activePortfolioId = newPortfolio.id);
+    
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('investments')
+          .doc(newPortfolio.id)
+          .set(newPortfolio.toJson());
+      
+      // Update local asset cache for alerts
+      if (mounted) {
+        context.read<MarketDataService>().fetchUserAssets();
+      }
+      
+      if (mounted) {
+        setState(() => _activePortfolioId = newPortfolio.id);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Portfolio "${newPortfolio.name}" created')),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error adding portfolio: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to create portfolio: $e')),
+        );
+      }
+    }
   }
 
   void _deletePortfolio(Portfolio portfolio) {
@@ -176,14 +260,25 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
             onPressed: () async {
               final uid = FirebaseAuth.instance.currentUser?.uid;
               if (uid != null) {
-                await FirebaseFirestore.instance.collection('users').doc(uid).collection('investments').doc(portfolio.id).delete();
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(uid)
+                    .collection('investments')
+                    .doc(portfolio.id)
+                    .delete();
+                
+                // Update local asset cache for alerts
+                if (context.mounted) {
+                  context.read<MarketDataService>().fetchUserAssets();
+                }
               }
               if (!context.mounted) return;
               Navigator.pop(context);
               if (mounted) {
                 setState(() {
                   if (_activePortfolioId == portfolio.id) {
-                    _activePortfolioId = _portfolios.firstWhere((p) => p.id != portfolio.id).id;
+                    _activePortfolioId =
+                        _portfolios.firstWhere((p) => p.id != portfolio.id).id;
                   }
                 });
               }
@@ -196,7 +291,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
     );
   }
 
-  void _addAsset(String name, double buyPrice, double currentPrice, double quantity, double? takeProfit, double? stopLoss) async {
+  void _addAsset(String name, double buyPrice, double currentPrice,
+      double quantity, double? takeProfit, double? stopLoss) async {
     if (_activePortfolioId == null) return;
     final activePortfolio =
         _portfolios.firstWhere((p) => p.id == _activePortfolioId);
@@ -220,10 +316,35 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
     );
 
     activePortfolio.assets.add(newAsset);
-    
+
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
-      await FirebaseFirestore.instance.collection('users').doc(uid).collection('investments').doc(activePortfolio.id).set(activePortfolio.toJson());
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('investments')
+            .doc(activePortfolio.id)
+            .set(activePortfolio.toJson());
+        
+        // Update local asset cache for alerts
+        if (mounted) {
+          context.read<MarketDataService>().fetchUserAssets();
+        }
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Asset "${newAsset.name}" added')),
+          );
+        }
+      } catch (e) {
+        debugPrint('Error adding asset: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to add asset: $e')),
+          );
+        }
+      }
     }
   }
 
@@ -233,10 +354,19 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
         _portfolios.firstWhere((p) => p.id == _activePortfolioId);
 
     activePortfolio.assets.remove(asset);
-    
+
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
-      await FirebaseFirestore.instance.collection('users').doc(uid).collection('investments').doc(activePortfolio.id).set(activePortfolio.toJson());
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('investments')
+          .doc(activePortfolio.id)
+          .set(activePortfolio.toJson());
+      
+      // Update local asset cache for alerts
+      if (!mounted) return;
+      context.read<MarketDataService>().fetchUserAssets();
     }
   }
 
@@ -278,6 +408,23 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
     final stopLossController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
+    final marketData =
+        context.read<MarketDataService>().stocksData;
+
+    nameController.addListener(() {
+      final ticker = nameController.text.trim().toUpperCase();
+      // Only auto-fill if we have exactly matched a ticker or if the user stopped typing
+      if (marketData.containsKey(ticker)) {
+        final price = marketData[ticker]['price'];
+        if (price != null) {
+          final priceStr = price.toString();
+          if (currentPriceController.text != priceStr) {
+            currentPriceController.text = priceStr;
+          }
+        }
+      }
+    });
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -288,17 +435,47 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextFormField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Asset Name (e.g., AAPL)'),
-                  validator: (value) =>
-                      value == null || value.trim().isEmpty ? 'Required' : null,
-                  textCapitalization: TextCapitalization.characters,
+                Autocomplete<String>(
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text == '') {
+                      return const Iterable<String>.empty();
+                    }
+                    return marketData.keys.where((String option) {
+                      return option.contains(textEditingValue.text.toUpperCase());
+                    });
+                  },
+                  onSelected: (String selection) {
+                    nameController.text = selection;
+                    // Trigger price update immediately on selection
+                    final price = marketData[selection]?['price'];
+                    if (price != null) {
+                      currentPriceController.text = price.toString();
+                    }
+                  },
+                  fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                    // Sync the autocomplete's internal controller with our nameController
+                    controller.addListener(() {
+                      nameController.text = controller.text;
+                    });
+                    return TextFormField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      onFieldSubmitted: (value) => onFieldSubmitted(),
+                      decoration: const InputDecoration(
+                        labelText: 'Asset Name (e.g., COMI.CA)',
+                        hintText: 'Start typing to search...',
+                      ),
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty ? 'Required' : null,
+                      textCapitalization: TextCapitalization.characters,
+                    );
+                  },
                 ),
                 TextFormField(
                   controller: buyPriceController,
                   decoration: const InputDecoration(labelText: 'Buy Price'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
                     if (double.tryParse(value) == null) return 'Invalid number';
@@ -307,8 +484,12 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                 ),
                 TextFormField(
                   controller: currentPriceController,
-                  decoration: const InputDecoration(labelText: 'Current Price'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Current Price',
+                    hintText: 'Auto-fills if ticker is recognized',
+                  ),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
                     if (double.tryParse(value) == null) return 'Invalid number';
@@ -318,7 +499,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                 TextFormField(
                   controller: quantityController,
                   decoration: const InputDecoration(labelText: 'Quantity'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
                     if (double.tryParse(value) == null) return 'Invalid number';
@@ -328,10 +510,14 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: takeProfitController,
-                  decoration: const InputDecoration(labelText: 'Target Price (Take Profit)'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                      labelText: 'Target Price (Take Profit)'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   validator: (value) {
-                    if (value != null && value.isNotEmpty && double.tryParse(value) == null) {
+                    if (value != null &&
+                        value.isNotEmpty &&
+                        double.tryParse(value) == null) {
                       return 'Invalid number';
                     }
                     return null;
@@ -339,10 +525,14 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                 ),
                 TextFormField(
                   controller: stopLossController,
-                  decoration: const InputDecoration(labelText: 'Stop Loss Price'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration:
+                      const InputDecoration(labelText: 'Stop Loss Price'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   validator: (value) {
-                    if (value != null && value.isNotEmpty && double.tryParse(value) == null) {
+                    if (value != null &&
+                        value.isNotEmpty &&
+                        double.tryParse(value) == null) {
                       return 'Invalid number';
                     }
                     return null;
@@ -365,8 +555,12 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                   double.parse(buyPriceController.text),
                   double.parse(currentPriceController.text),
                   double.parse(quantityController.text),
-                  takeProfitController.text.isNotEmpty ? double.parse(takeProfitController.text) : null,
-                  stopLossController.text.isNotEmpty ? double.parse(stopLossController.text) : null,
+                  takeProfitController.text.isNotEmpty
+                      ? double.parse(takeProfitController.text)
+                      : null,
+                  stopLossController.text.isNotEmpty
+                      ? double.parse(stopLossController.text)
+                      : null,
                 );
                 Navigator.pop(context);
               }
@@ -380,26 +574,72 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.lock_outline, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              const Text(
+                'Portfolio Locked',
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Please sign in to manage your personal portfolios.',
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () async {
+                  // Standard practice to navigate back to login in this app's architecture
+                  // is to ensure the auth state is null, which triggers the root AuthWrapper.
+                  await FirebaseAuth.instance.signOut();
+                },
+                child: const Text('Sign In'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
-    final activePortfolio = _portfolios.firstWhere(
-      (p) => p.id == _activePortfolioId,
-      orElse: () => _portfolios.first,
-    );
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: Colors.white));
+    }
+
+    final activePortfolio = _portfolios.isEmpty
+        ? null
+        : _portfolios.firstWhere(
+            (p) => p.id == _activePortfolioId,
+            orElse: () => _portfolios.first,
+          );
 
     double totalSpent = 0;
     double currentValue = 0;
-
-    for (var asset in activePortfolio.assets) {
-      totalSpent += asset.buyPrice * asset.quantity;
-      currentValue += asset.currentPrice * asset.quantity;
-    }
-
     double totalRoiPercentage = 0;
-    if (totalSpent > 0) {
-      totalRoiPercentage = ((currentValue - totalSpent) / totalSpent) * 100;
+
+    final marketData =
+        Provider.of<MarketDataService>(context).stocksData;
+
+    if (activePortfolio != null) {
+      for (var asset in activePortfolio.assets) {
+        totalSpent += asset.buyPrice * asset.quantity;
+        final priceVal = marketData[asset.name]?['price'];
+        final livePrice = (priceVal is num) ? priceVal.toDouble() : asset.currentPrice;
+        currentValue += livePrice * asset.quantity;
+      }
+      if (totalSpent > 0) {
+        totalRoiPercentage = ((currentValue - totalSpent) / totalSpent) * 100;
+      }
     }
 
     final portfolioSelector = SizedBox(
@@ -413,10 +653,10 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
             return Padding(
               padding: const EdgeInsets.only(left: 8.0),
               child: ActionChip(
-                label: const Text('+ New', style: TextStyle(color: Colors.white)),
+                label:
+                    const Text('+ New', style: TextStyle(color: Colors.white)),
                 backgroundColor: Colors.transparent,
-                side: BorderSide(
-                    color: Theme.of(context).colorScheme.primary),
+                side: BorderSide(color: Theme.of(context).colorScheme.primary),
                 onPressed: _showAddPortfolioDialog,
               ),
             );
@@ -432,17 +672,14 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
               child: ChoiceChip(
                 label: Text(portfolio.name),
                 selected: isActive,
-                selectedColor: Theme.of(context)
-                    .colorScheme
-                    .primary
-                    .withAlpha(51),
+                selectedColor:
+                    Theme.of(context).colorScheme.primary.withAlpha(51),
                 backgroundColor: Theme.of(context).cardColor,
                 labelStyle: TextStyle(
                   color: isActive
                       ? Theme.of(context).colorScheme.primary
                       : Theme.of(context).textTheme.bodyMedium?.color,
-                  fontWeight:
-                      isActive ? FontWeight.bold : FontWeight.normal,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
                 ),
                 side: BorderSide(
                   color: isActive
@@ -466,6 +703,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
     final myPortfolioView = Column(
       children: [
         portfolioSelector,
+        if (activePortfolio != null) ...[
           // Dashboard Summary Card
           Card(
             margin: const EdgeInsets.all(16),
@@ -492,24 +730,33 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Total Spent', style: TextStyle(color: Colors.grey.shade400, fontSize: 11)),
+                          Text('Total Spent',
+                              style: TextStyle(
+                                  color: Colors.grey.shade400, fontSize: 11)),
                           const SizedBox(height: 4),
-                          Text('\$${totalSpent.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          Text('\$${totalSpent.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold)),
                         ],
                       ),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text('Current Value', style: TextStyle(color: Colors.grey.shade400, fontSize: 11)),
+                          Text('Current Value',
+                              style: TextStyle(
+                                  color: Colors.grey.shade400, fontSize: 11)),
                           const SizedBox(height: 4),
-                          Text('\$${currentValue.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          Text('\$${currentValue.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
                     decoration: BoxDecoration(
                       color: Theme.of(context).scaffoldBackgroundColor,
                       borderRadius: BorderRadius.circular(12),
@@ -517,7 +764,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Total ROI', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                        const Text('Total ROI',
+                            style: TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w500)),
                         Flexible(
                           child: Text(
                             '${totalRoiPercentage > 0 ? '+' : ''}${totalRoiPercentage.toStringAsFixed(2)}%',
@@ -530,7 +779,10 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
                                   ? Colors.greenAccent
                                   : (totalRoiPercentage < 0
                                       ? Colors.redAccent
-                                      : Theme.of(context).textTheme.bodyLarge?.color),
+                                      : Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.color),
                             ),
                           ),
                         ),
@@ -541,272 +793,505 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
               ),
             ),
           ),
-          
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Assets',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
-              ),
+        ] else ...[
+          const SizedBox(height: 64),
+          const Center(
+            child: Text(
+              'No profiles found.',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
             ),
           ),
+          const SizedBox(height: 8),
+          const Center(
+            child: Text(
+              'Create a profile to start tracking your assets.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          const SizedBox(height: 32),
+        ],
 
-          Expanded(
-            child: activePortfolio.assets.isEmpty
-                ? Center(
-                    child: Text(
-                      'No assets added yet.',
-                      style: TextStyle(color: Colors.grey.shade500),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.only(top: 8),
-                    itemCount: activePortfolio.assets.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index == activePortfolio.assets.length) {
-                        return const SizedBox(height: 100);
-                      }
-                      final asset = activePortfolio.assets[index];
-                      final assetRoi = ((asset.currentPrice - asset.buyPrice) /
-                              asset.buyPrice) *
-                          100;
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Assets',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary),
+            ),
+          ),
+        ),
 
-                      return Dismissible(
-                        key: Key(asset.id),
-                        direction: DismissDirection.endToStart,
-                        background: Container(
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade400,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: const Icon(Icons.delete, color: Colors.white),
+        Expanded(
+          child: (activePortfolio == null || activePortfolio.assets.isEmpty)
+              ? Center(
+                  child: Text(
+                    activePortfolio == null
+                        ? 'Select or create a profile above.'
+                        : 'No assets added yet.',
+                    style: TextStyle(color: Colors.grey.shade500),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.only(top: 8),
+                  itemCount: activePortfolio.assets.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index == activePortfolio.assets.length) {
+                      return const SizedBox(height: 100);
+                    }
+                    final asset = activePortfolio.assets[index];
+                    final livePrice = (marketData[asset.name]?['price'] as num?)
+                            ?.toDouble() ??
+                        asset.currentPrice;
+                    final assetRoi =
+                        ((livePrice - asset.buyPrice) / asset.buyPrice) * 100;
+
+                    return Dismissible(
+                      key: Key(asset.id),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade400,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        onDismissed: (_) => _deleteAsset(asset),
-                        child: Card(
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 6),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 1,
-                          child: Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        asset.name,
-                                        style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: Theme.of(context).colorScheme.primary),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Qty: ${asset.quantity}',
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey.shade400),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Expanded(
-                                  flex: 3,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.end,
-                                        children: [
-                                          Text('Buy: \$${asset.buyPrice.toStringAsFixed(2)}',
-                                              style: TextStyle(fontSize: 11, color: Theme.of(context).textTheme.bodyMedium?.color)),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.end,
-                                        children: [
-                                          if (asset.takeProfit != null) ...[
-                                            const Icon(Icons.track_changes, size: 12, color: Colors.greenAccent),
-                                            const SizedBox(width: 2),
-                                          ],
-                                          if (asset.stopLoss != null) ...[
-                                            const Icon(Icons.security, size: 12, color: Colors.redAccent),
-                                            const SizedBox(width: 2),
-                                          ],
-                                          Text('Cur: \$${asset.currentPrice.toStringAsFixed(2)}',
-                                              style: TextStyle(fontSize: 11, color: Theme.of(context).textTheme.bodyMedium?.color)),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  flex: 2,
-                                  child: Container(
-                                    alignment: Alignment.centerRight,
-                                    child: Text(
-                                      '${assetRoi > 0 ? '+' : ''}${assetRoi.toStringAsFixed(2)}%',
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                      onDismissed: (_) => _deleteAsset(asset),
+                      child: Card(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 6),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 1,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      asset.name,
                                       style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                        color: assetRoi > 0
-                                            ? Colors.greenAccent
-                                            : (assetRoi < 0
-                                                ? Colors.redAccent
-                                                : Theme.of(context).textTheme.bodyLarge?.color),
-                                      ),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Qty: ${asset.quantity}',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade400),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                flex: 3,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                            'Buy: \$${asset.buyPrice.toStringAsFixed(2)}',
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyMedium
+                                                    ?.color)),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        if (asset.takeProfit != null) ...[
+                                          const Icon(Icons.track_changes,
+                                              size: 12,
+                                              color: Colors.greenAccent),
+                                          const SizedBox(width: 2),
+                                        ],
+                                        if (asset.stopLoss != null) ...[
+                                          const Icon(Icons.security,
+                                              size: 12,
+                                              color: Colors.redAccent),
+                                          const SizedBox(width: 2),
+                                        ],
+                                        Text(
+                                            'Cur: \$${livePrice.toStringAsFixed(2)}',
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyMedium
+                                                    ?.color)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                flex: 2,
+                                child: Container(
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    '${assetRoi > 0 ? '+' : ''}${assetRoi.toStringAsFixed(2)}%',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: assetRoi > 0
+                                          ? Colors.greenAccent
+                                          : (assetRoi < 0
+                                              ? Colors.redAccent
+                                              : Theme.of(context)
+                                                  .textTheme
+                                                  .bodyLarge
+                                                  ?.color),
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      );
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
 
-    final marketStatusView = StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('market_status').doc('latest').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          print('Error: ${snapshot.error}');
-          return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
-        }
-
-        print('Connection State: ${snapshot.connectionState}');
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
+    final marketStatusView = Consumer<MarketDataService>(
+      builder: (context, service, _) {
+        // If the service is loading for the first time
+        if (service.isLoading && !service.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (!snapshot.hasData) {
-          print('Snapshot has no data.');
-          return Center(child: Text('No market data available', style: TextStyle(color: Colors.grey.shade500)));
+        // If there's an error and no cached data, show error
+        if (service.error != null && !service.hasData) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.cloud_off, color: Colors.grey.shade500, size: 48),
+                const SizedBox(height: 16),
+                Text('Could not load market data',
+                    style: TextStyle(color: Colors.grey.shade500)),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => service.fetchAllMarketData(),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
         }
 
-        print('Snapshot has data. Document exists: ${snapshot.data!.exists}');
-
-        if (!snapshot.data!.exists) {
-          return Center(child: Text('No market data available', style: TextStyle(color: Colors.grey.shade500)));
-        }
-        final rawData = snapshot.data!.data() as Map<String, dynamic>?;
-        if (rawData == null || !rawData.containsKey('stocks')) {
-          return Center(child: Text('No market data available', style: TextStyle(color: Colors.grey.shade500)));
-        }
-        final Map<String, dynamic> stocksData = rawData['stocks'] as Map<String, dynamic>;
-        
-        if (stocksData.isEmpty) {
-          return Center(child: Text('No market data available', style: TextStyle(color: Colors.grey.shade500)));
+        // If no data at all
+        if (!service.hasData) {
+          return Center(
+              child: Text('No market data available',
+                  style: TextStyle(color: Colors.grey.shade500)));
         }
 
+        final stocksData = service.stocksData;
         final stockEntries = stocksData.entries.toList();
         stockEntries.sort((a, b) => a.key.compareTo(b.key));
 
-        return ListView.builder(
-          padding: const EdgeInsets.only(top: 8, bottom: 80),
-          itemCount: stockEntries.length,
-          itemBuilder: (context, index) {
-            final ticker = stockEntries[index].key;
-            final data = stockEntries[index].value as Map<String, dynamic>;
-            final price = (data['price'] as num).toDouble();
-            final rsi = (data['rsi'] as num).toDouble();
+        return RefreshIndicator(
+          onRefresh: () => service.fetchAllMarketData(),
+          color: Colors.white,
+          backgroundColor: const Color(0xFF1E1E1E),
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+            itemCount: stockEntries.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final ticker = stockEntries[index].key;
+              final data = stockEntries[index].value as Map<String, dynamic>;
 
-            Color rsiColor;
-            Color rsiBgColor;
-            if (rsi < 30) {
-              rsiColor = Colors.greenAccent;
-              rsiBgColor = Colors.greenAccent.withAlpha(26);
-            } else if (rsi > 70) {
-              rsiColor = Colors.redAccent;
-              rsiBgColor = Colors.redAccent.withAlpha(26);
-            } else {
-              rsiColor = Colors.grey.shade400;
-              rsiBgColor = Colors.grey.shade800;
-            }
+              final priceRaw = data['price'];
+              final rsiRaw = data['rsi'];
+              final macdRaw = data['macd'] as String? ?? 'N/A';
+              final price = priceRaw is num ? priceRaw.toDouble() : 0.0;
+              final rsi = rsiRaw is num ? rsiRaw.toDouble() : 0.0;
+              final isDataAvailable = priceRaw is num;
 
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              color: Theme.of(context).cardColor,
-              elevation: 1,
-              child: ListTile(
-                title: Text(ticker, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                subtitle: Text('Price: \$${price.toStringAsFixed(2)}', style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color)),
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: rsiBgColor,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'RSI: ${rsi.toStringAsFixed(0)}',
-                    style: TextStyle(color: rsiColor, fontWeight: FontWeight.bold),
+              // Sentiment Logic
+              Color sentimentColor;
+              String sentimentLabel;
+              if (!isDataAvailable) {
+                sentimentColor = Colors.grey.shade600;
+                sentimentLabel = 'OFFLINE';
+              } else if (rsi <= 35) {
+                sentimentColor = Colors.greenAccent;
+                sentimentLabel = 'OVERSOLD';
+              } else if (rsi >= 70) {
+                sentimentColor = Colors.redAccent;
+                sentimentLabel = 'OVERBOUGHT';
+              } else {
+                sentimentColor = Colors.blueAccent;
+                sentimentLabel = 'NEUTRAL';
+              }
+
+              return Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: sentimentColor.withValues(alpha: 0.05),
+                      blurRadius: 20,
+                      spreadRadius: 0,
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Stack(
+                    children: [
+                      // Glass Background
+                      Container(
+                        height: 110,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.03),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.08),
+                            width: 1,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      // Sentiment Ribbon (Vertical)
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: 4,
+                        child: Container(color: sentimentColor),
+                      ),
+                      // Content
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 8),
+                            // Ticker & Label
+                            Expanded(
+                              flex: 3,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    ticker,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          sentimentColor.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      sentimentLabel,
+                                      style: TextStyle(
+                                        color: sentimentColor,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Metrics Grid
+                            Expanded(
+                              flex: 5,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      _buildMetricPill(
+                                        label: 'PRICE',
+                                        value: isDataAvailable
+                                            ? '\$${price.toStringAsFixed(2)}'
+                                            : 'N/A',
+                                        color: Colors.white,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      _buildMetricPill(
+                                        label: 'RSI',
+                                        value: isDataAvailable
+                                            ? rsi.toStringAsFixed(0)
+                                            : 'N/A',
+                                        color: sentimentColor,
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  // MACD Status Badge
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            Colors.black.withValues(alpha: 0.3),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.05),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.analytics_outlined,
+                                            size: 14,
+                                            color: Colors.grey.shade400,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            macdRaw.toUpperCase(),
+                                            style: TextStyle(
+                                              color: Colors.grey.shade300,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         );
       },
     );
 
-    return DefaultTabController(
-      length: 2,
+    return Theme(
+      data: Theme.of(context).copyWith(
+        tabBarTheme: const TabBarThemeData(
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.grey,
+        ),
+      ),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Investments', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: const Text('Investments',
+              style: TextStyle(fontWeight: FontWeight.bold)),
           backgroundColor: Colors.transparent,
-          elevation: 0,
-          bottom: const TabBar(
-            indicatorColor: Color(0xFFFFFFFF),
-            labelColor: Color(0xFFFFFFFF),
-            unselectedLabelColor: Color(0xFF888888),
-            tabs: [
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.account_circle_outlined,
+                  color: Colors.white),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const ProfileScreen()),
+                );
+              },
+            ),
+          ],
+          bottom: TabBar(
+            controller: _tabController,
+            indicatorColor: const Color(0xFFFFFFFF),
+            labelColor: const Color(0xFFFFFFFF),
+            unselectedLabelColor: const Color(0xFF888888),
+            tabs: const [
               Tab(text: 'My Portfolio'),
               Tab(text: 'Market Status'),
             ],
           ),
         ),
         body: TabBarView(
+          controller: _tabController,
           children: [
             myPortfolioView,
             marketStatusView,
           ],
         ),
-        floatingActionButton: Builder(
-          builder: (context) {
-            final tabController = DefaultTabController.of(context);
-            return AnimatedBuilder(
-              animation: tabController,
-              builder: (context, child) {
-                final isPortfolioTab = tabController.index == 0;
-                if (!isPortfolioTab) return const SizedBox.shrink();
-                return FloatingActionButton(
-                  onPressed: _showAddAssetDialog,
-                  child: const Icon(Icons.add),
-                );
-              },
-            );
-          },
-        ),
+        floatingActionButton: (_tabController.index == 0 && _activePortfolioId != null) 
+          ? FloatingActionButton(
+              heroTag: null,
+              onPressed: _showAddAssetDialog,
+              child: const Icon(Icons.add),
+            )
+          : null,
       ),
+    );
+  }
+
+  Widget _buildMetricPill({
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.grey.shade500,
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 }

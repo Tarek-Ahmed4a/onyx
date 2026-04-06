@@ -1,17 +1,23 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:google_nav_bar/google_nav_bar.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
+import 'services/market_data_service.dart';
 import 'screens/tasks_screen.dart';
 import 'screens/calendar_screen.dart';
 import 'screens/investments_screen.dart';
 import 'screens/expenses_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/chat_screen.dart';
+import 'services/background_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -24,23 +30,30 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint("Failed to load .env file: $e");
+  }
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  if (!kIsWeb) {
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  }
 
   FirebaseMessaging messaging = FirebaseMessaging.instance;
   NotificationSettings settings = await messaging.requestPermission();
-  
+
   debugPrint('User granted permission: ${settings.authorizationStatus}');
-  
+
   try {
     String? token = await messaging.getToken();
     if (token != null) {
       debugPrint("🚀 FCM TOKEN: $token");
-      
+
       if (FirebaseAuth.instance.currentUser != null) {
         String uid = FirebaseAuth.instance.currentUser!.uid;
         await FirebaseFirestore.instance.collection('users').doc(uid).set({
@@ -62,16 +75,30 @@ void main() async {
 
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    
+
     const DarwinInitializationSettings initializationSettingsIOS =
         DarwinInitializationSettings();
 
-    const InitializationSettings initializationSettings = InitializationSettings(
+    const InitializationSettings initializationSettings =
+        InitializationSettings(
       android: initializationSettingsAndroid,
       iOS: initializationSettingsIOS,
     );
 
     await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+    final prefs = await SharedPreferences.getInstance();
+
+    if (!kIsWeb) {
+      // Initialize Workmanager
+      await BackgroundService.init();
+
+      // Auto-register if enabled
+      final alertsEnabled = prefs.getBool('background_alerts_enabled') ?? true;
+      if (alertsEnabled) {
+        await BackgroundService.registerPeriodicTask();
+      }
+    }
   } catch (e) {
     debugPrint(e.toString());
   }
@@ -84,44 +111,53 @@ class FinanceApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Onyx',
-      themeMode: ThemeMode.dark, // Force dark mode for global OLED minimalist theme
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF000000), // OLED Black
-        cardColor: const Color(0xFF121212), // Slightly lighter for cards
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFFFFFFF),
+    return ChangeNotifierProvider(
+      create: (_) => MarketDataService(),
+      child: MaterialApp(
+        title: 'Onyx',
+        themeMode:
+            ThemeMode.dark, // Force dark mode for global OLED minimalist theme
+        darkTheme: ThemeData(
           brightness: Brightness.dark,
-          primary: const Color(0xFFFFFFFF), // Primary accent color (White)
-          onPrimary: const Color(0xFF000000), // Text on primary
-          surface: const Color(0xFF121212),
+          scaffoldBackgroundColor: const Color(0xFF000000), // OLED Black
+          cardColor: const Color(0xFF121212), // Slightly lighter for cards
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFFFFFFFF),
+            brightness: Brightness.dark,
+            primary: const Color(0xFFFFFFFF), // Primary accent color (White)
+            onPrimary: const Color(0xFF000000), // Text on primary
+            surface: const Color(0xFF121212),
+          ),
+          textTheme: const TextTheme(
+            bodyLarge: TextStyle(color: Color(0xFFE0E0E0)),
+            bodyMedium: TextStyle(color: Color(0xFFE0E0E0)),
+            bodySmall: TextStyle(color: Color(0xFFE0E0E0)),
+            titleLarge: TextStyle(color: Color(0xFFE0E0E0)),
+            titleMedium: TextStyle(color: Color(0xFFE0E0E0)),
+            titleSmall: TextStyle(color: Color(0xFFE0E0E0)),
+          ),
+          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+            backgroundColor: Color(0xFF121212),
+            selectedItemColor: Color(0xFFFFFFFF), // Active icons
+            unselectedItemColor: Color(0xFFE0E0E0),
+          ),
+          useMaterial3: true,
         ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Color(0xFFE0E0E0)),
-          bodyMedium: TextStyle(color: Color(0xFFE0E0E0)),
-          bodySmall: TextStyle(color: Color(0xFFE0E0E0)),
-          titleLarge: TextStyle(color: Color(0xFFE0E0E0)),
-          titleMedium: TextStyle(color: Color(0xFFE0E0E0)),
-          titleSmall: TextStyle(color: Color(0xFFE0E0E0)),
-        ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Color(0xFF121212),
-          selectedItemColor: Color(0xFFFFFFFF), // Active icons
-          unselectedItemColor: Color(0xFFE0E0E0),
-        ),
-        useMaterial3: true,
+        home: const AuthWrapper(),
+        debugShowCheckedModeBanner: false,
       ),
-      home: const AuthWrapper(),
-      debugShowCheckedModeBanner: false,
     );
   }
 }
 
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
@@ -130,12 +166,44 @@ class AuthWrapper extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(
-              child: CircularProgressIndicator(),
+              child: CircularProgressIndicator(color: Colors.white),
             ),
           );
         }
 
-        if (snapshot.hasData) {
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Authentication Error:\n${snapshot.error}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => setState(() {}), // Trigger rebuild/retry
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.hasData && snapshot.data != null) {
+          // Trigger a single market data fetch on login
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final service =
+                Provider.of<MarketDataService>(context, listen: false);
+            if (!service.hasData && !service.isLoading) {
+              service.fetchAllMarketData();
+            }
+          });
           return const MainScaffold();
         }
 
@@ -160,11 +228,25 @@ class _MainScaffoldState extends State<MainScaffold> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _currentIndex);
+
+    // Start automatic market data updates (60s)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<MarketDataService>(context, listen: false)
+          .startPeriodicRefresh(seconds: 60);
+    });
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+
+    // Stop automatic updates when leaving the main app area
+    // Use try-catch or listen:false for safety in dispose
+    try {
+      Provider.of<MarketDataService>(context, listen: false)
+          .stopPeriodicRefresh();
+    } catch (_) {}
+
     super.dispose();
   }
 
@@ -201,29 +283,98 @@ class _MainScaffoldState extends State<MainScaffold> {
         physics: const BouncingScrollPhysics(),
         children: _screens,
       ),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          color: Colors.transparent,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          child: GNav(
-            gap: 6,
-            activeColor: const Color(0xFFFFFFFF),
-            iconSize: 20,
-            textStyle: const TextStyle(fontSize: 12, color: Color(0xFFFFFFFF), fontWeight: FontWeight.w600),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            duration: const Duration(milliseconds: 400),
-            tabBackgroundColor: const Color(0xFF121212),
-            color: const Color(0xFF555555), // Inactive icon color
-            tabs: const [
-              GButton(icon: Icons.check_circle_outline, text: 'Tasks'),
-              GButton(icon: Icons.calendar_today_outlined, text: 'Calendar'),
-              GButton(icon: Icons.trending_up_outlined, text: 'Investments'),
-              GButton(icon: Icons.account_balance_wallet_outlined, text: 'Expenses'),
-            ],
-            selectedIndex: _currentIndex,
-            onTabChange: _onTabTapped,
+      bottomNavigationBar: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Theme(
+            data: Theme.of(context).copyWith(
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+            ),
+            child: BottomNavigationBar(
+              backgroundColor: Colors.black,
+              type: BottomNavigationBarType.fixed,
+              showSelectedLabels: false,
+              showUnselectedLabels: false,
+              currentIndex:
+                  _currentIndex < 2 ? _currentIndex : _currentIndex + 1,
+              onTap: (index) {
+                if (index == 2) return;
+                final pageIndex = index > 2 ? index - 1 : index;
+                _onTabTapped(pageIndex);
+              },
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.check_circle_outline),
+                  label: '',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.calendar_today_outlined),
+                  label: '',
+                ),
+                BottomNavigationBarItem(
+                  icon: SizedBox(width: 24, height: 24),
+                  label: '',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.trending_up_outlined),
+                  label: '',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.account_balance_wallet_outlined),
+                  label: '',
+                ),
+              ],
+            ),
           ),
-        ),
+          Positioned(
+            left: MediaQuery.of(context).size.width * 0.2,
+            top: 12,
+            bottom: 12,
+            child: Container(
+                width: 1, color: Colors.white.withValues(alpha: 0.15)),
+          ),
+          Positioned(
+            left: MediaQuery.of(context).size.width * 0.4,
+            top: 12,
+            bottom: 12,
+            child: Container(
+                width: 1, color: Colors.white.withValues(alpha: 0.15)),
+          ),
+          Positioned(
+            left: MediaQuery.of(context).size.width * 0.6,
+            top: 12,
+            bottom: 12,
+            child: Container(
+                width: 1, color: Colors.white.withValues(alpha: 0.15)),
+          ),
+          Positioned(
+            left: MediaQuery.of(context).size.width * 0.8,
+            top: 12,
+            bottom: 12,
+            child: Container(
+                width: 1, color: Colors.white.withValues(alpha: 0.15)),
+          ),
+          Positioned(
+            child: FloatingActionButton(
+              heroTag: null,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ChatScreen()),
+                );
+              },
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              shape: const CircleBorder(),
+              elevation: 4,
+              child: Icon(
+                Icons.auto_awesome,
+                color: Theme.of(context).colorScheme.onPrimary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
