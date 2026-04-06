@@ -340,57 +340,60 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final double progress = (limit > 0) ? (spent / limit).clamp(0.0, 1.0) : 0.0;
     final bool overBudget = spent > limit;
 
-    return Card(
-      elevation: 2,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: const Color(0xFF0F0F0F),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.05),
+          width: 1,
+        ),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min, 
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Flexible(
-                  flex: 3,
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
+                Text(
+                  title,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.5),
                 ),
-                const SizedBox(width: 8),
-                Flexible(
-                  flex: 2,
-                  child: Text(
-                    '\$${spent.toStringAsFixed(0)} / \$${limit.toStringAsFixed(0)}',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: Theme.of(context).textTheme.bodyLarge?.color,
-                      fontWeight: FontWeight.bold,
-                    ),
+                Text(
+                  '\$${spent.toStringAsFixed(0)} / \$${limit.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4.0), 
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
               child: LinearProgressIndicator(
                 value: progress,
-                color: overBudget ? Colors.red : color,
-                backgroundColor: color.withAlpha(51),
-                minHeight: 10,
-                borderRadius: BorderRadius.circular(5),
+                color: color,
+                backgroundColor: color.withValues(alpha: 0.1),
+                minHeight: 8,
               ),
             ),
             if (overBudget)
               Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                    'Over budget by \$${(spent - limit).toStringAsFixed(2)}',
-                    style: const TextStyle(color: Colors.red, fontSize: 12)),
+                padding: const EdgeInsets.only(top: 12.0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 14),
+                    const SizedBox(width: 6),
+                    Text(
+                        'Over by \$${(spent - limit).toStringAsFixed(0)}',
+                        style: const TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ],
+                ),
               ),
           ],
         ),
@@ -398,8 +401,54 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
+  Widget _buildSummaryMetric({
+    required String label,
+    required String value,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              if (onTap != null) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.edit_outlined, size: 10, color: Colors.grey.shade600),
+              ],
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   @override
   Widget build(BuildContext context) {
+    if (_activeWalletId == null && _wallets.isNotEmpty) {
+      _activeWalletId = _wallets.first.id;
+    }
+
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
@@ -465,6 +514,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final wLimit = activeWallet.initialIncome * (activeWallet.wantsRatio / 100);
     final sLimit = activeWallet.initialIncome * (activeWallet.savingsRatio / 100);
 
+    double totalExpenses = 0;
+    for (var e in activeExpenses) {
+      totalExpenses += e.amount;
+    }
+
     final walletSelector = SizedBox(
       height: 60,
       child: ListView.builder(
@@ -522,9 +576,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
 
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: const Text('Expenses', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF000000),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
           IconButton(
@@ -544,76 +599,175 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             walletSelector,
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.all(16.0),
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(0, 0, 0, 100),
                 children: [
-            Card(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  children: [
-                    const Text('Monthly Income',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: () => _showWalletSettingsDialog(activeWallet),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('\$${activeWallet.initialIncome.toStringAsFixed(2)}',
-                                style: Theme.of(context).textTheme.titleLarge),
-                            const SizedBox(width: 8),
-                            Icon(Icons.edit, color: Theme.of(context).colorScheme.primary, size: 18),
-                          ],
-                        ),
+                  // Unified Summary Card
+                  Card(
+                    margin: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    elevation: 0,
+                    color: const Color(0xFF1A1A1A),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'TOTAL EXPENSES',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.2,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.refresh, size: 18, color: Colors.grey.shade600),
+                                onPressed: _resetExpenses,
+                                constraints: const BoxConstraints(),
+                                padding: EdgeInsets.zero,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '\$${totalExpenses.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                                _buildSummaryMetric(
+                                  label: 'INCOME',
+                                  value: '\$${activeWallet.initialIncome.toStringAsFixed(0)}',
+                                  onTap: () => _showWalletSettingsDialog(activeWallet),
+                                ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                InkWell(
-                  onTap: () => _showWalletSettingsDialog(activeWallet),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+                  ),
+                  
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '${activeWallet.needsRatio.toStringAsFixed(0)}/${activeWallet.wantsRatio.toStringAsFixed(0)}/${activeWallet.savingsRatio.toStringAsFixed(0)} Breakdown',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                          'BUDGET BREAKDOWN',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        Icon(Icons.edit, size: 16, color: Theme.of(context).colorScheme.primary),
+                        Text(
+                          '${activeWallet.needsRatio.toStringAsFixed(0)}/${activeWallet.wantsRatio.toStringAsFixed(0)}/${activeWallet.savingsRatio.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.primary),
-                  onPressed: _resetExpenses,
-                  tooltip: 'Reset Expenses',
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildCategoryCard(
-                'Needs (${activeWallet.needsRatio.toStringAsFixed(0)}%)', nSpent, nLimit, Colors.blue),
-            const SizedBox(height: 12),
-            _buildCategoryCard(
-                'Wants (${activeWallet.wantsRatio.toStringAsFixed(0)}%)', wSpent, wLimit, Colors.orange),
-            const SizedBox(height: 12),
-            _buildCategoryCard('Savings (${activeWallet.savingsRatio.toStringAsFixed(0)}%)', sSpent,
-                sLimit, Colors.green),
-            const SizedBox(height: 100), // Prevent FAB overlap
+                  
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      children: [
+                        _buildCategoryCard('Needs', nSpent, nLimit, Colors.blueAccent),
+                        const SizedBox(height: 12),
+                        _buildCategoryCard('Wants', wSpent, wLimit, Colors.orangeAccent),
+                        const SizedBox(height: 12),
+                        _buildCategoryCard('Savings', sSpent, sLimit, Colors.greenAccent),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+                  
+                  if (activeExpenses.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+                      child: Text(
+                        'RECENT EXPENSES',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.2,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                    ...activeExpenses.reversed.take(10).map((expense) {
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          color: const Color(0xFF0F0F0F),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.05),
+                            width: 1,
+                          ),
+                        ),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: expense.category == 'Need' 
+                                ? Colors.blueAccent.withAlpha(51)
+                                : expense.category == 'Want'
+                                    ? Colors.orangeAccent.withAlpha(51)
+                                    : Colors.greenAccent.withAlpha(51),
+                            child: Icon(
+                              expense.category == 'Need' 
+                                  ? Icons.shopping_bag_outlined 
+                                  : expense.category == 'Want'
+                                      ? Icons.celebration_outlined
+                                      : Icons.savings_outlined,
+                              size: 18,
+                              color: expense.category == 'Need' 
+                                  ? Colors.blueAccent 
+                                  : expense.category == 'Want'
+                                      ? Colors.orangeAccent
+                                      : Colors.greenAccent,
+                            ),
+                          ),
+                          title: Text(
+                            expense.category,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
+                          subtitle: Text(
+                            '${expense.date.day}/${expense.date.month}/${expense.date.year}',
+                            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                          ),
+                          trailing: Text(
+                            '-\$${expense.amount.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+
+                  const SizedBox(height: 40),
                 ],
               ),
             ),

@@ -914,291 +914,240 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
       ),
     );
 
-    final myPortfolioView = ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 100),
+    final myPortfolioView = Column(
       children: [
         portfolioSelector,
-        if (activePortfolio != null) ...[
-          // Redesigned Dashboard Summary Card
-          Card(
-            margin: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            elevation: 0,
-            color: const Color(0xFF1A1A1A), // Subtle dark grey for contrast
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'PORTFOLIO VALUE',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.5,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: (totalRoiPercentage >= 0
-                                  ? Colors.greenAccent
-                                  : Colors.redAccent)
-                              .withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${totalRoiPercentage >= 0 ? '+' : ''}${totalRoiPercentage.toStringAsFixed(2)}%',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: totalRoiPercentage >= 0
-                                ? Colors.greenAccent
-                                : Colors.redAccent,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '\$${currentValue.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -1,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  // Sparkline Graph Section
-                  SizedBox(
-                    height: 80,
-                    child: CustomPaint(
-                      painter: PortfolioPerformancePainter(
-                        // Simulate a trend line based on ROI for "Graph" requirement
-                        [0.4, 0.3, 0.5, 0.45, 0.6, 0.55, 0.8, 0.75, totalRoiPercentage * 0.05 + 0.5],
-                        totalRoiPercentage >= 0
-                            ? Colors.greenAccent
-                            : Colors.redAccent,
-                      ),
-                      child: Container(),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildSummaryMetric(
-                        label: 'INVESTED',
-                        value: '\$${totalSpent.toStringAsFixed(2)}',
-                      ),
-                      _buildSummaryMetric(
-                        label: 'PL TOTAL',
-                        value: '\$${(currentValue - totalSpent).toStringAsFixed(2)}',
-                        valueColor: totalRoiPercentage >= 0
-                            ? Colors.greenAccent
-                            : Colors.redAccent,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ] else ...[
-          const SizedBox(height: 64),
-          const Center(
-            child: Text(
-              'No profiles found.',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Center(
-            child: Text(
-              'Create a profile to start tracking your assets.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
-          ),
-          const SizedBox(height: 32),
-        ],
-
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Expanded(
+          child: ListView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 100),
             children: [
-              Text(
-                'YOUR ASSETS',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.5,
-                  color: Colors.grey.shade500,
-                ),
-              ),
-              Icon(Icons.sort_rounded, size: 18, color: Colors.grey.shade600),
-            ],
-          ),
-        ),
-
-        if (activePortfolio != null && activePortfolio.assets.isNotEmpty)
-          ...activePortfolio.assets.map((asset) {
-            final livePrice = (marketData[asset.name]?['price'] as num?)
-                    ?.toDouble() ??
-                asset.currentPrice;
-            final assetRoi =
-                ((livePrice - asset.buyPrice) / asset.buyPrice) * 100;
-
-            return Dismissible(
-              key: Key(asset.id),
-              direction: DismissDirection.endToStart,
-              background: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.redAccent.withValues(alpha: 0.8),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: const Icon(Icons.delete_outline, color: Colors.white),
-              ),
-              onDismissed: (_) => _deleteAsset(asset),
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  color: const Color(0xFF0F0F0F),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    width: 1,
+              if (activePortfolio != null) ...[
+                // Redesigned Dashboard Summary Card
+                Card(
+                  margin: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  elevation: 0,
+                  color: const Color(0xFF1A1A1A),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              asset.name,
-                              style: const TextStyle(
-                                fontSize: 16,
+                              'TOTAL PAID',
+                              style: TextStyle(
+                                fontSize: 11,
                                 fontWeight: FontWeight.w900,
-                                letterSpacing: 0.5,
+                                letterSpacing: 1.2,
+                                color: Colors.grey.shade600,
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              '${asset.quantity} SHARES',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey.shade600,
-                                letterSpacing: 1,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: (totalRoiPercentage >= 0
+                                        ? Colors.greenAccent
+                                        : Colors.redAccent)
+                                    .withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${totalRoiPercentage >= 0 ? '+' : ''}${totalRoiPercentage.toStringAsFixed(2)}% ROI',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: totalRoiPercentage >= 0
+                                      ? Colors.greenAccent
+                                      : Colors.redAccent,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      Expanded(
-                        flex: 4,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              '\$${livePrice.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '\$${totalSpent.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        // Sparkline Graph
+                        SizedBox(
+                          height: 60,
+                          child: CustomPaint(
+                            painter: PortfolioPerformancePainter(
+                              [0.4, 0.3, 0.5, 0.45, 0.6, 0.55, 0.8, 0.75, totalRoiPercentage * 0.05 + 0.5],
+                              totalRoiPercentage >= 0
+                                  ? Colors.greenAccent
+                                  : Colors.redAccent,
                             ),
-                            const SizedBox(height: 4),
+                            child: Container(),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        _buildSummaryMetric(
+                          label: 'CURRENT VALUE',
+                          value: '\$${currentValue.toStringAsFixed(2)}',
+                          valueColor: Colors.white,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ] else ...[
+                const SizedBox(height: 64),
+                const Center(
+                  child: Text(
+                    'No profiles found.',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Center(
+                  child: Text(
+                    'Create a profile to start tracking your assets.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+                child: Text(
+                  'YOUR ASSETS',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ),
+              if (activePortfolio != null && activePortfolio.assets.isNotEmpty)
+                ...activePortfolio.assets.map((asset) {
+                  final livePrice = (marketData[asset.name]?['price'] as num?)
+                          ?.toDouble() ??
+                      asset.currentPrice;
+                  final assetRoi =
+                      ((livePrice - asset.buyPrice) / asset.buyPrice) * 100;
+
+                  return Dismissible(
+                    key: Key(asset.id),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: const Icon(Icons.delete_outline, color: Colors.white),
+                    ),
+                    onDismissed: (_) => _deleteAsset(asset),
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        color: const Color(0xFF0F0F0F),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          width: 1,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          children: [
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                if (asset.takeProfit != null) ...[
-                                  Text(
-                                    '🎯 \$${asset.takeProfit!.toStringAsFixed(1)}',
-                                    style: const TextStyle(
-                                      fontSize: 9,
-                                      color: Colors.greenAccent,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        asset.name,
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Qty: ${asset.quantity}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.grey.shade500,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 8),
-                                ],
-                                if (asset.stopLoss != null) ...[
-                                  Text(
-                                    '🛑 \$${asset.stopLoss!.toStringAsFixed(1)}',
-                                    style: const TextStyle(
-                                      fontSize: 9,
-                                      color: Colors.redAccent,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blueAccent),
+                                  onPressed: () => _showEditAssetDialog(asset),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                              ],
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16.0),
+                              child: Divider(color: Colors.white10, height: 1),
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _buildAssetDetail('BUY', '\$${asset.buyPrice.toStringAsFixed(2)}'),
+                                _buildAssetDetail('CURRENT', '\$${livePrice.toStringAsFixed(2)}', 
+                                  color: assetRoi >= 0 ? Colors.greenAccent : Colors.redAccent),
+                                _buildAssetDetail('ROI', '${assetRoi >= 0 ? '+' : ''}${assetRoi.toStringAsFixed(1)}%',
+                                  color: assetRoi >= 0 ? Colors.greenAccent : Colors.redAccent),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _buildAssetDetail('TARGET (TP)', asset.takeProfit != null ? '\$${asset.takeProfit!.toStringAsFixed(2)}' : 'N/A', color: Colors.greenAccent.withValues(alpha: 0.7)),
+                                _buildAssetDetail('STOP LOSS', asset.stopLoss != null ? '\$${asset.stopLoss!.toStringAsFixed(2)}' : 'N/A', color: Colors.redAccent.withValues(alpha: 0.7)),
                               ],
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Column(
-                        children: [
-                          Text(
-                            '${assetRoi >= 0 ? '+' : ''}${assetRoi.toStringAsFixed(1)}%',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 14,
-                              color: assetRoi >= 0
-                                  ? Colors.greenAccent
-                                  : Colors.redAccent,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.more_vert_rounded,
-                                size: 18, color: Colors.grey),
-                            onPressed: () => _showEditAssetDialog(asset),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        ],
-                      ),
-                    ],
+                    ),
+                  );
+                }),
+              if (activePortfolio != null && activePortfolio.assets.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(40.0),
+                  child: Center(
+                    child: Text(
+                      'No assets added yet.',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
                   ),
                 ),
-              ),
-            );
-          }),
-        
-        if (activePortfolio != null && activePortfolio.assets.isEmpty)
-          Padding(
-            padding: const EdgeInsets.all(40.0),
-            child: Center(
-              child: Text(
-                'No assets added yet.',
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-            ),
+              const SizedBox(height: 40),
+            ],
           ),
-        
-        const SizedBox(height: 40),
+        ),
       ],
     );
 
@@ -1541,6 +1490,32 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
             fontSize: 18,
             fontWeight: FontWeight.w900,
             color: valueColor ?? Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAssetDetail(String label, String value, {Color? color}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: color ?? Colors.white,
           ),
         ),
       ],
