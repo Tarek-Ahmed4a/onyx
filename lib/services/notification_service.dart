@@ -1,6 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -13,6 +14,15 @@ class NotificationService {
 
   final Map<String, DateTime> _lastNotified = {};
   final Map<String, double> _lastTriggeredValue = {};
+
+  Future<void> subscribeToMarketOpportunities() async {
+    try {
+      await FirebaseMessaging.instance.subscribeToTopic('market_opportunities');
+      debugPrint("🚀 Successfully subscribed to market_opportunities topic.");
+    } catch (e) {
+      debugPrint("❌ Failed to subscribe to market_opportunities: $e");
+    }
+  }
 
   Future<void> init() async {
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -147,41 +157,9 @@ class NotificationService {
     }
   }
 
-  /// Checks for general market signals (RSI/MACD).
+  /* DEPRECATED: Handled by Cloud Functions 
   Future<void> checkMarketSignals(Map<String, dynamic> livePrices) async {
-    for (var ticker in livePrices.keys) {
-      final info = livePrices[ticker];
-      if (info == null) continue;
-
-      final double rsi = (info['rsi'] as num?)?.toDouble() ?? 50.0;
-      final String macd = (info['macd'] as String? ?? '').toLowerCase();
-
-      // Optimized Buy Signal: RSI < 35 AND Bullish MACD
-      if (rsi < 35 && macd.contains('bullish')) {
-        final key = '${ticker}_BUY';
-        if (_shouldNotify(key, rsi)) {
-          await showNotification(
-            id: ticker.hashCode + 1,
-            title: "🟢 فرصة شراء: $ticker",
-            body: "سهم $ticker مؤشراته بتقول إنه في منطقة دخول كويسة دلوقتى.",
-            payload: ticker,
-          );
-          _recordNotification(key, rsi);
-        }
-      } 
-      // Optimized Sell Signal: RSI > 75 AND Bearish MACD
-      else if (rsi > 75 && macd.contains('bearish')) {
-        final key = '${ticker}_SELL';
-        if (_shouldNotify(key, rsi)) {
-          await showNotification(
-            id: ticker.hashCode + 2,
-            title: "🔴 فرصة بيع: $ticker",
-            body: "سهم $ticker دخل منطقة التشبع، فكر في جني الأرباح.",
-            payload: ticker,
-          );
-          _recordNotification(key, rsi);
-        }
-      }
-    }
+    ...
   }
+  */
 }

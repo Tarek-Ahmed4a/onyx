@@ -1,0 +1,11 @@
+{
+  "name": "onyx-market-scanner",
+  "version": "1.0.0",
+  "description": "Market scanner and alert script for ONYX",
+  "main": "scanner.js",
+  "dependencies": {
+    "firebase-admin": "^11.11.0",
+    "axios": "^1.6.0"
+  },
+  "private": true
+}

@@ -1,8 +1,7 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/background_service.dart';
+import '../services/notification_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -36,12 +35,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _backgroundAlertsEnabled = value;
     });
 
-    if (!kIsWeb) {
-      if (value) {
-        await BackgroundService.registerPeriodicTask();
-      } else {
-        await BackgroundService.cancelAll();
-      }
+    if (value) {
+      await NotificationService().subscribeToMarketOpportunities();
+    } else {
+      // Unsubscribe logic could be added here
+      debugPrint("FCM Topic Unsubscription not implemented in this UI demo.");
     }
   }
 
@@ -134,13 +132,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               border: Border.all(color: Colors.grey.shade800),
             ),
             child: SwitchListTile(
-              title: const Text('Background Scanner'),
-              subtitle: const Text(kIsWeb 
-                ? 'Not supported on Web' 
-                : 'RSI/MACD signals & Portfolio alerts'),
-              value: _backgroundAlertsEnabled && !kIsWeb,
-              onChanged: (_isLoadingPrefs || kIsWeb) ? null : _toggleBackgroundAlerts,
-              secondary: const Icon(Icons.notifications_active_outlined),
+              title: const Text('Alpha Signals & Radar'),
+              subtitle: const Text('Receive push alerts for Volume Spikes & Trend Breakouts'),
+              value: _backgroundAlertsEnabled,
+              onChanged: _isLoadingPrefs ? null : _toggleBackgroundAlerts,
+              secondary: const Icon(Icons.radar),
               activeThumbColor: Colors.white,
             ),
           ),

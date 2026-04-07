@@ -8,6 +8,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import 'widgets/connectivity_indicator.dart';
+import 'screens/market_opportunities_screen.dart';
 import 'firebase_options.dart';
 import 'services/market_data_service.dart';
 import 'screens/tasks_screen.dart';
@@ -16,7 +18,6 @@ import 'screens/investments_screen.dart';
 import 'screens/expenses_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/chat_screen.dart';
-import 'services/background_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 @pragma('vm:entry-point')
@@ -38,6 +39,12 @@ void main() async {
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Enable Offline Persistence for Firestore (Professional Architecture)
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
 
   if (!kIsWeb) {
@@ -87,17 +94,9 @@ void main() async {
 
     await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
-    final prefs = await SharedPreferences.getInstance();
-
     if (!kIsWeb) {
-      // Initialize Workmanager
-      await BackgroundService.init();
-
-      // Auto-register if enabled
-      final alertsEnabled = prefs.getBool('background_alerts_enabled') ?? true;
-      if (alertsEnabled) {
-        await BackgroundService.registerPeriodicTask();
-      }
+      // Background polling deprecated in favor of professional FCM
+      // await BackgroundService.init(); 
     }
   } catch (e) {
     debugPrint(e.toString());
@@ -253,6 +252,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   final List<Widget> _screens = const [
     TasksScreen(),
     CalendarScreen(),
+    MarketOpportunitiesScreen(), // New Screen
     InvestmentsScreen(),
     ExpensesScreen(),
   ];
@@ -277,11 +277,16 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: _onPageChanged,
-        physics: const BouncingScrollPhysics(),
-        children: _screens,
+      body: Stack(
+        children: [
+          PageView(
+            controller: _pageController,
+            onPageChanged: _onPageChanged,
+            physics: const BouncingScrollPhysics(),
+            children: _screens,
+          ),
+          const ConnectivityIndicator(), // Non-intrusive offline banner
+        ],
       ),
       bottomNavigationBar: Stack(
         clipBehavior: Clip.none,
@@ -297,11 +302,11 @@ class _MainScaffoldState extends State<MainScaffold> {
               type: BottomNavigationBarType.fixed,
               showSelectedLabels: false,
               showUnselectedLabels: false,
-              currentIndex:
-                  _currentIndex < 2 ? _currentIndex : _currentIndex + 1,
+               currentIndex:
+                  _currentIndex < 3 ? _currentIndex : _currentIndex + 1,
               onTap: (index) {
-                if (index == 2) return;
-                final pageIndex = index > 2 ? index - 1 : index;
+                if (index == 3) return;
+                final pageIndex = index > 3 ? index - 1 : index;
                 _onTabTapped(pageIndex);
               },
               items: const [
@@ -311,6 +316,10 @@ class _MainScaffoldState extends State<MainScaffold> {
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.calendar_today_outlined),
+                  label: '',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.radar), // Opportunity Radar
                   label: '',
                 ),
                 BottomNavigationBarItem(
@@ -329,28 +338,35 @@ class _MainScaffoldState extends State<MainScaffold> {
             ),
           ),
           Positioned(
-            left: MediaQuery.of(context).size.width * 0.2,
+            left: MediaQuery.of(context).size.width * 0.166,
             top: 12,
             bottom: 12,
             child: Container(
                 width: 1, color: Colors.white.withValues(alpha: 0.15)),
           ),
           Positioned(
-            left: MediaQuery.of(context).size.width * 0.4,
+            left: MediaQuery.of(context).size.width * 0.333,
             top: 12,
             bottom: 12,
             child: Container(
                 width: 1, color: Colors.white.withValues(alpha: 0.15)),
           ),
           Positioned(
-            left: MediaQuery.of(context).size.width * 0.6,
+            left: MediaQuery.of(context).size.width * 0.5,
             top: 12,
             bottom: 12,
             child: Container(
                 width: 1, color: Colors.white.withValues(alpha: 0.15)),
           ),
           Positioned(
-            left: MediaQuery.of(context).size.width * 0.8,
+            left: MediaQuery.of(context).size.width * 0.666,
+            top: 12,
+            bottom: 12,
+            child: Container(
+                width: 1, color: Colors.white.withValues(alpha: 0.15)),
+          ),
+          Positioned(
+            left: MediaQuery.of(context).size.width * 0.833,
             top: 12,
             bottom: 12,
             child: Container(

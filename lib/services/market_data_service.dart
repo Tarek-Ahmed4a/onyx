@@ -16,8 +16,13 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
 
   MarketDataService() {
     WidgetsBinding.instance.addObserver(this);
-    _loadCachedData();
-    fetchUserAssets(); // Initial fetch of assets for alerting
+    // 1. Load from SharedPreferences immediately
+    _loadCachedData().then((_) {
+      // 2. Load from Firestore cache (Offline Persistence)
+      fetchUserAssets(); 
+      // 3. Finally, trigger a silent network update
+      fetchAllMarketData(isSilent: true);
+    });
   }
 
   @override
@@ -99,11 +104,13 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     try {
+      // Prioritize Cache with source: Source.cache
+      // If we are offline, this will return the cached data immediately.
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('investments')
-          .get();
+          .get(const GetOptions(source: Source.serverAndCache));
 
       final List<dynamic> allAssets = [];
       for (var doc in snapshot.docs) {
@@ -202,17 +209,17 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
     _isLoading = false;
     notifyListeners();
 
-    // Perform high-performance alert check using local cache (No Firestore Reads)
+    // Local alert checking DEPRECATED. Handled by Firebase Cloud Functions.
+    /*
     if (_stocksData.isNotEmpty) {
       final notificationService = NotificationService();
-      // 1. Check general market technical signals (RSI/MACD)
       notificationService.checkMarketSignals(_stocksData);
       
-      // 2. Check specific price alerts for cached assets
       if (_cachedUserAssets.isNotEmpty) {
         notificationService.checkPriceAlerts(_stocksData, _cachedUserAssets);
       }
     }
+    */
   }
 
   /// Get cached data for a specific ticker.
