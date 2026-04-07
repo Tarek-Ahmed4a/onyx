@@ -147,7 +147,7 @@ class BackgroundService {
       kTaskScanner,
       frequency: const Duration(minutes: 15),
       constraints: Constraints(networkType: NetworkType.connected),
-      existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
+      existingWorkPolicy: ExistingWorkPolicy.replace,
     );
   }
 
