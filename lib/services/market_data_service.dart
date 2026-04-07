@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'notification_service.dart';
 
 /// Single Source of Truth for all EGX market data.
 ///
@@ -19,7 +18,7 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
     // 1. Load from SharedPreferences immediately
     _loadCachedData().then((_) {
       // 2. Load from Firestore cache (Offline Persistence)
-      fetchUserAssets(); 
+      fetchUserAssets();
       // 3. Finally, trigger a silent network update
       fetchAllMarketData(isSilent: true);
     });
@@ -119,7 +118,8 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
         allAssets.addAll(assets);
       }
       _cachedUserAssets = allAssets;
-      debugPrint('📦 MarketDataService: Cached ${_cachedUserAssets.length} user assets for alerts.');
+      debugPrint(
+          '📦 MarketDataService: Cached ${_cachedUserAssets.length} user assets for alerts.');
     } catch (e) {
       debugPrint('⚠️ MarketDataService: Error caching user assets: $e');
     }

@@ -18,7 +18,6 @@ import 'screens/investments_screen.dart';
 import 'screens/expenses_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/chat_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -96,7 +95,7 @@ void main() async {
 
     if (!kIsWeb) {
       // Background polling deprecated in favor of professional FCM
-      // await BackgroundService.init(); 
+      // await BackgroundService.init();
     }
   } catch (e) {
     debugPrint(e.toString());
@@ -302,7 +301,7 @@ class _MainScaffoldState extends State<MainScaffold> {
               type: BottomNavigationBarType.fixed,
               showSelectedLabels: false,
               showUnselectedLabels: false,
-               currentIndex:
+              currentIndex:
                   _currentIndex < 3 ? _currentIndex : _currentIndex + 1,
               onTap: (index) {
                 if (index == 3) return;
