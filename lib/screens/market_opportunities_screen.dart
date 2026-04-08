@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../widgets/connectivity_indicator.dart';
+import 'calendar_screen.dart';
 
 class MarketOpportunitiesScreen extends StatelessWidget {
   const MarketOpportunitiesScreen({super.key});
@@ -26,6 +27,17 @@ class MarketOpportunitiesScreen extends StatelessWidget {
                 floating: false,
                 pinned: true,
                 backgroundColor: Colors.black,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.calendar_today_outlined, color: Colors.white),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const CalendarScreen()),
+                      );
+                    },
+                  ),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
                   title: const Text(
                     'Opportunity Radar',

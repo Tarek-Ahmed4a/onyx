@@ -11,6 +11,11 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import random
 import math
 from collections import deque
+from datetime import timedelta
+import json
+import firebase_admin
+from firebase_admin import credentials, firestore, messaging
+
 
 # --- Configuration ---
 USER_AGENTS = [
@@ -145,6 +150,178 @@ def refresh_market_data():
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=refresh_market_data, trigger="interval", seconds=60)
+
+def setup_firebase():
+    if not firebase_admin._apps:
+        cred_json = os.environ.get('FIREBASE_CREDENTIALS')
+        if cred_json:
+            try:
+                cred_dict = json.loads(cred_json)
+                cred = credentials.Certificate(cred_dict)
+                firebase_admin.initialize_app(cred)
+                print("Firebase Initialized.")
+            except Exception as e:
+                print(f"Error initializing Firebase: {e}")
+        else:
+            print("FIREBASE_CREDENTIALS not found in environment.")
+
+setup_firebase()
+
+def cleanup_old_signals():
+    try:
+        if not firebase_admin._apps: return
+        db = firestore.client()
+        cutoff = datetime.utcnow() - timedelta(hours=24)
+        signals_ref = db.collection('market_signals')
+        query = signals_ref.where('timestamp', '<', cutoff)
+        docs = query.stream()
+        count = 0
+        for doc in docs:
+            doc.reference.delete()
+            count += 1
+        print(f"Cleaned up {count} old signals.")
+    except Exception as e:
+        print(f"Cleanup error: {e}")
+
+cleanup_old_signals()
+
+def scan_market():
+    try:
+        now_cairo = pd.Timestamp.now(tz='Africa/Cairo')
+        if now_cairo.weekday() not in [0, 1, 2, 3, 6]:
+            print("Outside EGX trading days (Fri-Sat).")
+            return
+            
+        current_time_float = now_cairo.hour + now_cairo.minute / 60.0
+        if not (10.0 <= current_time_float <= 14.5):
+            print(f"Outside EGX hours ({now_cairo.strftime('%H:%M')}).")
+            return
+            
+        print("Starting Market Scan...")
+        tickers_str = " ".join(EGX_30)
+        data = yf.download(tickers_str, period="2mo", interval="1d", group_by="ticker", auto_adjust=False, prepost=False, threads=True)
+        
+        if not firebase_admin._apps: 
+            return
+            
+        db = firestore.client()
+        
+        for ticker in EGX_30:
+            stock_data = MARKET_DATA_CACHE.get(ticker)
+            if not stock_data or stock_data['price'] == 0:
+                continue
+                
+            current_price = stock_data['price']
+            current_rsi = stock_data['rsi']
+            
+            volume_spike = False
+            try:
+                if len(EGX_30) == 1:
+                    df = data
+                else:
+                    df = data[ticker]
+                if not df.empty and len(df) > 1:
+                    avg_vol = df['Volume'].iloc[-30:-1].mean()
+                    current_vol = df['Volume'].iloc[-1]
+                    if avg_vol > 0 and current_vol > (3 * avg_vol):
+                        volume_spike = True
+            except Exception as e:
+                pass
+                
+            if current_rsi < 30 or volume_spike:
+                signal_type = "RSI_REVERSAL" if current_rsi < 30 else "VOLUME_SPIKE"
+                if current_rsi < 30 and volume_spike:
+                    signal_type = "PRICE_BREAKOUT"
+                    
+                msg = f"{ticker} is showing strong opportunities at {current_price} EGP."
+                
+                recent_signals = db.collection('market_signals').where('ticker', '==', ticker).where('type', '==', signal_type).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(1).stream()
+                recent_list = list(recent_signals)
+                recently_alerted = False
+                if recent_list:
+                    last_alert_time = recent_list[0].to_dict().get('timestamp')
+                    if last_alert_time:
+                        try:
+                            # Handling Datetime With Timezone
+                            import pytz
+                            if last_alert_time.tzinfo is None:
+                                last_alert_time = last_alert_time.replace(tzinfo=pytz.UTC)
+                            if (datetime.now(pytz.UTC) - last_alert_time).total_seconds() < 3600 * 4:
+                                recently_alerted = True
+                        except Exception as e:
+                            pass
+
+                if not recently_alerted:
+                    db.collection('market_signals').add({
+                        'ticker': ticker,
+                        'type': signal_type,
+                        'message': msg,
+                        'value': str(current_price),
+                        'timestamp': firestore.SERVER_TIMESTAMP
+                    })
+                    
+                    try:
+                        message = messaging.Message(
+                            notification=messaging.Notification(
+                                title="Market Opportunity 🎯",
+                                body=f"{ticker}: {signal_type.replace('_', ' ')} logic triggered"
+                            ),
+                            topic='market_opportunities'
+                        )
+                        messaging.send(message)
+                    except Exception as me:
+                        pass
+                
+        users_ref = db.collection('users')
+        for user_doc in users_ref.stream():
+            uid = user_doc.id
+            inv_ref = users_ref.document(uid).collection('investments')
+            for portfolio in inv_ref.stream():
+                p_data = portfolio.to_dict()
+                assets = p_data.get('assets', [])
+                updated_assets = False
+                
+                for asset in assets:
+                    ticker = asset.get('name')
+                    target = asset.get('takeProfit')
+                    stop_loss = asset.get('stopLoss')
+                    token = asset.get('fcmToken')
+                    
+                    stock_data = MARKET_DATA_CACHE.get(ticker)
+                    if stock_data and stock_data['price'] > 0:
+                        cp = stock_data['price']
+                        hit_type = None
+                        
+                        if target and target > 0 and cp >= target:
+                            hit_type = "Target Reached"
+                            asset['takeProfit'] = None 
+                            updated_assets = True
+                            
+                        elif stop_loss and stop_loss > 0 and cp <= stop_loss:
+                            hit_type = "Stop Loss Hit"
+                            asset['stopLoss'] = None
+                            updated_assets = True
+                            
+                        if hit_type and token:
+                            try:
+                                msg = messaging.Message(
+                                    notification=messaging.Notification(
+                                        title=f"Alert: {ticker}",
+                                        body=f"{ticker} has hit its {hit_type} at {cp}"
+                                    ),
+                                    token=token
+                                )
+                                messaging.send(msg)
+                            except Exception as e:
+                                pass
+                                
+                if updated_assets:
+                    portfolio.reference.update({'assets': assets})
+                    
+    except Exception as e:
+        print(f"Scan Market Error: {e}")
+
+scheduler.add_job(func=scan_market, trigger="interval", minutes=15)
 scheduler.start()
 
 @app.route('/api/egx/all')
@@ -172,6 +349,10 @@ def get_all():
         "stocks": safe_stocks,
         "last_updated": datetime.utcnow().isoformat()
     })
+
+@app.route('/')
+def health_check():
+    return jsonify({"status": "ONYX Radar is awake and running"}), 200
 
 @app.route('/force_sync')
 def force():

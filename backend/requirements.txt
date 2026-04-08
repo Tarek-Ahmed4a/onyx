@@ -7,3 +7,5 @@ beautifulsoup4==4.12.3
 requests==2.32.3
 apscheduler==3.10.4
 lxml
+firebase-admin
+pytz
