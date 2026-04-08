@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
 import '../services/market_data_service.dart';
+import '../widgets/connectivity_indicator.dart';
 import 'profile_screen.dart';
 import 'calendar_screen.dart';
 
@@ -1431,11 +1432,16 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
             ],
           ),
         ),
-        body: TabBarView(
-          controller: _tabController,
+        body: Stack(
           children: [
-            myPortfolioView,
-            marketStatusView,
+            TabBarView(
+              controller: _tabController,
+              children: [
+                myPortfolioView,
+                marketStatusView,
+              ],
+            ),
+            const ConnectivityIndicator(),
           ],
         ),
         floatingActionButton: (_tabController.index == 0 && _activePortfolioId != null) 

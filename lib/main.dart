@@ -8,7 +8,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'widgets/connectivity_indicator.dart';
 import 'screens/market_opportunities_screen.dart';
 import 'firebase_options.dart';
 import 'services/market_data_service.dart';
@@ -45,35 +44,36 @@ void main() async {
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
 
-  if (!kIsWeb) {
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  }
-
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
-  NotificationSettings settings = await messaging.requestPermission();
-
-  debugPrint('User granted permission: ${settings.authorizationStatus}');
-
-  try {
-    String? token = await messaging.getToken();
-    if (token != null) {
-      debugPrint("🚀 FCM TOKEN: $token");
-
-      if (FirebaseAuth.instance.currentUser != null) {
-        String uid = FirebaseAuth.instance.currentUser!.uid;
-        await FirebaseFirestore.instance.collection('users').doc(uid).set({
-          'fcmToken': token,
-        }, SetOptions(merge: true));
-        debugPrint("🚀 FCM TOKEN synced to Firestore: $token");
-      } else {
-        debugPrint("User not logged in, FCM token not synced to Firestore.");
+  // Initialize FCM asynchronously to avoid blocking cold starts offline
+  Future.microtask(() async {
+    try {
+      if (!kIsWeb) {
+        FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
       }
-    } else {
-      debugPrint("FCM token is null.");
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      NotificationSettings settings = await messaging.requestPermission();
+      debugPrint('User granted permission: ${settings.authorizationStatus}');
+      
+      String? token = await messaging.getToken();
+      if (token != null) {
+        debugPrint("🚀 FCM TOKEN: $token");
+
+        if (FirebaseAuth.instance.currentUser != null) {
+          String uid = FirebaseAuth.instance.currentUser!.uid;
+          await FirebaseFirestore.instance.collection('users').doc(uid).set({
+            'fcmToken': token,
+          }, SetOptions(merge: true));
+          debugPrint("🚀 FCM TOKEN synced to Firestore: $token");
+        } else {
+          debugPrint("User not logged in, FCM token not synced to Firestore.");
+        }
+      } else {
+        debugPrint("FCM token is null.");
+      }
+    } catch (e) {
+      debugPrint("Could not setup FCM: $e");
     }
-  } catch (e) {
-    debugPrint("Could not get FCM token: $e");
-  }
+  });
 
   try {
     tz.initializeTimeZones();
@@ -274,16 +274,11 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          PageView(
-            controller: _pageController,
-            onPageChanged: _onPageChanged,
-            physics: const BouncingScrollPhysics(),
-            children: _screens,
-          ),
-          const ConnectivityIndicator(), // Non-intrusive offline banner
-        ],
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: _onPageChanged,
+        physics: const BouncingScrollPhysics(),
+        children: _screens,
       ),
       bottomNavigationBar: Stack(
         clipBehavior: Clip.none,

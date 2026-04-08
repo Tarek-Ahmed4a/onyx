@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import '../widgets/connectivity_indicator.dart';
 
 class MarketOpportunitiesScreen extends StatelessWidget {
   const MarketOpportunitiesScreen({super.key});
@@ -9,8 +10,10 @@ class MarketOpportunitiesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
+      body: Stack(
+        children: [
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
             .collection('market_signals')
             .orderBy('timestamp', descending: true)
             .limit(50)
@@ -90,6 +93,9 @@ class MarketOpportunitiesScreen extends StatelessWidget {
             ],
           );
         },
+      ),
+      const ConnectivityIndicator(),
+      ],
       ),
     );
   }
