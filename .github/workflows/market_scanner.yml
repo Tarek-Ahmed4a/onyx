@@ -28,7 +28,7 @@ jobs:
 
       - name: Run Market Scanner
         env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ONYX_C4702 }}
         run: |
           cd backend_scripts
           node scanner.js

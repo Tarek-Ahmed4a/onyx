@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
 import '../services/market_data_service.dart';
 import 'profile_screen.dart';
+import 'calendar_screen.dart';
 
 class Asset {
   final String id;
@@ -1396,6 +1397,17 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
               style: TextStyle(fontWeight: FontWeight.bold)),
           backgroundColor: Colors.transparent,
           actions: [
+            IconButton(
+              icon: const Icon(Icons.calendar_today_outlined,
+                  color: Colors.white),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const CalendarScreen()),
+                );
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.account_circle_outlined,
                   color: Colors.white),

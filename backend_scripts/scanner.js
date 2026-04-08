@@ -39,16 +39,50 @@ async function runScanner() {
       return;
     }
 
-    // 3. Process Individual User Alerts (Target Price & Stop Loss)
+    // 3. Cleanup Old Market Signals (Older than 24h)
+    await cleanupOldSignals();
+
+    // 4. Process Individual User Alerts (Target Price & Stop Loss)
     await processUserAlerts(marketData);
 
-    // 4. Process Global Market Screener (Opportunity Radar)
+    // 5. Process Global Market Screener (Opportunity Radar)
     await processMarketScreener(marketData);
 
     console.log("✅ Market Scanner completed successfully.");
   } catch (error) {
     console.error("❌ Scanner Error:", error);
     process.exit(1);
+  }
+}
+
+/**
+ * Deletes market signals older than 24 hours.
+ */
+async function cleanupOldSignals() {
+  console.log("🧹 Cleaning up old market signals (24h+)...");
+  const yesterday = new Date();
+  yesterday.setHours(yesterday.getHours() - 24);
+
+  try {
+    const oldSnapshot = await db
+      .collection("market_signals")
+      .where("timestamp", "<", yesterday)
+      .get();
+
+    if (oldSnapshot.empty) {
+      console.log("✅ No old signals found.");
+      return;
+    }
+
+    const batch = db.batch();
+    oldSnapshot.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+    console.log(`✅ Deleted ${oldSnapshot.size} stale signals.`);
+  } catch (error) {
+    console.error("⚠️ Cleanup Error:", error);
   }
 }
 

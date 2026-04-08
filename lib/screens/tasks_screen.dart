@@ -4,6 +4,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'profile_screen.dart';
+import 'calendar_screen.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../main.dart';
@@ -927,6 +928,17 @@ class _TasksScreenState extends State<TasksScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           actions: [
+            IconButton(
+              icon: const Icon(Icons.calendar_today_outlined,
+                  color: Colors.white),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const CalendarScreen()),
+                );
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.account_circle_outlined, color: Colors.white),
               onPressed: () {

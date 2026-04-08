@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/wallet_model.dart';
 import 'profile_screen.dart';
+import 'calendar_screen.dart';
 
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key});
@@ -582,6 +583,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_today_outlined, color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CalendarScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.account_circle_outlined, color: Colors.white),
             onPressed: () {

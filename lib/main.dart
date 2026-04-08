@@ -13,7 +13,6 @@ import 'screens/market_opportunities_screen.dart';
 import 'firebase_options.dart';
 import 'services/market_data_service.dart';
 import 'screens/tasks_screen.dart';
-import 'screens/calendar_screen.dart';
 import 'screens/investments_screen.dart';
 import 'screens/expenses_screen.dart';
 import 'screens/login_screen.dart';
@@ -250,9 +249,8 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   final List<Widget> _screens = const [
     TasksScreen(),
-    CalendarScreen(),
-    MarketOpportunitiesScreen(), // New Screen
     InvestmentsScreen(),
+    MarketOpportunitiesScreen(),
     ExpensesScreen(),
   ];
 
@@ -302,70 +300,59 @@ class _MainScaffoldState extends State<MainScaffold> {
               showSelectedLabels: false,
               showUnselectedLabels: false,
               currentIndex:
-                  _currentIndex < 3 ? _currentIndex : _currentIndex + 1,
+                  _currentIndex < 2 ? _currentIndex : _currentIndex + 1,
               onTap: (index) {
-                if (index == 3) return;
-                final pageIndex = index > 3 ? index - 1 : index;
+                if (index == 2) return;
+                final pageIndex = index > 2 ? index - 1 : index;
                 _onTabTapped(pageIndex);
               },
               items: const [
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.check_circle_outline),
+                  icon: Icon(Icons.assignment_turned_in), // Market Analysis (Tasks)
                   label: '',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.calendar_today_outlined),
+                  icon: Icon(Icons.trending_up), // My Portfolio (Investments)
                   label: '',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.radar), // Opportunity Radar
+                  icon: SizedBox(width: 24, height: 24), // Center placeholder
                   label: '',
                 ),
                 BottomNavigationBarItem(
-                  icon: SizedBox(width: 24, height: 24),
+                  icon: Icon(Icons.track_changes), // Opportunity Radar
                   label: '',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.trending_up_outlined),
-                  label: '',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.account_balance_wallet_outlined),
+                  icon: Icon(Icons.account_balance_wallet), // Expenses
                   label: '',
                 ),
               ],
             ),
           ),
-          Positioned(
-            left: MediaQuery.of(context).size.width * 0.166,
+           Positioned(
+            left: MediaQuery.of(context).size.width * 0.2,
             top: 12,
             bottom: 12,
             child: Container(
                 width: 1, color: Colors.white.withValues(alpha: 0.15)),
           ),
           Positioned(
-            left: MediaQuery.of(context).size.width * 0.333,
+            left: MediaQuery.of(context).size.width * 0.4,
             top: 12,
             bottom: 12,
             child: Container(
                 width: 1, color: Colors.white.withValues(alpha: 0.15)),
           ),
           Positioned(
-            left: MediaQuery.of(context).size.width * 0.5,
+            left: MediaQuery.of(context).size.width * 0.6,
             top: 12,
             bottom: 12,
             child: Container(
                 width: 1, color: Colors.white.withValues(alpha: 0.15)),
           ),
           Positioned(
-            left: MediaQuery.of(context).size.width * 0.666,
-            top: 12,
-            bottom: 12,
-            child: Container(
-                width: 1, color: Colors.white.withValues(alpha: 0.15)),
-          ),
-          Positioned(
-            left: MediaQuery.of(context).size.width * 0.833,
+            left: MediaQuery.of(context).size.width * 0.8,
             top: 12,
             bottom: 12,
             child: Container(
