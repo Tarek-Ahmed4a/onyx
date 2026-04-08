@@ -246,6 +246,10 @@ class _TasksScreenState extends State<TasksScreen> {
     );
 
     activeCategory.items.add(newTask);
+    if (scheduledAt != null) {
+      _scheduleNotification(newTask);
+    }
+
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
       await FirebaseFirestore.instance
@@ -254,10 +258,6 @@ class _TasksScreenState extends State<TasksScreen> {
           .collection('task_categories')
           .doc(activeCategory.id)
           .set(activeCategory.toJson());
-    }
-
-    if (scheduledAt != null) {
-      _scheduleNotification(newTask);
     }
   }
 
