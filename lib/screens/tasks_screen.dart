@@ -5,10 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'profile_screen.dart';
 import 'calendar_screen.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/timezone.dart' as tz;
-import '../main.dart';
 import '../models/note_model.dart';
+import '../services/notification_service.dart';
 import 'note_detail_screen.dart';
 
 class TaskItem {
@@ -94,57 +92,16 @@ class _TasksScreenState extends State<TasksScreen> {
   @override
   void initState() {
     super.initState();
-    _requestPermissions();
     _loadData();
-  }
-
-  Future<void> _requestPermissions() async {
-    final androidImplementation =
-        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-    await androidImplementation?.requestNotificationsPermission();
-    await androidImplementation?.requestExactAlarmsPermission();
   }
 
   Future<void> _scheduleNotification(TaskItem task) async {
     if (task.scheduledAt == null) return;
-
-    final tz.TZDateTime scheduledDate =
-        tz.TZDateTime.from(task.scheduledAt!, tz.local);
-
-    if (scheduledDate.isBefore(tz.TZDateTime.now(tz.local))) return;
-
-    try {
-      await flutterLocalNotificationsPlugin.zonedSchedule(
-        task.id.hashCode,
-        'Task Reminder',
-        task.title,
-        scheduledDate,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'task_reminders_channel',
-            'Task Reminders',
-            channelDescription: 'Notifications for scheduled tasks',
-            importance: Importance.max,
-            priority: Priority.high,
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-      );
-    } catch (e) {
-      debugPrint('Error scheduling notification: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
+    await NotificationService().scheduleTaskReminder(task.id, task.title, task.scheduledAt!);
   }
 
   Future<void> _cancelNotification(TaskItem task) async {
-    await flutterLocalNotificationsPlugin.cancel(task.id.hashCode);
+    await NotificationService().cancelTaskReminder(task.id);
   }
 
   Future<void> _loadData() async {

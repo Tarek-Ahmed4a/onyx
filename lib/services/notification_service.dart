@@ -26,7 +26,11 @@ class NotificationService {
 
   Future<void> init() async {
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosSettings = DarwinInitializationSettings();
+    const iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
 
     const settings = InitializationSettings(
       android: androidSettings,
@@ -39,7 +43,55 @@ class NotificationService {
         debugPrint('Notification clicked: ${details.payload}');
       },
     );
+
+    // Request Android permissions for exact alarms and notifications
+    final androidImplementation = _notificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await androidImplementation?.requestNotificationsPermission();
+    await androidImplementation?.requestExactAlarmsPermission();
   }
+
+  // ==========================================
+  // 🔘 LOCAL TASK ALERTS (Offline-First)
+  // ==========================================
+
+  Future<void> scheduleTaskReminder(String id, String title, DateTime scheduledAt) async {
+    final tz.TZDateTime scheduledDate = tz.TZDateTime.from(scheduledAt, tz.local);
+
+    if (scheduledDate.isBefore(tz.TZDateTime.now(tz.local))) return;
+
+    try {
+      await _notificationsPlugin.zonedSchedule(
+        id.hashCode,
+        'Task Reminder',
+        title,
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'task_reminders_channel',
+            'Task Reminders',
+            channelDescription: 'Notifications for scheduled tasks',
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, // Critical for offline precise background wakeup
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } catch (e) {
+      debugPrint('Error scheduling task reminder: $e');
+    }
+  }
+
+  Future<void> cancelTaskReminder(String id) async {
+    await _notificationsPlugin.cancel(id.hashCode);
+  }
+
+  // ==========================================
+  // 🌍 REMOTE MARKET SIGNALS (Needs Internet)
+  // ==========================================
 
   /// Determines if a notification should be triggered based on time cooldown
   /// and price movement thresholds to prevent spam.
