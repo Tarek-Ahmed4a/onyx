@@ -9,6 +9,122 @@ import '../widgets/connectivity_indicator.dart';
 import 'profile_screen.dart';
 import 'calendar_screen.dart';
 
+const Map<String, String> knownFunds = {
+  'NMF': 'صندوق NM أسهم شريعة',
+  'CMS': 'صندوق مؤشر CI EGX33 الشريعة',
+  'ASO': 'صندوق أزيموت فرص الشريعة',
+  'BWA': 'صندوق بلتون وفرة',
+  'ADA': 'صندوق الأهلي ذهب',
+  'AZG': 'صندوق Azimut جولد',
+  'BFA': 'صندوق بلتون فضة',
+  'BSB': 'صندوق بلتون سبائك',
+  'MTF': 'صندوق مصر للتأمين التكافلي',
+};
+
+const Map<String, String> knownStocks = {
+  'AMER.CA': '(مجموعة عامر القابضة (عامر جروب',
+  'ATLC.CA': 'A.T.LEASEالتوفيق للتأجير التمويلي -أية.تي.ليس',
+  'TALM.CA': 'Taaleem Management Services تعليم لخدمات الإدارة',
+  'ISPH.CA': 'ابن سينا فارما',
+  'ABUK.CA': 'ابوقير للاسمدة والصناعات الكيماوية',
+  'AIHC.CA': 'ارابيا انفستمنتس هولدنج',
+  'AIDC.CA': 'ارابيا للاستثمار والتنمية',
+  'ASPI.CA': 'اسباير كابيتال القابضة للاستثمارات المالية',
+  'SCEM.CA': 'اسمنت سيناء',
+  'ASCM.CA': 'اسيك للتعدين - اسكوم',
+  'EMFD.CA': 'إعمار مصر للتنمية',
+  'ACTF.CA': 'اكت فاينانشال للاستشارات',
+  'ALCN.CA': 'الاسكندرية لتداول الحاويات والبضائع',
+  'AMOC.CA': 'الاسكندرية للزيوت المعدنية',
+  'IDRE.CA': 'الاسماعيلية الجديدة للتطوير والتنمية العمرانية-شركة منقسمة',
+  'ISMA.CA': 'الاسماعيلية مصر للدواجن',
+  'AFDI.CA': 'الاهلي للتنمية والاستثمار',
+  'COMI.CA': 'البنك التجاري الدولي -مصر (سى اى بى )',
+  'EXPA.CA': 'البنك المصري لتنمية الصادرات',
+  'DAPH.CA': 'التعمير والاستشارات الهندسية',
+  'ISMQ.CA': 'الحديد والصلب للمناجم والمحاجر',
+  'ICFC.CA': 'الدولية للأسمدة والكيماويات',
+  'IFAP.CA': 'الدوليه للمحاصيل الزراعيه',
+  'ZEOT.CA': 'الزيوت المستخلصة ومنتجاتها',
+  'OCDI.CA': 'السادس من اكتوبر للتنميه والاستثمار- سوديك',
+  'SWDY.CA': 'السويدى اليكتريك',
+  'EAST.CA': 'الشرقية - ايسترن كومباني',
+  'ELSH.CA': 'الشمس للاسكان والتعمير',
+  'UEGC.CA': 'الصعيد العامة للمقاولات والاستثمار العقاري SCCD',
+  'EGCH.CA': 'الصناعات الكيماوية المصرية - كيما',
+  'ENGC.CA': 'الصناعات الهندسية المعمارية للانشاء والتعمير - ايكون',
+  'RMDA.CA': 'العاشر من رمضان للصناعات الدوائية والمستحضرات تشخيصية-راميدا',
+  'PRCL.CA': 'العامة لمنتجات الخزف والصيني',
+  'MEPA.CA': 'العبوات الطبية',
+  'OBRI.CA': 'العبور للاستثمار العقارى',
+  'ARCC.CA': 'العربية للاسمنت',
+  'ECAP.CA': 'العز للسيراميك و البورسلين - الجوهره',
+  'POUL.CA': 'القاهرة للدواجن',
+  'COSG.CA': 'القاهرة للزيوت والصابون',
+  'CCAP.CA': 'القلعة للاستثمارات المالية',
+  'CSAG.CA': 'القناة للتوكيلات الملاحية',
+  'IEEC.CA': 'المشروعات الصناعية والهندسية',
+  'PHAR.CA': 'المصرية الدولية للصناعات الدوائية - ايبيكو',
+  'ETRS.CA': 'المصرية لخدمات النقل (ايجيترانس)',
+  'ETEL.CA': 'المصرية للاتصالات',
+  'EGTS.CA': 'المصرية للمنتجعات السياحية',
+  'MOED.CA': 'المصرية لنظم التعليم الحديثة',
+  'MPRC.CA': 'المصريه لمدينة الانتاج الاعلامى',
+  'EHDR.CA': 'المصريين للاسكان والتنمية والتعمير',
+  'ARAB.CA': 'المطورون العرب القابضة',
+  'AMIA.CA': 'الملتقي العربي للاستثمارات',
+  'MPCO.CA': 'المنصورة للدواجن',
+  'ORWE.CA': 'النساجون الشرقيون للسجاد',
+  'KABO.CA': 'النصر للملابس والمنسوجات - كابو',
+  'NIPH.CA': 'النيل للادوية والصناعات الكيماوية - النيل',
+  'MTIE.CA': 'ام.ام جروب للصناعة والتجارة العالمية',
+  'OFH.CA': 'او بي المالية القابضة',
+  'ORAS.CA': 'اوراسكوم كونستراكشون بي ال سي',
+  'OIH.CA': 'اوراسكوم للاستثمار القابضه',
+  'ORHD.CA': 'اوراسكوم للتنمية مصر',
+  'EFIH.CA': 'اي فاينانس للاستثمارات المالية والرقمية',
+  'EFID.CA': 'ايديتا للصناعات الغذائية',
+  'PHDC.CA': 'بالم هيلز للتعمير',
+  'BTFH.CA': 'بلتون القابضة',
+  'HDBK.CA': 'بنك التعمير والاسكان',
+  'CIEB.CA': 'بنك كريدي اجريكول مصر',
+  'TANM.CA': 'تنمية للاستثمار العقاري',
+  'BIOC.CA': 'جلاكسو سميثكلاين',
+  'SVCE.CA': 'جنوب الوادى للاسمنت',
+  'JUFO.CA': 'جهينة للصناعات الغذائية',
+  'GPIM.CA': 'جى بى اى للنمو العمرانى',
+  'GBCO.CA': 'جى بى كوربوريشن',
+  'DSCW.CA': 'دايس للملابس الجاهزة',
+  'RAYA.CA': 'راية القابضة للأستثمارات المالية',
+  'RACC.CA': 'راية لخدمات مراكز الاتصالات',
+  'ZMID.CA': 'زهراء المعادي للاستثمار والتعمير',
+  'SIPC.CA': 'سبأ الدولية للأدوية والصناعات الكيماوية',
+  'SKPC.CA': 'سيدى كرير للبتروكيماويات - سيدبك',
+  'SDTI.CA': 'شارم دريمز للاستثمار السياحى',
+  'NCCW.CA': 'شركة النصر للأعمال المدنية',
+  'TAQA.CA': 'طاقة عربية',
+  'VLMR.CA': 'فالمور القابضة للاستثمار',
+  'VLMRA.CA': 'فالمور القابضة للاستثماربالجنية',
+  'FWRY.CA': 'فوري لتكنولوجيا البنوك والمدفوعات الالكترونية',
+  'CNFN.CA': 'كونتكت المالية القابضة',
+  'LCSW.CA': 'ليسيكو مصر',
+  'MCRO.CA': 'ماكرو جروب للمستحضرات الطبية-ماكرو كابيتال',
+  'HRHO.CA': 'مجموعة اي اف جي القابضة',
+  'TMGH.CA': 'مجموعة طلعت مصطفى القابضة',
+  'MASR.CA': 'مدينة مصر للاسكان والتعمير',
+  'HELI.CA': 'مصر الجديدة للاسكان والتعمير',
+  'ATQA.CA': 'مصر الوطنية للصلب - عتاقة',
+  'MFPC.CA': 'مصر لإنتاج الأسمدة - موبكو',
+  'MCQE.CA': 'مصر للاسمنت - قنا',
+  'EGAL.CA': 'مصر للالومنيوم',
+  'ADIB.CA': 'مصرف أبو ظبي الأسلامي- مصر',
+  'AFMC.CA': 'مطاحن ومخابز الاسكندرية',
+  'MPCI.CA': 'ممفيس للادوية والصناعات الكيماوية',
+  'KRDI.CA': 'نهر الخير للتنمية والأستثمار الزراعى والخدمات البيئية',
+  'VALU.CA': 'يو للتمويل الاستهلاكى',
+  'UNIP.CA': 'يونيفرسال لصناعة مواد التعبئة و التغليف و الورق - يونيباك',
+};
+
 class Asset {
   final String id;
   String name;
@@ -88,12 +204,16 @@ class InvestmentsScreen extends StatefulWidget {
   State<InvestmentsScreen> createState() => _InvestmentsScreenState();
 }
 
-class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProviderStateMixin {
+class _InvestmentsScreenState extends State<InvestmentsScreen>
+    with TickerProviderStateMixin {
   List<Portfolio> _portfolios = [];
   String? _activePortfolioId;
   bool _isLoading = true;
   StreamSubscription? _portfoliosSub;
   late TabController _tabController;
+
+  String _marketSearchQuery = '';
+  String _marketFilter = 'Stocks';
 
   @override
   void dispose() {
@@ -116,7 +236,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
     try {
       await _createDefaultPortfolioIfMissing();
       _loadPortfolios();
-      
+
       // Fetch initial market data if not already loaded
       if (mounted) {
         final marketDataService = context.read<MarketDataService>();
@@ -127,7 +247,11 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
     } catch (e) {
       debugPrint('Investment Init Error: $e');
     } finally {
-      if (mounted) setState(() { _isLoading = false; });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -147,7 +271,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           name: 'Main Profile',
         );
-        await collection.doc(defaultPortfolio.id).set(defaultPortfolio.toJson());
+        await collection
+            .doc(defaultPortfolio.id)
+            .set(defaultPortfolio.toJson());
       }
     } catch (e) {
       debugPrint('Error creating default portfolio: $e');
@@ -209,7 +335,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
     );
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    
+
     try {
       await FirebaseFirestore.instance
           .collection('users')
@@ -217,12 +343,12 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
           .collection('investments')
           .doc(newPortfolio.id)
           .set(newPortfolio.toJson());
-      
+
       // Update local asset cache for alerts
       if (mounted) {
         context.read<MarketDataService>().fetchUserAssets();
       }
-      
+
       if (mounted) {
         setState(() => _activePortfolioId = newPortfolio.id);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -268,7 +394,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
                     .collection('investments')
                     .doc(portfolio.id)
                     .delete();
-                
+
                 // Update local asset cache for alerts
                 if (context.mounted) {
                   context.read<MarketDataService>().fetchUserAssets();
@@ -328,12 +454,12 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
             .collection('investments')
             .doc(activePortfolio.id)
             .set(activePortfolio.toJson());
-        
+
         // Update local asset cache for alerts
         if (mounted) {
           context.read<MarketDataService>().fetchUserAssets();
         }
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Asset "${newAsset.name}" added')),
@@ -350,8 +476,14 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
     }
   }
 
-  void _updateAsset(Asset oldAsset, String name, double buyPrice, double currentPrice,
-      double quantity, double? takeProfit, double? stopLoss) async {
+  void _updateAsset(
+      Asset oldAsset,
+      String name,
+      double buyPrice,
+      double currentPrice,
+      double quantity,
+      double? takeProfit,
+      double? stopLoss) async {
     if (_activePortfolioId == null) return;
     final activePortfolio =
         _portfolios.firstWhere((p) => p.id == _activePortfolioId);
@@ -579,7 +711,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
           .collection('investments')
           .doc(activePortfolio.id)
           .set(activePortfolio.toJson());
-      
+
       // Update local asset cache for alerts
       if (!mounted) return;
       context.read<MarketDataService>().fetchUserAssets();
@@ -624,8 +756,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
     final stopLossController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
-    final marketData =
-        context.read<MarketDataService>().stocksData;
+    final marketData = context.read<MarketDataService>().stocksData;
 
     nameController.addListener(() {
       final ticker = nameController.text.trim().toUpperCase();
@@ -657,7 +788,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
                       return const Iterable<String>.empty();
                     }
                     return marketData.keys.where((String option) {
-                      return option.contains(textEditingValue.text.toUpperCase());
+                      return option
+                          .contains(textEditingValue.text.toUpperCase());
                     });
                   },
                   onSelected: (String selection) {
@@ -668,7 +800,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
                       currentPriceController.text = price.toString();
                     }
                   },
-                  fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                  fieldViewBuilder:
+                      (context, controller, focusNode, onFieldSubmitted) {
                     // Sync the autocomplete's internal controller with our nameController
                     controller.addListener(() {
                       nameController.text = controller.text;
@@ -682,7 +815,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
                         hintText: 'Start typing to search...',
                       ),
                       validator: (value) =>
-                          value == null || value.trim().isEmpty ? 'Required' : null,
+                          value == null || value.trim().isEmpty
+                              ? 'Required'
+                              : null,
                       textCapitalization: TextCapitalization.characters,
                     );
                   },
@@ -829,7 +964,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
     }
 
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Colors.white));
+      return const Center(
+          child: CircularProgressIndicator(color: Colors.white));
     }
 
     final activePortfolio = _portfolios.isEmpty
@@ -843,14 +979,14 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
     double currentValue = 0;
     double totalRoiPercentage = 0;
 
-    final marketData =
-        Provider.of<MarketDataService>(context).stocksData;
+    final marketData = Provider.of<MarketDataService>(context).stocksData;
 
     if (activePortfolio != null) {
       for (var asset in activePortfolio.assets) {
         totalSpent += asset.buyPrice * asset.quantity;
         final priceVal = marketData[asset.name]?['price'];
-        final livePrice = (priceVal is num) ? priceVal.toDouble() : asset.currentPrice;
+        final livePrice =
+            (priceVal is num) ? priceVal.toDouble() : asset.currentPrice;
         currentValue += livePrice * asset.quantity;
       }
       if (totalSpent > 0) {
@@ -986,14 +1122,67 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
                         // Sparkline Graph
                         SizedBox(
                           height: 60,
-                          child: CustomPaint(
-                            painter: PortfolioPerformancePainter(
-                              [0.4, 0.3, 0.5, 0.45, 0.6, 0.55, 0.8, 0.75, totalRoiPercentage * 0.05 + 0.5],
-                              totalRoiPercentage >= 0
-                                  ? Colors.greenAccent
-                                  : Colors.redAccent,
-                            ),
-                            child: Container(),
+                          child: StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(FirebaseAuth.instance.currentUser?.uid)
+                                .collection('investments')
+                                .doc(activePortfolio.id)
+                                .collection('portfolio_snapshots')
+                                .orderBy('timestamp')
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white24),
+                                  ),
+                                );
+                              }
+
+                              List<double> dataPoints = [];
+                              if (snapshot.hasData &&
+                                  snapshot.data!.docs.isNotEmpty) {
+                                for (var doc in snapshot.data!.docs) {
+                                  final data =
+                                      doc.data() as Map<String, dynamic>;
+                                  final val = data['total_value'];
+                                  if (val is num) {
+                                    dataPoints.add(val.toDouble());
+                                  }
+                                }
+                              }
+
+                              if (dataPoints.isEmpty) {
+                                return Center(
+                                  child: Text(
+                                    'No Data Yet',
+                                    style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                );
+                              }
+
+                              if (dataPoints.length == 1) {
+                                dataPoints.add(dataPoints.first);
+                              }
+
+                              return CustomPaint(
+                                painter: PortfolioPerformancePainter(
+                                  dataPoints,
+                                  totalRoiPercentage >= 0
+                                      ? Colors.greenAccent
+                                      : Colors.redAccent,
+                                ),
+                                child: Container(),
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -1027,7 +1216,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
                 ),
               ],
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24.0, vertical: 12.0),
                 child: Text(
                   'YOUR ASSETS',
                   style: TextStyle(
@@ -1040,9 +1230,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
               ),
               if (activePortfolio != null && activePortfolio.assets.isNotEmpty)
                 ...activePortfolio.assets.map((asset) {
-                  final livePrice = (marketData[asset.name]?['price'] as num?)
-                          ?.toDouble() ??
-                      asset.currentPrice;
+                  final livePrice =
+                      (marketData[asset.name]?['price'] as num?)?.toDouble() ??
+                          asset.currentPrice;
                   final assetRoi =
                       ((livePrice - asset.buyPrice) / asset.buyPrice) * 100;
 
@@ -1050,18 +1240,21 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
                     key: Key(asset.id),
                     direction: DismissDirection.endToStart,
                     background: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
                       decoration: BoxDecoration(
                         color: Colors.redAccent.withValues(alpha: 0.8),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: const Icon(Icons.delete_outline, color: Colors.white),
+                      child:
+                          const Icon(Icons.delete_outline, color: Colors.white),
                     ),
                     onDismissed: (_) => _deleteAsset(asset),
                     child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(24),
                         color: const Color(0xFF0F0F0F),
@@ -1079,29 +1272,49 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        asset.name,
+                                        knownFunds[asset.name] ??
+                                            knownStocks[asset.name] ??
+                                            asset.name,
                                         style: const TextStyle(
-                                          fontSize: 18,
+                                          fontSize: 16,
                                           fontWeight: FontWeight.w900,
                                           letterSpacing: 0.5,
                                         ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                      Text(
-                                        'Qty: ${asset.quantity}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.grey.shade500,
-                                        ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Text(
+                                            asset.name,
+                                            style: TextStyle(
+                                              color: Colors.grey.shade500,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Qty: ${asset.quantity}',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.grey.shade500,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blueAccent),
+                                  icon: const Icon(Icons.edit_outlined,
+                                      size: 20, color: Colors.blueAccent),
                                   onPressed: () => _showEditAssetDialog(asset),
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(),
@@ -1115,19 +1328,38 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                _buildAssetDetail('BUY', '\$${asset.buyPrice.toStringAsFixed(2)}'),
-                                _buildAssetDetail('CURRENT', '\$${livePrice.toStringAsFixed(2)}', 
-                                  color: assetRoi >= 0 ? Colors.greenAccent : Colors.redAccent),
-                                _buildAssetDetail('ROI', '${assetRoi >= 0 ? '+' : ''}${assetRoi.toStringAsFixed(1)}%',
-                                  color: assetRoi >= 0 ? Colors.greenAccent : Colors.redAccent),
+                                _buildAssetDetail('BUY',
+                                    '\$${asset.buyPrice.toStringAsFixed(2)}'),
+                                _buildAssetDetail('CURRENT',
+                                    '\$${livePrice.toStringAsFixed(2)}',
+                                    color: assetRoi >= 0
+                                        ? Colors.greenAccent
+                                        : Colors.redAccent),
+                                _buildAssetDetail('ROI',
+                                    '${assetRoi >= 0 ? '+' : ''}${assetRoi.toStringAsFixed(1)}%',
+                                    color: assetRoi >= 0
+                                        ? Colors.greenAccent
+                                        : Colors.redAccent),
                               ],
                             ),
                             const SizedBox(height: 16),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                _buildAssetDetail('TARGET (TP)', asset.takeProfit != null ? '\$${asset.takeProfit!.toStringAsFixed(2)}' : 'N/A', color: Colors.greenAccent.withValues(alpha: 0.7)),
-                                _buildAssetDetail('STOP LOSS', asset.stopLoss != null ? '\$${asset.stopLoss!.toStringAsFixed(2)}' : 'N/A', color: Colors.redAccent.withValues(alpha: 0.7)),
+                                _buildAssetDetail(
+                                    'TARGET (TP)',
+                                    asset.takeProfit != null
+                                        ? '\$${asset.takeProfit!.toStringAsFixed(2)}'
+                                        : 'N/A',
+                                    color: Colors.greenAccent
+                                        .withValues(alpha: 0.7)),
+                                _buildAssetDetail(
+                                    'STOP LOSS',
+                                    asset.stopLoss != null
+                                        ? '\$${asset.stopLoss!.toStringAsFixed(2)}'
+                                        : 'N/A',
+                                    color: Colors.redAccent
+                                        .withValues(alpha: 0.7)),
                               ],
                             ),
                           ],
@@ -1153,7 +1385,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
       ],
     );
 
-  final marketStatusView = Consumer<MarketDataService>(
+    final marketStatusView = Consumer<MarketDataService>(
       builder: (context, service, _) {
         // If the service is loading for the first time
         if (service.isLoading && !service.hasData) {
@@ -1188,185 +1420,291 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
         }
 
         final stocksData = service.stocksData;
-        final stockEntries = stocksData.entries.toList();
+        var stockEntries = stocksData.entries.toList();
+
+        stockEntries = stockEntries.where((entry) {
+          final ticker = entry.key;
+          final isFund = knownFunds.containsKey(ticker);
+          if (_marketFilter == 'Funds' && !isFund) return false;
+          if (_marketFilter == 'Stocks' && isFund) return false;
+          return true;
+        }).toList();
+
+        if (_marketSearchQuery.isNotEmpty) {
+          final query = _marketSearchQuery.toLowerCase();
+          stockEntries = stockEntries.where((entry) {
+            final ticker = entry.key.toLowerCase();
+            final fullName =
+                (knownFunds[entry.key] ?? knownStocks[entry.key] ?? entry.key)
+                    .toLowerCase();
+            return ticker.contains(query) || fullName.contains(query);
+          }).toList();
+        }
+
         stockEntries.sort((a, b) => a.key.compareTo(b.key));
 
-        return RefreshIndicator(
-          onRefresh: () => service.fetchAllMarketData(),
-          color: Colors.white,
-          backgroundColor: const Color(0xFF1E1E1E),
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-            itemCount: stockEntries.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final ticker = stockEntries[index].key;
-              final data = stockEntries[index].value as Map<String, dynamic>;
-
-              final priceRaw = data['price'];
-              final rsiRaw = data['rsi'];
-              final macdRaw = data['macd'] as String? ?? 'N/A';
-              final price = priceRaw is num ? priceRaw.toDouble() : 0.0;
-              final rsi = rsiRaw is num ? rsiRaw.toDouble() : 0.0;
-              final isDataAvailable = priceRaw is num;
-
-              // Sentiment Logic
-              Color sentimentColor;
-              String sentimentLabel;
-              if (!isDataAvailable) {
-                sentimentColor = Colors.grey.shade600;
-                sentimentLabel = 'OFFLINE';
-              } else if (rsi <= 35) {
-                sentimentColor = Colors.greenAccent;
-                sentimentLabel = 'OVERSOLD';
-              } else if (rsi >= 70) {
-                sentimentColor = Colors.redAccent;
-                sentimentLabel = 'OVERBOUGHT';
-              } else {
-                sentimentColor = Colors.blueAccent;
-                sentimentLabel = 'NEUTRAL';
-              }
-
-              return Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: sentimentColor.withValues(alpha: 0.05),
-                      blurRadius: 20,
-                      spreadRadius: 0,
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Column(
+                children: [
+                  TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search ticker or name...',
+                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                      filled: true,
+                      fillColor: const Color(0xFF1E1E1E),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
                     ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Stack(
+                    onChanged: (val) {
+                      setState(() {
+                        _marketSearchQuery = val;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
                     children: [
-                      // Glass Background
-                      Container(
-                        height: 110,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.03),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.08),
-                            width: 1,
+                      ChoiceChip(
+                        label: const Text('Stocks'),
+                        selected: _marketFilter == 'Stocks',
+                        onSelected: (val) {
+                          if (val) {
+                            setState(() {
+                              _marketFilter = 'Stocks';
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('Funds'),
+                        selected: _marketFilter == 'Funds',
+                        onSelected: (val) {
+                          if (val) {
+                            setState(() {
+                              _marketFilter = 'Funds';
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () => service.fetchAllMarketData(),
+                color: Colors.white,
+                backgroundColor: const Color(0xFF1E1E1E),
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                  itemCount: stockEntries.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final ticker = stockEntries[index].key;
+                    final data =
+                        stockEntries[index].value as Map<String, dynamic>;
+                    final fullName =
+                        knownFunds[ticker] ?? knownStocks[ticker] ?? ticker;
+
+                    final priceRaw = data['price'];
+                    final rsiRaw = data['rsi'];
+                    final macdRaw = data['macd'] as String? ?? 'N/A';
+                    final price = priceRaw is num ? priceRaw.toDouble() : 0.0;
+                    final rsi = rsiRaw is num ? rsiRaw.toDouble() : 0.0;
+                    final isDataAvailable = priceRaw is num;
+
+                    // Sentiment Logic
+                    Color sentimentColor;
+                    String sentimentLabel;
+                    if (!isDataAvailable) {
+                      sentimentColor = Colors.grey.shade600;
+                      sentimentLabel = 'OFFLINE';
+                    } else if (rsi <= 35) {
+                      sentimentColor = Colors.greenAccent;
+                      sentimentLabel = 'OVERSOLD';
+                    } else if (rsi >= 70) {
+                      sentimentColor = Colors.redAccent;
+                      sentimentLabel = 'OVERBOUGHT';
+                    } else {
+                      sentimentColor = Colors.blueAccent;
+                      sentimentLabel = 'NEUTRAL';
+                    }
+
+                    return Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: sentimentColor.withValues(alpha: 0.05),
+                            blurRadius: 20,
+                            spreadRadius: 0,
                           ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
+                        ],
                       ),
-                      // Sentiment Ribbon (Vertical)
-                      Positioned(
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: 4,
-                        child: Container(color: sentimentColor),
-                      ),
-                      // Content
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Row(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Stack(
                           children: [
-                            const SizedBox(width: 8),
-                            // Ticker & Label
-                            Expanded(
-                              flex: 3,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    ticker,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          sentimentColor.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      sentimentLabel,
-                                      style: TextStyle(
-                                        color: sentimentColor,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 1,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                            // Glass Background
+                            Container(
+                              height: 110,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.03),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                  width: 1,
+                                ),
+                                borderRadius: BorderRadius.circular(20),
                               ),
                             ),
-                            // Metrics Grid
-                            Expanded(
-                              flex: 5,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                            // Sentiment Ribbon (Vertical)
+                            Positioned(
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: 4,
+                              child: Container(color: sentimentColor),
+                            ),
+                            // Content
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Row(
                                 children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      _buildMetricPill(
-                                        label: 'PRICE',
-                                        value: isDataAvailable
-                                            ? '\$${price.toStringAsFixed(2)}'
-                                            : 'N/A',
-                                        color: Colors.white,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      _buildMetricPill(
-                                        label: 'RSI',
-                                        value: isDataAvailable
-                                            ? rsi.toStringAsFixed(0)
-                                            : 'N/A',
-                                        color: sentimentColor,
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  // MACD Status Badge
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color:
-                                            Colors.black.withValues(alpha: 0.3),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.05),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.analytics_outlined,
-                                            size: 14,
-                                            color: Colors.grey.shade400,
+                                  const SizedBox(width: 8),
+                                  // Ticker & Label
+                                  Expanded(
+                                    flex: 3,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          fullName,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.5,
                                           ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            macdRaw.toUpperCase(),
-                                            style: TextStyle(
-                                              color: Colors.grey.shade300,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w600,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              ticker,
+                                              style: TextStyle(
+                                                color: Colors.grey.shade500,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: sentimentColor
+                                                    .withValues(alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                sentimentLabel,
+                                                style: TextStyle(
+                                                  color: sentimentColor,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  letterSpacing: 1,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Metrics Grid
+                                  Expanded(
+                                    flex: 5,
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
+                                          children: [
+                                            _buildMetricPill(
+                                              label: 'PRICE',
+                                              value: isDataAvailable
+                                                  ? '\$${price.toStringAsFixed(2)}'
+                                                  : 'N/A',
+                                              color: Colors.white,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            _buildMetricPill(
+                                              label: 'RSI',
+                                              value: isDataAvailable
+                                                  ? rsi.toStringAsFixed(0)
+                                                  : 'N/A',
+                                              color: sentimentColor,
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        // MACD Status Badge
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.3),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.05),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.analytics_outlined,
+                                                  size: 14,
+                                                  color: Colors.grey.shade400,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  macdRaw.toUpperCase(),
+                                                  style: TextStyle(
+                                                    color: Colors.grey.shade300,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
@@ -1375,12 +1713,12 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
                           ],
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -1427,7 +1765,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
             labelColor: const Color(0xFFFFFFFF),
             unselectedLabelColor: const Color(0xFF888888),
             tabs: const [
-              Tab(text: 'My Portfolio'),
+              Tab(text: 'My Wallet'),
               Tab(text: 'Market Status'),
             ],
           ),
@@ -1444,13 +1782,14 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> with TickerProvid
             const ConnectivityIndicator(),
           ],
         ),
-        floatingActionButton: (_tabController.index == 0 && _activePortfolioId != null) 
-          ? FloatingActionButton(
-              heroTag: null,
-              onPressed: _showAddAssetDialog,
-              child: const Icon(Icons.add),
-            )
-          : null,
+        floatingActionButton:
+            (_tabController.index == 0 && _activePortfolioId != null)
+                ? FloatingActionButton(
+                    heroTag: null,
+                    onPressed: _showAddAssetDialog,
+                    child: const Icon(Icons.add),
+                  )
+                : null,
       ),
     );
   }
@@ -1589,7 +1928,8 @@ class PortfolioPerformancePainter extends CustomPainter {
     );
 
     final fillPaint = Paint()
-      ..shader = gradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..shader =
+          gradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height))
       ..style = PaintingStyle.fill;
 
     canvas.drawPath(shadowPath, fillPaint);

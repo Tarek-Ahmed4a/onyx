@@ -29,14 +29,113 @@ def get_headers():
 app = Flask(__name__)
 CORS(app)
 
-EGX_30 = [
-    'ABUK.CA', 'ADIB.CA', 'AMOC.CA', 'ARCC.CA', 'BTFH.CA',
-    'CCAP.CA', 'COMI.CA', 'EAST.CA', 'EFID.CA', 'EFIH.CA',
-    'EGAL.CA', 'EGCH.CA', 'EMFD.CA', 'ETEL.CA', 'FWRY.CA',
-    'GBCO.CA', 'HELI.CA', 'HRHO.CA', 'ISPH.CA', 'JUFO.CA',
-    'MCQE.CA', 'ORAS.CA', 'ORHD.CA', 'OIH.CA',  'ORWE.CA',
-    'PHDC.CA', 'RAYA.CA', 'RMDA.CA', 'TMGH.CA', 'VLMR.CA'
+EGX_100 = [
+'AMER.CA' ,
+'ATLC.CA' ,
+'TALM.CA' ,
+'ISPH.CA' ,
+'ABUK.CA' ,
+'AIHC.CA' ,
+'AIDC.CA' ,
+'ASPI.CA' ,
+'SCEM.CA' ,
+'ASCM.CA' ,
+'EMFD.CA' ,
+'ACTF.CA' ,
+'ALCN.CA' ,
+'AMOC.CA' ,
+'IDRE.CA' ,
+'ISMA.CA' ,
+'AFDI.CA' ,
+'COMI.CA' ,
+'EXPA.CA' ,
+'DAPH.CA' ,
+'ISMQ.CA' ,
+'ICFC.CA' ,
+'IFAP.CA' ,
+'ZEOT.CA' ,
+'OCDI.CA' ,
+'SWDY.CA' ,
+'EAST.CA' ,
+'ELSH.CA' ,
+'UEGC.CA' ,
+'EGCH.CA' ,
+'ENGC.CA' ,
+'RMDA.CA' ,
+'PRCL.CA' ,
+'MEPA.CA' ,
+'OBRI.CA' ,
+'ARCC.CA' ,
+'ECAP.CA' ,
+'POUL.CA' ,
+'COSG.CA' ,
+'CCAP.CA' ,
+'CSAG.CA' ,
+'IEEC.CA' ,
+'PHAR.CA' ,
+'ETRS.CA' ,
+'ETEL.CA' ,
+'EGTS.CA' ,
+'MOED.CA' ,
+'MPRC.CA' ,
+'EHDR.CA' ,
+'ARAB.CA' ,
+'AMIA.CA' ,
+'MPCO.CA' ,
+'ORWE.CA' ,
+'KABO.CA' ,
+'NIPH.CA' ,
+'MTIE.CA' ,
+'OFH.CA' ,
+'ORAS.CA' ,
+'OIH.CA' ,
+'ORHD.CA' ,
+'EFIH.CA' ,
+'EFID.CA' ,
+'PHDC.CA' ,
+'BTFH.CA' ,
+'HDBK.CA' ,
+'CIEB.CA' ,
+'TANM.CA' ,
+'BIOC.CA' ,
+'SVCE.CA' ,
+'JUFO.CA' ,
+'GPIM.CA' ,
+'GBCO.CA' ,
+'DSCW.CA' ,
+'RAYA.CA' ,
+'RACC.CA' ,
+'ZMID.CA' ,
+'SIPC.CA' ,
+'SKPC.CA' ,
+'SDTI.CA' ,
+'NCCW.CA' ,
+'TAQA.CA' ,
+'VLMR.CA' ,
+'VLMRA.CA' ,
+'FWRY.CA' ,
+'CNFN.CA' ,
+'LCSW.CA' ,
+'MCRO.CA' ,
+'HRHO.CA' ,
+'TMGH.CA' ,
+'MASR.CA' ,
+'HELI.CA' ,
+'ATQA.CA' ,
+'MFPC.CA' ,
+'MCQE.CA' ,
+'EGAL.CA' ,
+'ADIB.CA' ,
+'AFMC.CA' ,
+'MPCI.CA' ,
+'KRDI.CA' ,
+'VALU.CA' ,
+'UNIP.CA' ,
 ]
+
+MUTUAL_FUNDS = ['NMF', 'CMS', 'ASO', 'BWA', 'ADA', 'AZG', 'BFA', 'BSB', 'MTF']
+
+WATCHLIST = EGX_100 + MUTUAL_FUNDS
 
 # Initialize Storage with Deques for each ticker (maxlen 100 for 1-minute accumulation)
 MARKET_DATA_CACHE = {
@@ -47,7 +146,7 @@ MARKET_DATA_CACHE = {
         "source": "Initializing",
         "deque": deque(maxlen=100)
     }
-    for ticker in EGX_30
+    for ticker in WATCHLIST
 }
 
 # --- Technicals ---
@@ -84,6 +183,29 @@ def _fetch_mubasher_price(ticker):
         print(f"Mubasher Error {ticker}: {e}")
     return None
 
+def _fetch_fund_price(ticker):
+    """Fallback web scraper for Egyptian Mutual Funds"""
+    try:
+        # First attempt: standard /funds/ URL
+        url = f"https://www.mubasher.info/markets/EGX/funds/{ticker}"
+        resp = requests.get(url, headers=get_headers(), timeout=5)
+        soup = BeautifulSoup(resp.text, 'lxml')
+        price_tag = soup.select_one('.market-summary__last-price')
+        if price_tag:
+            return float(price_tag.text.strip().replace(',', ''))
+        
+        # Second attempt fallback: /stocks/ URL since some (like AZG) trade like equities
+        url_alt = f"https://www.mubasher.info/markets/EGX/stocks/{ticker}"
+        resp_alt = requests.get(url_alt, headers=get_headers(), timeout=5)
+        soup_alt = BeautifulSoup(resp_alt.text, 'lxml')
+        price_tag_alt = soup_alt.select_one('.market-summary__last-price')
+        if price_tag_alt:
+            return float(price_tag_alt.text.strip().replace(',', ''))
+
+    except Exception as e:
+        print(f"Fund Scraping Error {ticker}: {e}")
+    return None
+
 # --- Data Engine ---
 def _fetch_single_ticker_aggressive(ticker):
     """Accumulates live prices into the deque and recalculates technicals."""
@@ -91,32 +213,35 @@ def _fetch_single_ticker_aggressive(ticker):
         data = MARKET_DATA_CACHE.get(ticker)
         if not data: return None
         
-        # 1. Primary Live Price (Mubasher)
-        live_price = _fetch_mubasher_price(ticker)
+        is_fund = ticker in MUTUAL_FUNDS
+        
+        # 1. Primary Live Price
+        live_price = _fetch_fund_price(ticker) if is_fund else _fetch_mubasher_price(ticker)
         
         # 2. History Bootstrap (Only if deque is empty)
         history_dq = data["deque"]
-        source = "Mubasher (Live Accumulation)"
+        source = "Fund Scraper" if is_fund else "Mubasher (Live Accumulation)"
         
         if len(history_dq) < 40:
-            # Attempt one-time bootstrap from yfinance
-            try:
-                stock = yf.Ticker(ticker)
-                df = stock.history(period="1mo", timeout=3)
-                if not df.empty:
-                    # Fill deque with historical points
-                    history_dq.clear()
-                    for p in df['Close'].tolist():
-                        history_dq.append(p)
-                    source = "Hybrid (yf Bootstrap + Live)"
-            except: pass
+            if not is_fund:
+                # Attempt one-time bootstrap from yfinance
+                try:
+                    stock = yf.Ticker(ticker)
+                    df = stock.history(period="1mo", timeout=3)
+                    if not df.empty:
+                        # Fill deque with historical points
+                        history_dq.clear()
+                        for p in df['Close'].tolist():
+                            history_dq.append(p)
+                        source = "Hybrid (yf Bootstrap + Live)"
+                except: pass
             
             # If still empty or yf failed, seed with dummy history
             if len(history_dq) < 40 and live_price:
                 history_dq.clear()
                 for _ in range(40):
                     history_dq.append(live_price)
-                source = "Mubasher (Dummy Seed)"
+                source = "Seed Scraper" if is_fund else "Mubasher (Dummy Seed)"
 
         # 3. Append latest point
         if live_price:
@@ -140,9 +265,9 @@ def _fetch_single_ticker_aggressive(ticker):
         return None
 
 def refresh_market_data():
-    print(f"🕒 Refreshing 30 tickers (Live Accumulation)...")
+    print(f"🕒 Refreshing {len(WATCHLIST)} tickers (Live Accumulation)...")
     with ThreadPoolExecutor(max_workers=30) as executor:
-        futures = {executor.submit(_fetch_single_ticker_aggressive, t): t for t in EGX_30}
+        futures = {executor.submit(_fetch_single_ticker_aggressive, t): t for t in WATCHLIST}
         for f in as_completed(futures):
             # The function updates MARKET_DATA_CACHE[ticker] directly
             f.result() 
@@ -198,7 +323,7 @@ def scan_market():
             return
             
         print("Starting Market Scan...")
-        tickers_str = " ".join(EGX_30)
+        tickers_str = " ".join(EGX_100)
         data = yf.download(tickers_str, period="2mo", interval="1d", group_by="ticker", auto_adjust=False, prepost=False, threads=True)
         
         if not firebase_admin._apps: 
@@ -206,7 +331,7 @@ def scan_market():
             
         db = firestore.client()
         
-        for ticker in EGX_30:
+        for ticker in WATCHLIST:
             stock_data = MARKET_DATA_CACHE.get(ticker)
             if not stock_data or stock_data['price'] == 0:
                 continue
@@ -216,15 +341,16 @@ def scan_market():
             
             volume_spike = False
             try:
-                if len(EGX_30) == 1:
-                    df = data
-                else:
-                    df = data[ticker]
-                if not df.empty and len(df) > 1:
-                    avg_vol = df['Volume'].iloc[-30:-1].mean()
-                    current_vol = df['Volume'].iloc[-1]
-                    if avg_vol > 0 and current_vol > (3 * avg_vol):
-                        volume_spike = True
+                if ticker in EGX_100:
+                    if len(EGX_100) == 1:
+                        df = data
+                    else:
+                        df = data[ticker]
+                    if not df.empty and len(df) > 1:
+                        avg_vol = df['Volume'].iloc[-30:-1].mean()
+                        current_vol = df['Volume'].iloc[-1]
+                        if avg_vol > 0 and current_vol > (3 * avg_vol):
+                            volume_spike = True
             except Exception as e:
                 pass
                 
@@ -321,7 +447,59 @@ def scan_market():
     except Exception as e:
         print(f"Scan Market Error: {e}")
 
+def take_daily_snapshots():
+    """Background job that calculates total portfolio value for all users and saves a snapshot."""
+    print("Initiating Daily Portfolio Snapshots...")
+    if not firebase_admin._apps: return
+    try:
+        db = firestore.client()
+        users_ref = db.collection('users')
+        user_docs = users_ref.stream()
+        
+        count = 0
+        for user_doc in user_docs:
+            uid = user_doc.id
+            inv_ref = users_ref.document(uid).collection('investments')
+            for portfolio in inv_ref.stream():
+                p_data = portfolio.to_dict()
+                assets = p_data.get('assets', [])
+                total_val = 0.0
+                
+                for asset in assets:
+                    ticker = asset.get('name')
+                    qty = asset.get('quantity', 0)
+                    if not ticker or qty <= 0: continue
+                    
+                    price = 0.0
+                    cached_data = MARKET_DATA_CACHE.get(ticker)
+                    if cached_data and cached_data['price'] > 0:
+                        price = cached_data['price']
+                    else:
+                        price = asset.get('buyPrice', 0.0)
+                        
+                    total_val += (price * float(qty))
+                
+                if total_val > 0:
+                    snapshot_ref = portfolio.reference.collection('portfolio_snapshots')
+                    snapshot_ref.add({
+                        'timestamp': firestore.SERVER_TIMESTAMP,
+                        'total_value': round(total_val, 2)
+                    })
+                    count += 1
+                    
+        print(f"✅ Daily Portfolio Snapshots completed successfully. ({count} portfolios)")
+    except Exception as e:
+        print(f"Error taking daily snapshots: {e}")
+
 scheduler.add_job(func=scan_market, trigger="interval", minutes=15)
+scheduler.add_job(
+    func=take_daily_snapshots,
+    trigger="cron",
+    day_of_week='sun,mon,tue,wed,thu',
+    hour=14,
+    minute=45,
+    timezone='Africa/Cairo'
+)
 scheduler.start()
 
 @app.route('/api/egx/all')
