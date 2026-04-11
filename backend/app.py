@@ -183,27 +183,57 @@ def _fetch_mubasher_price(ticker):
         print(f"Mubasher Error {ticker}: {e}")
     return None
 
-def _fetch_fund_price(ticker):
-    """Fallback web scraper for Egyptian Mutual Funds"""
-    try:
-        # First attempt: standard /funds/ URL
-        url = f"https://www.mubasher.info/markets/EGX/funds/{ticker}"
-        resp = requests.get(url, headers=get_headers(), timeout=5)
-        soup = BeautifulSoup(resp.text, 'lxml')
-        price_tag = soup.select_one('.market-summary__last-price')
-        if price_tag:
-            return float(price_tag.text.strip().replace(',', ''))
-        
-        # Second attempt fallback: /stocks/ URL since some (like AZG) trade like equities
-        url_alt = f"https://www.mubasher.info/markets/EGX/stocks/{ticker}"
-        resp_alt = requests.get(url_alt, headers=get_headers(), timeout=5)
-        soup_alt = BeautifulSoup(resp_alt.text, 'lxml')
-        price_tag_alt = soup_alt.select_one('.market-summary__last-price')
-        if price_tag_alt:
-            return float(price_tag_alt.text.strip().replace(',', ''))
+FUND_KEYWORDS = {
+    'ADA': 'صندوق استثمار شركة الأهلي لإدارة الإستثمارات المالية وايفولف للاستثمار في الذهب',
+    'BSB': 'صندوق استثمار بلتون ايفولف للاستثمار في الذهب - سبائك',
+    'BFA': 'صندوق استثمار بلتون - إيفولف للاستثمار في الفضة - فضة',
+    'BWA': 'صندوق بلتون متعدد الإصدارات للاستثمار في أسهم مؤشر الشريعة EGX33 - الإصدار الأول - وفرة',
+    'NMF': 'صندوق استثمار نعيم مصر وفقا لأحكام الشريعة الإسلامية',
+    'CMS': 'صندوق استثمار سي آي استس مانجمنت للاسثتمار في مؤشر الشريعة EGX33 - مصر مؤشر شريعة إكويتى',
+    'MTF': 'صندوق استثمار شركة مصر للتأمين التكافلي النقدى الإسلامي',
+    'AZG': 'صندوق أزيموت للمعادن النفيسة الإسلامي - الإصدار الأول - جولد - AZ', 
+    'ASO': 'صندوق أزيموت لفرص الأسهم - فرص الشريعة  AZ', 
+}
 
+def _fetch_fund_price(ticker):
+    """Offset-Paginated JSON API scraper for Egyptian Mutual Funds."""
+    try:
+        keyword = FUND_KEYWORDS.get(ticker)
+        if not keyword:
+            return None
+            
+        # Offset pagination by 20 up to 200
+        for start_offset in range(0, 220, 20):
+            url = f"https://www.mubasher.info/api/1/funds?country=eg&size=20&start={start_offset}"
+            print(f"Fetching API: {url} for {ticker}")
+            
+            resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
+            print(f"Mubasher API Status: {resp.status_code} (Offset {start_offset})")
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                rows = data.get('rows', [])
+                
+                for row in rows:
+                    if keyword in row.get('name', ''):
+                        price_val = row.get('price')
+                        if price_val is not None:
+                            price = float(price_val)
+                            print(f"✅ API Success: {ticker} -> {price}")
+                            return price
+                
+                if not rows:
+                    break
+            else:
+                print(f"Failed HTTP Status {resp.status_code} at offset {start_offset}")
+                break
+                
+        print(f"Failed to find match for keyword '{keyword}' across all API offsets for {ticker}")
+        
     except Exception as e:
-        print(f"Fund Scraping Error {ticker}: {e}")
+        print(f"Exception for {ticker}: {str(e)}")
+        print(f"API Scraping failed for {ticker}, falling back to DB")
+        
     return None
 
 # --- Data Engine ---
@@ -217,6 +247,27 @@ def _fetch_single_ticker_aggressive(ticker):
         
         # 1. Primary Live Price
         live_price = _fetch_fund_price(ticker) if is_fund else _fetch_mubasher_price(ticker)
+        
+        # Fallback to Firestore DB if live scraping failed (especially for Funds)
+        if live_price is None:
+            try:
+                if firebase_admin._apps:
+                    db = firestore.client()
+                    users_ref = db.collection('users')
+                    for user_doc in users_ref.stream():
+                        inv_ref = users_ref.document(user_doc.id).collection('investments')
+                        for portfolio in inv_ref.stream():
+                            p_data = portfolio.to_dict()
+                            for asset in p_data.get('assets', []):
+                                if asset.get('name') == ticker:
+                                    val = float(asset.get('buyPrice', 0.0))
+                                    if val > 0:
+                                        live_price = val
+                                        break
+                            if live_price is not None: break
+                        if live_price is not None: break
+            except Exception as e:
+                print(f"Firestore fallback error {ticker}: {e}")
         
         # 2. History Bootstrap (Only if deque is empty)
         history_dq = data["deque"]

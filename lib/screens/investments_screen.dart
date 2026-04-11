@@ -1601,7 +1601,10 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         const SizedBox(height: 6),
-                                        Row(
+                                        Wrap(
+                                          spacing: 8.0,
+                                          runSpacing: 4.0,
+                                          crossAxisAlignment: WrapCrossAlignment.center,
                                           children: [
                                             Text(
                                               ticker,
@@ -1611,17 +1614,11 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
-                                            const SizedBox(width: 8),
                                             Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 2),
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: sentimentColor
-                                                    .withValues(alpha: 0.1),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
+                                                color: sentimentColor.withValues(alpha: 0.1),
+                                                borderRadius: BorderRadius.circular(4),
                                               ),
                                               child: Text(
                                                 sentimentLabel,
@@ -1631,6 +1628,36 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                                   fontWeight: FontWeight.bold,
                                                   letterSpacing: 1,
                                                 ),
+                                              ),
+                                            ),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withValues(alpha: 0.3),
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(
+                                                  color: Colors.white.withValues(alpha: 0.05),
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.analytics_outlined,
+                                                    size: 12,
+                                                    color: Colors.grey.shade400,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    macdRaw.toUpperCase(),
+                                                    style: TextStyle(
+                                                      color: Colors.grey.shade300,
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w600,
+                                                      letterSpacing: 0.5,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                           ],
@@ -1666,44 +1693,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 12),
-                                        // MACD Status Badge
-                                        Align(
-                                          alignment: Alignment.centerRight,
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 10, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black
-                                                  .withValues(alpha: 0.3),
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                              border: Border.all(
-                                                color: Colors.white
-                                                    .withValues(alpha: 0.05),
-                                              ),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(
-                                                  Icons.analytics_outlined,
-                                                  size: 14,
-                                                  color: Colors.grey.shade400,
-                                                ),
-                                                const SizedBox(width: 6),
-                                                Text(
-                                                  macdRaw.toUpperCase(),
-                                                  style: TextStyle(
-                                                    color: Colors.grey.shade300,
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
+
                                       ],
                                     ),
                                   ),
