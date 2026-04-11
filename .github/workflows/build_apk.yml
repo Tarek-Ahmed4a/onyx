@@ -38,9 +38,7 @@ jobs:
       - name: Create .env file
         run: echo "${{ secrets.ENV_FILE }}" > .env
 
-      # 2. إعطاء صلاحية التشغيل الإجبارية لملف جرادل على سيرفر لينكس
-      - name: Grant execute permission for gradlew
-        run: chmod +x android/gradlew
+      
 
       # 3. إضافة حرف (-v) عشان يطبع كل خطوة بالتفصيل الممل وميعلقش في صمت
       - name: Build release APK
