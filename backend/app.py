@@ -195,7 +195,7 @@ FUND_KEYWORDS = {
     'ASO': 'صندوق أزيموت لفرص الأسهم - فرص الشريعة  AZ', 
 }
 
-def _fetch_fund_price(ticker):
+def _fetch_fund_price(ticker): 
     """Offset-Paginated JSON API scraper for Egyptian Mutual Funds."""
     try:
         keyword = FUND_KEYWORDS.get(ticker)
