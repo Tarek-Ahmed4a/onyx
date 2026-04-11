@@ -24,6 +24,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          cache: true
 
       # 1. قفل تحليلات فلاتر عشان السيرفر ميعلقش مستني إجابة (y/n)
       - name: Disable Flutter Analytics
