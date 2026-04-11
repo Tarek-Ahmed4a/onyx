@@ -1555,15 +1555,16 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                         child: Stack(
                           children: [
                             // Glass Background
-                            Container(
-                              height: 110,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.03),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.08),
-                                  width: 1,
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.03),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.08),
+                                    width: 1,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
-                                borderRadius: BorderRadius.circular(20),
                               ),
                             ),
                             // Sentiment Ribbon (Vertical)
@@ -1600,21 +1601,21 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                         ),
-                                        const SizedBox(height: 6),
+                                        Text(
+                                          ticker,
+                                          style: TextStyle(
+                                            color: Colors.grey.shade500,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
                                         Wrap(
                                           spacing: 8.0,
                                           runSpacing: 4.0,
                                           crossAxisAlignment:
                                               WrapCrossAlignment.center,
                                           children: [
-                                            Text(
-                                              ticker,
-                                              style: TextStyle(
-                                                color: Colors.grey.shade500,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
                                             Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
