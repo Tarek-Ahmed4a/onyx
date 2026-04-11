@@ -1590,19 +1590,16 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
-                                        FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          alignment: AlignmentDirectional.centerStart,
-                                          child: Text(
-                                            fullName,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w900,
-                                              letterSpacing: 0.5,
-                                            ),
-                                            maxLines: 1,
+                                        Text(
+                                          fullName,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.5,
                                           ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                         Text(
                                           ticker,
@@ -1664,15 +1661,16 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                                     color: Colors.grey.shade400,
                                                   ),
                                                   const SizedBox(width: 4),
-                                                  Text(
-                                                    macdRaw.toUpperCase(),
-                                                    style: TextStyle(
-                                                      color:
-                                                          Colors.grey.shade300,
-                                                      fontSize: 10,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      letterSpacing: 0.5,
+                                                  Flexible(
+                                                    child: Text(
+                                                      macdRaw.toUpperCase(),
+                                                      style: TextStyle(
+                                                        color: Colors.grey.shade300,
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.w600,
+                                                        letterSpacing: 0.5,
+                                                      ),
+                                                      maxLines: 2,
                                                     ),
                                                   ),
                                                 ],
