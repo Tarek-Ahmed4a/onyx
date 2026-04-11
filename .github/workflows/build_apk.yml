@@ -20,11 +20,13 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          cache: true
+      - name: Manual Flutter Install (Bypass Extraction Freeze)
+        run: |
+          git clone https://github.com/flutter/flutter.git -b stable --depth 1
+          echo "$GITHUB_WORKSPACE/flutter/bin" >> $GITHUB_PATH
+
+      - name: Initialize Flutter
+        run: flutter precache
 
       # 1. قفل تحليلات فلاتر عشان السيرفر ميعلقش مستني إجابة (y/n)
       - name: Disable Flutter Analytics
