@@ -1598,8 +1598,6 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                             fontWeight: FontWeight.w900,
                                             letterSpacing: 0.5,
                                           ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
                                         ),
                                         Text(
                                           ticker,
@@ -1620,7 +1618,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                               padding:
                                                   const EdgeInsets.symmetric(
                                                       horizontal: 8,
-                                                      vertical: 2),
+                                                      vertical: 4),
                                               decoration: BoxDecoration(
                                                 color: sentimentColor
                                                     .withValues(alpha: 0.1),
@@ -1641,7 +1639,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                               padding:
                                                   const EdgeInsets.symmetric(
                                                       horizontal: 8,
-                                                      vertical: 2),
+                                                      vertical: 4),
                                               decoration: BoxDecoration(
                                                 color: Colors.black
                                                     .withValues(alpha: 0.3),
