@@ -1598,7 +1598,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                             fontWeight: FontWeight.w900,
                                             letterSpacing: 0.5,
                                           ),
-                                          maxLines: 1,
+                                          maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         Text(
@@ -1670,7 +1670,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                                         fontWeight: FontWeight.w600,
                                                         letterSpacing: 0.5,
                                                       ),
-                                                      maxLines: 2,
+                                                      maxLines: 1,
+                                                      softWrap: false,
                                                     ),
                                                   ),
                                                 ],
