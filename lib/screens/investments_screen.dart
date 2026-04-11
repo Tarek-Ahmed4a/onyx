@@ -1590,13 +1590,18 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
-                                        Text(
-                                          fullName,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w900,
-                                            letterSpacing: 0.5,
+                                        FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: AlignmentDirectional.centerStart,
+                                          child: Text(
+                                            fullName,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 0.5,
+                                            ),
+                                            maxLines: 1,
                                           ),
                                         ),
                                         Text(
@@ -1617,8 +1622,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                             Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4),
+                                                      horizontal: 10,
+                                                      vertical: 6),
                                               decoration: BoxDecoration(
                                                 color: sentimentColor
                                                     .withValues(alpha: 0.1),
@@ -1638,8 +1643,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                             Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4),
+                                                      horizontal: 10,
+                                                      vertical: 6),
                                               decoration: BoxDecoration(
                                                 color: Colors.black
                                                     .withValues(alpha: 0.3),
