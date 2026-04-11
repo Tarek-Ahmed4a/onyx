@@ -25,14 +25,23 @@ jobs:
         with:
           channel: 'stable'
 
+      # 1. قفل تحليلات فلاتر عشان السيرفر ميعلقش مستني إجابة (y/n)
+      - name: Disable Flutter Analytics
+        run: flutter config --no-analytics
+
       - name: Install dependencies
         run: flutter pub get
 
       - name: Create .env file
         run: echo "${{ secrets.ENV_FILE }}" > .env
 
+      # 2. إعطاء صلاحية التشغيل الإجبارية لملف جرادل على سيرفر لينكس
+      - name: Grant execute permission for gradlew
+        run: chmod +x android/gradlew
+
+      # 3. إضافة حرف (-v) عشان يطبع كل خطوة بالتفصيل الممل وميعلقش في صمت
       - name: Build release APK
-        run: flutter build apk --release
+        run: flutter build apk --release -v
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
