@@ -1604,7 +1604,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                         Wrap(
                                           spacing: 8.0,
                                           runSpacing: 4.0,
-                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
                                           children: [
                                             Text(
                                               ticker,
@@ -1615,10 +1616,15 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                               ),
                                             ),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: sentimentColor.withValues(alpha: 0.1),
-                                                borderRadius: BorderRadius.circular(4),
+                                                color: sentimentColor
+                                                    .withValues(alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
                                               ),
                                               child: Text(
                                                 sentimentLabel,
@@ -1631,12 +1637,18 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                               ),
                                             ),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: Colors.black.withValues(alpha: 0.3),
-                                                borderRadius: BorderRadius.circular(4),
+                                                color: Colors.black
+                                                    .withValues(alpha: 0.3),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
                                                 border: Border.all(
-                                                  color: Colors.white.withValues(alpha: 0.05),
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.05),
                                                 ),
                                               ),
                                               child: Row(
@@ -1651,9 +1663,11 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                                   Text(
                                                     macdRaw.toUpperCase(),
                                                     style: TextStyle(
-                                                      color: Colors.grey.shade300,
+                                                      color:
+                                                          Colors.grey.shade300,
                                                       fontSize: 10,
-                                                      fontWeight: FontWeight.w600,
+                                                      fontWeight:
+                                                          FontWeight.w600,
                                                       letterSpacing: 0.5,
                                                     ),
                                                   ),
@@ -1693,7 +1707,6 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                             ),
                                           ],
                                         ),
-
                                       ],
                                     ),
                                   ),
