@@ -1578,137 +1578,120 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                             // Content
                             Padding(
                               padding: const EdgeInsets.all(16.0),
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const SizedBox(width: 8),
-                                  // Ticker & Label
-                                  Expanded(
-                                    flex: 3,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          fullName,
-                                          style: const TextStyle(
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Title & Ticker
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              fullName,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w900,
+                                                letterSpacing: 0.5,
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              ticker,
+                                              style: TextStyle(
+                                                color: Colors.grey.shade500,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      // Metrics Grid
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          _buildMetricPill(
+                                            label: 'PRICE',
+                                            value: isDataAvailable
+                                                ? '\$${price.toStringAsFixed(2)}'
+                                                : 'N/A',
                                             color: Colors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w900,
-                                            letterSpacing: 0.5,
                                           ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        Text(
-                                          ticker,
-                                          style: TextStyle(
-                                            color: Colors.grey.shade500,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
+                                          const SizedBox(width: 8),
+                                          _buildMetricPill(
+                                            label: 'RSI',
+                                            value: isDataAvailable
+                                                ? rsi.toStringAsFixed(0)
+                                                : 'N/A',
+                                            color: sentimentColor,
                                           ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Wrap(
-                                          spacing: 8.0,
-                                          runSpacing: 4.0,
-                                          crossAxisAlignment:
-                                              WrapCrossAlignment.center,
-                                          children: [
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 6),
-                                              decoration: BoxDecoration(
-                                                color: sentimentColor
-                                                    .withValues(alpha: 0.1),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                sentimentLabel,
-                                                style: TextStyle(
-                                                  color: sentimentColor,
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                  letterSpacing: 1,
-                                                ),
-                                              ),
-                                            ),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 6),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black
-                                                    .withValues(alpha: 0.3),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                                border: Border.all(
-                                                  color: Colors.white
-                                                      .withValues(alpha: 0.05),
-                                                ),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(
-                                                    Icons.analytics_outlined,
-                                                    size: 12,
-                                                    color: Colors.grey.shade400,
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Flexible(
-                                                    child: Text(
-                                                      macdRaw.toUpperCase(),
-                                                      style: TextStyle(
-                                                        color: Colors.grey.shade300,
-                                                        fontSize: 10,
-                                                        fontWeight: FontWeight.w600,
-                                                        letterSpacing: 0.5,
-                                                      ),
-                                                      maxLines: 1,
-                                                      softWrap: false,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
-                                  // Metrics Grid
-                                  Expanded(
-                                    flex: 5,
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
+                                  const SizedBox(height: 12),
+                                  // Tags Section (Scrollable horizontally)
+                                  SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: Row(
                                       children: [
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.end,
-                                          children: [
-                                            _buildMetricPill(
-                                              label: 'PRICE',
-                                              value: isDataAvailable
-                                                  ? '\$${price.toStringAsFixed(2)}'
-                                                  : 'N/A',
-                                              color: Colors.white,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            _buildMetricPill(
-                                              label: 'RSI',
-                                              value: isDataAvailable
-                                                  ? rsi.toStringAsFixed(0)
-                                                  : 'N/A',
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: sentimentColor.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            sentimentLabel,
+                                            style: TextStyle(
                                               color: sentimentColor,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 1,
                                             ),
-                                          ],
+                                            maxLines: 1,
+                                            softWrap: false,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(alpha: 0.3),
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(
+                                              color: Colors.white.withValues(alpha: 0.05),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.analytics_outlined,
+                                                size: 12,
+                                                color: Colors.grey.shade400,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                macdRaw.toUpperCase(),
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade300,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w600,
+                                                  letterSpacing: 0.5,
+                                                ),
+                                                maxLines: 1,
+                                                softWrap: false,
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ],
                                     ),
