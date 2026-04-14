@@ -55,42 +55,25 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   // ── ONYX System Prompt ────────────────────────────────────
   static const String _systemPrompt =
       "You are ONYX, an elite algorithmic trading assistant and financial expert. \n\n"
-      "**[STRICT DIRECTIVE - GEOGRAPHIC CONTEXT]**\n"
-      "You are an elite financial AI assistant tailored for an Egyptian investor. "
-      "Unless explicitly stated otherwise by the user, you MUST assume that all queries "
-      "regarding 'the market', 'stocks', 'buying', or 'selling' refer strictly to the "
-      "Egyptian Stock Exchange (EGX) and the Egyptian economy. Prioritize EGX data, "
-      "Egyptian news, and EGP currency in your searches and responses.\n\n"
-      "**[STRICT DIRECTIVE - INTERNET ACCESS]**\n"
-      "You are connected to the internet via Google Search grounding. "
-      "If the user asks about current market expectations, real-time news, stock analysis, "
-      "global indices, commodities, or ANY financial topic where the provided local app data "
-      "is insufficient or absent, you MUST autonomously use your Google Search tool to find "
-      "the latest financial information. Base your response on those real-time web results. "
-      "NEVER say you cannot access the internet, cannot find real-time data, or do not have "
-      "access to live information. You always do.\n\n"
-      "**[STRICT DIRECTIVE - HARDCORE RULE]**\n"
-      "You are FORBIDDEN from mentioning, referencing, or analyzing the user's portfolio data UNLESS the user explicitly asks about it (e.g., using words like محفظتي, محفظتك, portfolio). If the user asks about a specific stock, ONLY analyze that exact stock. End of rule.\n\n"
-      "**[VITAL CONSTRAINT]**\n"
-      "You have access to the user's live portfolio and market data as background context. Answer ONLY the specific question asked. DO NOT analyze the user's portfolio or provide general market overviews unless explicitly requested. Be extremely concise, direct, and pragmatic. No fluff.\n\n"
-      "**[Your Personality & Tone]**\n"
-      "Speak exactly like a senior Egyptian financial engineer talking to a peer. "
-      "Use a pragmatic, 'No BS', confident, and direct tone. "
-      "Use natural Egyptian developer/trader slang gracefully "
-      "(e.g., 'يا هندسة', 'من الآخر', 'بص', 'فرصة ممتازة', 'السهم ده جاب آخره'). "
-      "NEVER sound like a generic AI or a corporate robot.\n\n"
-      "**[Core Directives - STRICT INSTRUCTIONS]**\n"
-      "1. **ZERO Disclaimers:** NEVER say 'I am an AI', 'I cannot give financial advice', "
-      "'Consult a professional', or 'The decision is yours'. "
-      "The user explicitly accepts all risks. Stop apologizing and start analyzing.\n"
-      "2. **Specific Stock Analysis:** Focus exclusively on the metrics provided in the <MARKET_DATA_INTERNAL> for the requested ticker. "
-      "If the user asks for general recommendations like 'أشتري إيه النهاردة؟', you may analyze the <FULL_MARKET_SCAN> to find top RSI/MACD signals.\n"
-      "3. **Format:** Output your technical breakdowns in clean, organized Markdown. "
-      "Use bullet points and emojis 💰📊📈🎯 for readability.\n"
-      "4. **ZERO Hallucination (Strict Grounding):** Your technical analysis for EGX stocks must be based "
-      "EXCLUSIVELY on the exact numbers provided inside the <MARKET_DATA_INTERNAL> tags. "
-      "If the user asks about a stock that is NOT in the list (e.g., Apple, Tesla), you MUST use Google Search to find the latest data and answer based on real-time web results.";
-
+      "**[1. PERSONA & TONE (THE 'NO BS' APPROACH)]**\n"
+      "Speak exactly like a senior Egyptian software architect and financial expert. Be pragmatic, straightforward, and tell it like it is. No sugar-coating. No fluff. No pseudo-questions. Use full sentences with real clarity. Sound smart, grounded, and direct, like you’re actually helping. Don't flatter the user; always tell the truth. Use natural Egyptian tech/trading slang gracefully (e.g., 'يا هندسة', 'من الآخر', 'بص', 'الزتونة'). NEVER sound like a generic AI or apologize.\n\n"
+      "**[2. EXTREME BREVITY (NO YAPPING)]**\n"
+      "Since your token limit is open, you are strictly bound by brevity. Get straight to the point immediately. Deliver high-value information in the absolute minimum number of words. If a 3-word answer works, do not use 10. The user's time is money.\n\n"
+      "Assume all queries about markets/stocks refer to the Egyptian Stock Exchange (EGX).\n\n"
+      "**[4. ANTI-EVASION & RISK HANDLING (CRITICAL)]**\n"
+      "DO NOT refuse high-risk questions. DO NOT narrate your search process. Provide a brutally honest 1-sentence reality check about risks, then IMMEDIATELY provide the requested data and specific stock picks (Tickers).\n\n"
+      "**[5. MANDATORY PORTFOLIO ALLOCATION FORMAT]**\n"
+      "When asked to allocate money (e.g., 'معايا 10000 جنيه'), strictly use this Markdown format:\n"
+      "⚠️ **تحذير مهم:** (1 sentence pragmatic reality check).\n"
+      "📊 **وضع البورصة دلوقتي:** (1 sentence on current EGX momentum).\n"
+      "💡 **أبرز الأسهم المرشحة:** (List 3-4 specific EGX stocks).\n"
+      "🗂️ **توزيعة مقترحة لـ [Amount]:**\n"
+      "| السهم | القطاع | المبلغ المقترح | السبب |\n"
+      "|---|---|---|---|\n"
+      "| [Stock Name] | [Sector] | [Allocated Value] | [Brief Reason] |\n"
+      "🔴 **نصائح سريعة:** (2 short bullet points).\n\n"
+      "**[CRITICAL formatting]**: You MUST fully complete all rows of the Markdown table. Keep your text explanations outside the table to an absolute minimum (max 1 short sentence) to ensure you have enough tokens to finish rendering the table completely.\n\n"
+      "**[DATA ENFORCEMENT - ZERO TOLERANCE]**: You HAVE access to live EGX prices in the <MARKET_DATA_INTERNAL> tags. The prices provided there are the ABSOLUTE TRUTH. Never claim you don't have access to data. If a stock is in the tags, use its price. If NOT in the tags, say 'I don't have the live price for this asset'. NEVER guess or hallucinate a price.";
   @override
   void initState() {
     super.initState();
@@ -187,23 +170,72 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   // ─── CONTEXT BUILDERS ─────────────────────────────────────
 
-  /// Builds a concise, pre-filtered market scan for the AI.
+  /// Builds a compact string of the top 25 EGX assets for the AI context.
   String _buildOptimizedMarketScan(MarketDataService service) {
-    if (service.stocksData.isEmpty) return '';
-    final buffer = StringBuffer();
-    buffer.writeln('<FULL_MARKET_SCAN>');
-    service.stocksData.forEach((ticker, info) {
-      if (info is Map) {
-        final double rsi = (info['rsi'] as num?)?.toDouble() ?? 50.0;
-        if (rsi <= 35 || rsi >= 75) {
-          final price = info['price'] ?? '?';
-          final macd = info['macd'] ?? 'Unknown';
-          buffer.write('$ticker: Price=$price, RSI=$rsi, MACD=$macd | ');
-        }
+    if (!service.hasData) return "Market Data is currently unavailable.";
+
+    final List<String> lines = [];
+    final stocks = service.stocksData;
+    
+    // Get all tickers to provide full EGX100 visibility as requested
+    final tickers = stocks.keys.toList()..sort();
+    final topTickers = tickers.take(100);
+
+    for (final t in topTickers) {
+      final data = stocks[t];
+      if (data == null) continue;
+      
+      final price = data['price'] ?? '?';
+      final change = data['change'] ?? '0';
+      final rsi = data['rsi'] ?? '50';
+      final macd = data['macd'] ?? 'Neutral';
+      
+      lines.add("$t: $price ($change%), RSI: $rsi, MACD: $macd");
+    }
+
+    return lines.join(" | ");
+  }
+
+  /// Extracted helper to identify stock mentions in Arabic and English.
+  List<String> _extractAllMentionedTickers(String text, MarketDataService service) {
+    final Set<String> foundTickers = {};
+    final words = text.toLowerCase();
+
+    // 1. Check for English Tickers (e.g. COMI)
+    for (final ticker in service.stocksData.keys) {
+      final symbol = ticker.split('.')[0].toLowerCase();
+      if (words.contains(symbol)) {
+        foundTickers.add(ticker);
+      }
+    }
+
+    // 2. Map Arabic Names to Tickers
+    final Map<String, String> arabicMap = {
+      'تجاري': 'COMI.CA',
+      'طلعت': 'TMGH.CA',
+      'مصطفي': 'TMGH.CA',
+      'مصطفى': 'TMGH.CA',
+      'شرقية': 'EAST.CA',
+      'دخان': 'EAST.CA',
+      'أوراسكوم': 'ORAS.CA',
+      'انشاء': 'ORAS.CA',
+      'فوري': 'FWRY.CA',
+      'هرماس': 'HRHO.CA',
+      'بيلتون': 'BTEL.CA',
+      'أبو قير': 'ABUK.CA',
+      'القلعة': 'CCAP.CA',
+      'إعمار': 'EMFD.CA',
+      'موبكو': 'MFPC.CA',
+      'سويدي': 'SWDY.CA',
+    };
+
+    arabicMap.forEach((arabic, ticker) {
+      if (words.contains(arabic)) {
+        foundTickers.add(ticker);
       }
     });
-    buffer.writeln('\n</FULL_MARKET_SCAN>');
-    return buffer.toString();
+
+    return foundTickers.toList();
   }
 
   /// Retrieves the user's portfolio data from Firestore for prompt injection.
@@ -242,46 +274,74 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
-  /// Assembles the full system instruction: persona + portfolio + market data.
   Future<String> _buildSystemInstruction(
       String userText, MarketDataService service) async {
-    final marketScan = _buildOptimizedMarketScan(service);
     final portfolioContext = await _getPortfolioContext();
 
-    // Deep context for a specific ticker if mentioned.
-    final ticker = _extractTicker(userText);
-    String tickerContext = '';
-    if (ticker != null) {
-      final stockData = service.getStockData(ticker);
-      if (stockData != null) {
-        tickerContext =
-            "\n[LIVE_DATA_SNIPPET: $ticker is trading at ${stockData['price']}, "
-            "RSI is ${stockData['rsi']}, MACD is ${stockData['macd']}]\n";
+    // 1. Identify ALL mentioned tickers (Arabic or English)
+    final mentionedTickers = _extractAllMentionedTickers(userText, service);
+    
+    // 2. Build High-Priority Context for these assets
+    String priorityContext = '';
+    if (mentionedTickers.isNotEmpty) {
+      priorityContext = "\n<PRIORITY_LIVE_DATA>\n";
+      for (final ticker in mentionedTickers) {
+        final stockData = service.getStockData(ticker);
+        if (stockData != null) {
+          priorityContext +=
+              "[EXACT_LIVE_DATA: $ticker is at ${stockData['price']} (${stockData['change']}%), Vol: ${stockData['volume']}, RSI: ${stockData['rsi']}, MACD: ${stockData['macd']}]\n";
+        }
       }
+      priorityContext += "</PRIORITY_LIVE_DATA>\n";
     }
+
+    final newsContext = service.news.isNotEmpty
+        ? "\n<MARKET_NEWS_INTERNAL>\n${service.news.join('\n')}\n</MARKET_NEWS_INTERNAL>\n"
+        : "";
+
+    final macroContext = service.macro.isNotEmpty
+        ? "\n<MARKET_MACRO_INTERNAL>\n"
+            "EGX100 Index: ${service.macro['egx100']}\n"
+            "USD/EGP Rate: ${service.macro['usd_egp']}\n"
+            "Gold (GC=F): ${service.macro['gold']}\n"
+            "Market Breadth: ${service.breadth}\n"
+            "</MARKET_MACRO_INTERNAL>\n"
+        : "";
 
     return """
 $_systemPrompt
 
+$priorityContext
 $portfolioContext
-$tickerContext
-
-<MARKET_DATA_INTERNAL>
-$marketScan
-</MARKET_DATA_INTERNAL>
+$newsContext
+$macroContext
 """;
   }
 
-  /// Builds the Gemini `contents` array from current message history.
+  /// Builds the Gemini `contents` array from current message history,
+  /// strictly enforcing alternating 'user' and 'model' roles.
   List<Map<String, dynamic>> _buildContents() {
-    return _messages.map((msg) {
-      return {
-        'role': msg.isUser ? 'user' : 'model',
-        'parts': [
-          {'text': msg.text}
-        ],
-      };
-    }).toList();
+    final List<Map<String, dynamic>> filtered = [];
+    for (final msg in _messages) {
+      final role = msg.isUser ? 'user' : 'model';
+      // Gemini API strictly requires starting with 'user' and alternating.
+      if (filtered.isEmpty) {
+        if (role == 'user') {
+          filtered.add({
+            'role': role,
+            'parts': [{'text': msg.text}],
+          });
+        }
+      } else {
+        if (filtered.last['role'] != role) {
+          filtered.add({
+            'role': role,
+            'parts': [{'text': msg.text}],
+          });
+        }
+      }
+    }
+    return filtered;
   }
 
   // ─── SEND MESSAGE (MAIN ENTRY POINT) ──────────────────────
@@ -303,8 +363,7 @@ $marketScan
 
     try {
       // Build shared context.
-      final systemInstruction =
-          await _buildSystemInstruction(text, service);
+      final systemInstruction = await _buildSystemInstruction(text, service);
       final contents = _buildContents();
 
       // ── Intelligent routing ──────────────────────────────
@@ -323,12 +382,13 @@ $marketScan
           conversationHistory: contents,
         );
       } else {
-        debugPrint('🤖 ChatScreen: Routing to CHAT model');
+        final marketScan = _buildOptimizedMarketScan(service);
         response = await _router.sendChatMessage(
           text,
           systemInstruction: systemInstruction,
           conversationHistory: contents,
-          enableGrounding: true,
+          enableGrounding: false,
+          localMarketData: marketScan,
         );
       }
 
@@ -347,6 +407,11 @@ $marketScan
       _scrollToBottom();
     } on AiQuotaException {
       setState(() {
+        if (_messages.isNotEmpty && _messages.last.isUser) {
+          _messages.removeLast();
+          _messageAnimControllers.removeLast().dispose();
+        }
+        _textController.text = text;
         _addMessage(Message(
           text:
               '⚠️ Servers busy. My brain is overloaded (Quota reached). Please try again in 5 mins.',
@@ -358,9 +423,13 @@ $marketScan
       _scrollToBottom();
     } on AiServerException {
       setState(() {
+        if (_messages.isNotEmpty && _messages.last.isUser) {
+          _messages.removeLast();
+          _messageAnimControllers.removeLast().dispose();
+        }
+        _textController.text = text;
         _addMessage(Message(
-          text:
-              'السيرفر عليه ضغط حالياً من جوجل، جرب تسأل تاني كمان دقيقة.',
+          text: 'السيرفر عليه ضغط حالياً من جوجل، جرب تسأل تاني كمان دقيقة.',
           isUser: false,
         ));
         _isLoading = false;
@@ -370,6 +439,11 @@ $marketScan
     } catch (e) {
       debugPrint('AI Chat Error: $e');
       setState(() {
+        if (_messages.isNotEmpty && _messages.last.isUser) {
+          _messages.removeLast();
+          _messageAnimControllers.removeLast().dispose();
+        }
+        _textController.text = text;
         _addMessage(Message(
           text: 'عذراً يا هندسة، حصلت مشكلة تقنية. جرب تاني كمان شوية.',
           isUser: false,
@@ -598,8 +672,7 @@ $marketScan
 
         Widget bubble = _MessageBubble(
           message: msg,
-          userName:
-              FirebaseAuth.instance.currentUser?.displayName ?? 'U',
+          userName: FirebaseAuth.instance.currentUser?.displayName ?? 'U',
         );
 
         if (animController != null) {
@@ -674,7 +747,8 @@ $marketScan
               _buildQuickPrompt('📊 Market Overview',
                   payload: 'نظرة عامة على السوق المصري (EGX) وأحدث الأخبار'),
               _buildQuickPrompt('💰 أشتري إيه؟',
-                  payload: 'بناءً على السوق المصري اليوم، إيه أفضل الأسهم اللي ممكن أشتريها دلوقتي وليه؟'),
+                  payload:
+                      'بناءً على السوق المصري اليوم، إيه أفضل الأسهم اللي ممكن أشتريها دلوقتي وليه؟'),
             ],
           ),
         ],
@@ -741,8 +815,7 @@ $marketScan
           const SizedBox(width: 10),
           // Typing dots
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: BoxDecoration(
               color: _ChatColors.aiBubble,
               borderRadius: const BorderRadius.only(
@@ -815,8 +888,7 @@ $marketScan
                     offset: const Offset(0, -4),
                   ),
                   BoxShadow(
-                    color:
-                        _ChatColors.accentGlow.withValues(alpha: 0.05),
+                    color: _ChatColors.accentGlow.withValues(alpha: 0.05),
                     blurRadius: 30,
                     offset: const Offset(0, -2),
                   ),
@@ -824,7 +896,6 @@ $marketScan
               ),
               child: Row(
                 children: [
-
                   // Text field
                   Expanded(
                     child: TextField(
@@ -838,8 +909,8 @@ $marketScan
                       decoration: InputDecoration(
                         hintText: 'Ask ONYX anything...',
                         hintStyle: TextStyle(
-                          color: _ChatColors.textSecondary
-                              .withValues(alpha: 0.5),
+                          color:
+                              _ChatColors.textSecondary.withValues(alpha: 0.5),
                           fontSize: 15,
                           fontWeight: FontWeight.w400,
                         ),
@@ -875,9 +946,7 @@ $marketScan
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
-                        color: _isLoading
-                            ? _ChatColors.surfaceLight
-                            : null,
+                        color: _isLoading ? _ChatColors.surfaceLight : null,
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: _isLoading
                             ? []
@@ -894,8 +963,7 @@ $marketScan
                         Icons.arrow_upward_rounded,
                         size: 20,
                         color: _isLoading
-                            ? _ChatColors.textSecondary
-                                .withValues(alpha: 0.4)
+                            ? _ChatColors.textSecondary.withValues(alpha: 0.4)
                             : Colors.white,
                       ),
                     ),
@@ -1002,15 +1070,13 @@ class _MessageBubble extends StatelessWidget {
                 border: isUser
                     ? null
                     : Border.all(
-                        color:
-                            _ChatColors.aiBorder.withValues(alpha: 0.5),
+                        color: _ChatColors.aiBorder.withValues(alpha: 0.5),
                         width: 1,
                       ),
                 boxShadow: [
                   BoxShadow(
                     color: isUser
-                        ? _ChatColors.userBubble
-                            .withValues(alpha: 0.2)
+                        ? _ChatColors.userBubble.withValues(alpha: 0.2)
                         : Colors.black.withValues(alpha: 0.15),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
@@ -1120,12 +1186,11 @@ class _MessageBubble extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: _ChatColors.surfaceLight
-                              .withValues(alpha: 0.4),
+                          color:
+                              _ChatColors.surfaceLight.withValues(alpha: 0.4),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: _ChatColors.aiBorder
-                                .withValues(alpha: 0.3),
+                            color: _ChatColors.aiBorder.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Column(
@@ -1151,8 +1216,7 @@ class _MessageBubble extends StatelessWidget {
                             ),
                             const SizedBox(height: 6),
                             ...message.sources!.map((source) => Padding(
-                                  padding:
-                                      const EdgeInsets.only(bottom: 4),
+                                  padding: const EdgeInsets.only(bottom: 4),
                                   child: InkWell(
                                     onTap: () {
                                       final uri = source['uri'];
@@ -1168,11 +1232,9 @@ class _MessageBubble extends StatelessWidget {
                                         color: _ChatColors.accentGlow
                                             .withValues(alpha: 0.85),
                                         fontSize: 12,
-                                        decoration:
-                                            TextDecoration.underline,
-                                        decorationColor:
-                                            _ChatColors.accentGlow
-                                                .withValues(alpha: 0.4),
+                                        decoration: TextDecoration.underline,
+                                        decorationColor: _ChatColors.accentGlow
+                                            .withValues(alpha: 0.4),
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -1229,8 +1291,7 @@ class _MessageBubble extends StatelessWidget {
   }
 
   Widget _buildUserAvatar() {
-    final initial =
-        userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
+    final initial = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
     return Container(
       width: 32,
       height: 32,
@@ -1312,8 +1373,7 @@ class _TypingDotState extends State<_TypingDot>
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: _ChatColors.accentGlow
-                .withValues(alpha: _animation.value),
+            color: _ChatColors.accentGlow.withValues(alpha: _animation.value),
             shape: BoxShape.circle,
           ),
         );

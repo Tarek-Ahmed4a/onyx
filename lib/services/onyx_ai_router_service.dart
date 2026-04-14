@@ -158,10 +158,16 @@ class OnyxAiRouterService {
     String prompt, {
     String? systemInstruction,
     List<Map<String, dynamic>>? conversationHistory,
-    bool enableGrounding = true,
+    bool enableGrounding = false,
+    String? localMarketData,
   }) async {
+    String ragContext = '';
+    if (enableGrounding) {
+      ragContext = await _fetchMarketContext(prompt);
+    }
+
     // Build contents: use history if provided, else wrap prompt.
-    final contents = conversationHistory ??
+    var contents = conversationHistory ??
         [
           {
             'role': 'user',
@@ -171,11 +177,49 @@ class OnyxAiRouterService {
           }
         ];
 
+    // Inject market data and RAG context invisibly into the latest user message
+    if (contents.isNotEmpty && contents.last['role'] == 'user') {
+      // Deep clone to prevent mutating the caller's history reference
+      final newContents = List<Map<String, dynamic>>.from(contents);
+      final lastMsg = Map<String, dynamic>.from(newContents.last);
+      final parts = List<Map<String, dynamic>>.from(lastMsg['parts']);
+      final part = Map<String, dynamic>.from(parts[0]);
+
+      String originalText = part['text'];
+      String modifiedText = originalText;
+
+      if (localMarketData != null && localMarketData.isNotEmpty) {
+        modifiedText = "<MARKET_DATA_INTERNAL>\n$localMarketData\n</MARKET_DATA_INTERNAL>\n\nUser Question: $modifiedText";
+      }
+
+      if (ragContext.isNotEmpty) {
+        modifiedText = "Context: $ragContext\n\nUser Question: $modifiedText";
+      }
+      
+      part['text'] = modifiedText;
+
+      parts[0] = part;
+      lastMsg['parts'] = parts;
+      newContents[newContents.length - 1] = lastMsg;
+      contents = newContents;
+    }
+
+    // ── Sliding Window ──────────────────────────────────────
+    // Limit history to the last 6 messages (≈ 3 user + 3 model)
+    // to minimize TPM quota usage, especially critical when
+    // Google Search grounding is enabled.
+    const int maxHistoryMessages = 6;
+    if (contents.length > maxHistoryMessages) {
+      contents = contents.sublist(contents.length - maxHistoryMessages);
+      debugPrint(
+          '✂️ OnyxAiRouter: Trimmed history to last $maxHistoryMessages messages');
+    }
+
     final body = <String, dynamic>{
       'contents': contents,
       'generationConfig': {
         'temperature': 0.7,
-        'maxOutputTokens': 400,
+        'maxOutputTokens': 4096,
       },
     };
 
@@ -185,12 +229,6 @@ class OnyxAiRouterService {
           {'text': systemInstruction}
         ]
       };
-    }
-
-    if (enableGrounding) {
-      body['tools'] = [
-        {'googleSearch': {}}
-      ];
     }
 
     return _callModelWithRetry(_chatModel, body);
@@ -237,12 +275,9 @@ class OnyxAiRouterService {
         ]
       },
       'contents': contents,
-      'tools': [
-        {'googleSearch': {}}
-      ],
       'generationConfig': {
         'temperature': 0.5,
-        'maxOutputTokens': 800,
+        'maxOutputTokens': 4096,
       },
     };
 
@@ -278,7 +313,6 @@ class OnyxAiRouterService {
       ],
       'generationConfig': {
         'temperature': 0.1,
-        'maxOutputTokens': 2048,
         'responseMimeType': 'application/json',
       },
     };
@@ -315,7 +349,6 @@ class OnyxAiRouterService {
       ],
       'generationConfig': {
         'temperature': 0.0,
-        'maxOutputTokens': 8,
       },
     };
 
@@ -351,11 +384,46 @@ class OnyxAiRouterService {
       ],
       'generationConfig': {
         'temperature': 0.3,
-        'maxOutputTokens': 512,
       },
     };
 
     return _callModelWithRetry(_summaryModel, body);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────
+  // TAVILY RAG FETCH ENGINE
+  // ─────────────────────────────────────────────────────────
+
+  Future<String> _fetchMarketContext(String userQuery) async {
+    final apiKey = dotenv.env['TAVILY_API_KEY'];
+    if (apiKey == null || apiKey.isEmpty) return '';
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('https://api.tavily.com/search'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'api_key': apiKey,
+              'query': '$userQuery البورصة المصرية EGX',
+              'search_depth': 'basic',
+              'include_answer': true,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        String fetchResult = data['answer'] ?? '';
+        return fetchResult.length > 1500
+            ? '${fetchResult.substring(0, 1500)}...'
+            : fetchResult;
+      }
+    } catch (e) {
+      debugPrint('⚠️ Tavily RAG Error: $e');
+    }
+    return '';
   }
 
   // ─────────────────────────────────────────────────────────
@@ -378,32 +446,33 @@ class OnyxAiRouterService {
       try {
         return await _executeRequest(model, body);
       } catch (e) {
-        final errorStr = e.toString();
+        debugPrint('Raw API Error: ${e.toString()}');
+        attempts++;
+        debugPrint('Key $_currentKeyIndex failed, switching to next key... (attempt $attempts/${_apiKeys.length})');
 
-        if (_isQuotaError(errorStr)) {
-          attempts++;
-          debugPrint(
-              '⚠️ OnyxAiRouter: Quota hit on key $_currentKeyIndex '
-              '(attempt $attempts/${_apiKeys.length})');
-
-          if (!_rotateKey()) {
-            // All keys exhausted
+        if (!_rotateKey()) {
+          // All keys exhausted. Throw to UI based on the last error encountered.
+          final errorStr = e.toString();
+          if (_isQuotaError(errorStr)) {
             throw const AiQuotaException(
               'All API keys have reached their quota. '
               'Please try again in a few minutes.',
             );
+          } else if (_isServerError(errorStr)) {
+            throw AiServerException(
+              'Google servers are currently overloaded. '
+              'Please try again in a moment. ($errorStr)',
+            );
+          } else {
+            throw AiException(
+              'An error occurred while communicating with the AI. ($errorStr)',
+            );
           }
-          // Continue loop with next key
-        } else if (_isServerError(errorStr)) {
-          throw AiServerException(
-            'Google servers are currently overloaded. '
-            'Please try again in a moment. ($errorStr)',
-          );
-        } else {
-          throw AiException(
-            'An error occurred while communicating with the AI. ($errorStr)',
-          );
         }
+        // Key rotated successfully, the while loop will now retry _executeRequest
+        // Note: Because we use the direct REST API via HTTP, we do not need to
+        // "re-instantiate" any GenerativeModel objects. The new key is cleanly
+        // injected into the URL on the next loop iteration. Tools are in the JSON body.
       }
     }
 

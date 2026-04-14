@@ -149,6 +149,14 @@ MARKET_DATA_CACHE = {
     for ticker in WATCHLIST
 }
 
+NEWS_CACHE = []
+MACRO_CACHE = {
+    "egx100": 0.0,
+    "usd_egp": 0.0,
+    "gold": 0.0,
+    "last_updated": ""
+}
+
 # --- Technicals ---
 def calculate_rsi(series, period=14):
     if len(series) < period: return 50.0
@@ -161,11 +169,11 @@ def calculate_rsi(series, period=14):
 
 def calculate_macd(series, fast=12, slow=26, signal=9):
     if len(series) < slow: return "Neutral"
-    ema_fast = series.ewm(span=fast, adjust=False).mean()
-    ema_slow = series.ewm(span=slow, adjust=False).mean()
-    macd_line = ema_fast - ema_slow
-    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
-    m, s = macd_line.iloc[-1], signal_line.iloc[-1]
+    EMA_fast = series.ewm(span=fast, adjust=False).mean()
+    EMA_slow = series.ewm(span=slow, adjust=False).mean()
+    MACD_line = EMA_fast - EMA_slow
+    Signal_line = MACD_line.ewm(span=signal, adjust=False).mean()
+    m, s = MACD_line.iloc[-1], Signal_line.iloc[-1]
     return "Bullish crossover" if m > s else "Bearish divergence"
 
 # --- Scrapers ---
@@ -173,7 +181,7 @@ def _fetch_mubasher_price(ticker):
     try:
         symbol = ticker.split('.')[0]
         url = f"https://www.mubasher.info/markets/EGX/stocks/{symbol}"
-        resp = requests.get(url, headers=get_headers(), timeout=5) # Reduced timeout
+        resp = requests.get(url, headers=get_headers(), timeout=5)
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.text, 'lxml')
             price_tag = soup.select_one('.market-summary__last-price')
@@ -182,6 +190,63 @@ def _fetch_mubasher_price(ticker):
     except Exception as e:
         print(f"Mubasher Error {ticker}: {e}")
     return None
+
+def _fetch_mubasher_news():
+    """Scrapes latest EGX headlines from Mubasher."""
+    try:
+        url = "https://www.mubasher.info/markets/EGX/news"
+        resp = requests.get(url, headers=get_headers(), timeout=10)
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text, 'lxml')
+            news_tags = soup.select('.news-list__item-title')
+            headlines = [t.text.strip() for t in news_tags[:10]] # Top 10
+            return headlines
+    except Exception as e:
+        print(f"News Fetch Error: {e}")
+    return []
+
+def _fetch_macro_indicators():
+    """Fetches USD/EGP, Gold, and EGX100 via yfinance."""
+    global MACRO_CACHE
+    try:
+        # Tickers: EGX100 (CASE100.CA), USD/EGP (EGP=X), Gold (GC=F)
+        tickers = ["CASE100.CA", "EGP=X", "GC=F"]
+        data = yf.download(tickers, period="1d", timeout=10)
+        
+        if not data.empty and 'Close' in data:
+            closes = data['Close'].iloc[-1]
+            MACRO_CACHE = {
+                "egx100": round(float(closes.get("CASE100.CA", 0.0)), 2),
+                "usd_egp": round(float(closes.get("EGP=X", 0.0)), 2),
+                "gold": round(float(closes.get("GC=F", 0.0)), 2),
+                "last_updated": datetime.utcnow().isoformat()
+            }
+            print(f"🌍 Macro Indicators Updated: {MACRO_CACHE}")
+    except Exception as e:
+        print(f"Macro Fetch Error: {e}")
+
+def _calculate_market_breadth():
+    """Calculates Gainers vs Losers for the AI to understand market tone."""
+    gainers = 0
+    losers = 0
+    neutral = 0
+    
+    for ticker, data in MARKET_DATA_CACHE.items():
+        if ticker in MUTUAL_FUNDS: continue # Focus on stocks
+        
+        change = data.get('change', 0.0)
+        if change > 0.5:
+            gainers += 1
+        elif change < -0.5:
+            losers += 1
+        else:
+            neutral += 1
+            
+    total = gainers + losers + neutral
+    if total == 0: return "Neutral / No Data"
+    
+    sentiment = "Strongly Bullish" if gainers > (losers * 2) else "Strongly Bearish" if losers > (gainers * 2) else "Mixed / Sideways"
+    return f"{sentiment} (Gainers: {gainers}, Losers: {losers}, Neutral: {neutral})"
 
 FUND_KEYWORDS = {
     'ADA': 'صندوق استثمار شركة الأهلي لإدارة الإستثمارات المالية وايفولف للاستثمار في الذهب',
@@ -316,11 +381,21 @@ def _fetch_single_ticker_aggressive(ticker):
         return None
 
 def refresh_market_data():
-    print(f"🕒 Refreshing {len(WATCHLIST)} tickers (Live Accumulation)...")
+    global NEWS_CACHE
+    print(f"🕒 Refreshing {len(WATCHLIST)} tickers + News + Macro...")
+    
+    # 1. Refresh News
+    new_news = _fetch_mubasher_news()
+    if new_news:
+        NEWS_CACHE = new_news
+        
+    # 2. Refresh Macro Indicators
+    _fetch_macro_indicators()
+        
+    # 3. Refresh Stock Data
     with ThreadPoolExecutor(max_workers=30) as executor:
         futures = {executor.submit(_fetch_single_ticker_aggressive, t): t for t in WATCHLIST}
         for f in as_completed(futures):
-            # The function updates MARKET_DATA_CACHE[ticker] directly
             f.result() 
     print(f"✅ Market state synchronized.")
 
@@ -576,6 +651,9 @@ def get_all():
         
     return jsonify({
         "stocks": safe_stocks,
+        "news": NEWS_CACHE,
+        "macro": MACRO_CACHE,
+        "breadth": _calculate_market_breadth(),
         "last_updated": datetime.utcnow().isoformat()
     })
 

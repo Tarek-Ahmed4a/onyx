@@ -1353,6 +1353,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                         : 'N/A',
                                     color: Colors.greenAccent
                                         .withValues(alpha: 0.7)),
+                                _buildAssetDetail('TOTAL',
+                                    '\$${(asset.buyPrice * asset.quantity).toStringAsFixed(2)}',
+                                    color: Colors.white70),
                                 _buildAssetDetail(
                                     'STOP LOSS',
                                     asset.stopLoss != null

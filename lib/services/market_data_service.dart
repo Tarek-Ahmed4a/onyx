@@ -64,6 +64,8 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
             "price": _parseNum(data["price"]),
             "rsi": _parseNum(data["rsi"], defaultVal: 50.0),
             "macd": data["macd"] ?? "Neutral",
+            "change": _parseNum(data["change"]),
+            "volume": _parseNum(data["volume"]),
             "source": data["source"] ?? "Unknown",
           };
         }
@@ -71,6 +73,9 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     _stocksData = newMap;
+    _news = (body['news'] as List?)?.map((e) => e.toString()).toList() ?? [];
+    _macro = (body['macro'] as Map?)?.cast<String, dynamic>() ?? {};
+    _breadth = body['breadth']?.toString() ?? 'Unknown';
     _lastUpdated = body['last_updated'] as String?;
     notifyListeners();
   }
@@ -81,6 +86,15 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
+
+  List<String> _news = [];
+  List<String> get news => _news;
+
+  Map<String, dynamic> _macro = {};
+  Map<String, dynamic> get macro => _macro;
+
+  String _breadth = '';
+  String get breadth => _breadth;
 
   String? _lastUpdated;
   String? get lastUpdated => _lastUpdated;
@@ -173,6 +187,8 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
                     "price": _parseNum(data["price"]),
                     "rsi": _parseNum(data["rsi"], defaultVal: 50.0),
                     "macd": data["macd"] ?? "Neutral",
+                    "change": _parseNum(data["change"]),
+                    "volume": _parseNum(data["volume"]),
                     "source": data["source"] ?? "Unknown",
                   };
                 }
@@ -183,6 +199,9 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
           }
 
           _stocksData = newMap;
+          _news = (body['news'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          _macro = (body['macro'] as Map?)?.cast<String, dynamic>() ?? {};
+          _breadth = body['breadth']?.toString() ?? 'Unknown';
           _lastUpdated = body['last_updated'] as String?;
           _error = null;
 
@@ -244,7 +263,9 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
         final price = info['price'] ?? '?';
         final rsi = info['rsi'] ?? '?';
         final macd = info['macd'] ?? 'Unknown';
-        buffer.write('$ticker: Price=$price, RSI=$rsi, MACD=$macd | ');
+        final change = info['change'] ?? '0';
+        final volume = info['volume'] ?? '0';
+        buffer.write('$ticker: Price=$price, Change=$change%, Vol=$volume, RSI=$rsi, MACD=$macd | ');
       }
     });
 
@@ -274,7 +295,9 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
             macd.contains('bullish') || macd.contains('bearish');
 
         if (isOversold || isOverbought || isMacdSignal) {
-          signals.add('$ticker: RSI=${rsi.toStringAsFixed(1)},MACD=$macd');
+          final change = info['change'] ?? '0';
+          final vol = info['volume'] ?? '0';
+          signals.add('$ticker: Price=${info['price']}, Chg=$change%, Vol=$vol, RSI=${rsi.toStringAsFixed(1)}, MACD=$macd');
         }
       }
     });
@@ -295,9 +318,11 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
     final price = data['price'] ?? '?';
     final rsi = data['rsi'] ?? '?';
     final macd = data['macd'] ?? 'Unknown';
+    final change = data['change'] ?? '0';
+    final volume = data['volume'] ?? '0';
 
     final context =
-        '[SYSTEM CONTEXT] ASSET: $ticker | LIVE PRICE: $price | TECHNICALS: RSI = $rsi, MACD = $macd [END CONTEXT]';
+        '[SYSTEM CONTEXT] ASSET: $ticker | LIVE PRICE: $price ($change%) | VOL: $volume | TECHNICALS: RSI = $rsi, MACD = $macd [END CONTEXT]';
 
     return '<MARKET_DATA_INTERNAL>\n$context\n</MARKET_DATA_INTERNAL>';
   }
