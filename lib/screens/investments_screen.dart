@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
 import '../services/market_data_service.dart';
 import '../widgets/connectivity_indicator.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'profile_screen.dart';
 import 'calendar_screen.dart';
 
@@ -174,17 +175,23 @@ class Portfolio {
   final String id;
   String name;
   List<Asset> assets;
+  double balance;
+  double initialBudget;
 
   Portfolio({
     required this.id,
     required this.name,
     List<Asset>? assets,
+    this.balance = 0.0,
+    this.initialBudget = 0.0,
   }) : assets = assets ?? [];
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
         'assets': assets.map((a) => a.toJson()).toList(),
+        'balance': balance,
+        'initialBudget': initialBudget,
       };
 
   factory Portfolio.fromJson(Map<String, dynamic> json) => Portfolio(
@@ -194,6 +201,8 @@ class Portfolio {
                 ?.map((item) => Asset.fromJson(item))
                 .toList() ??
             [],
+        balance: (json['balance'] as num?)?.toDouble() ?? 0.0,
+        initialBudget: (json['initialBudget'] as num?)?.toDouble() ?? 0.0,
       );
 }
 
@@ -214,11 +223,15 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
 
   String _marketSearchQuery = '';
   String _marketFilter = 'Stocks';
+  final Map<String, TextEditingController> _qtyControllers = {};
 
   @override
   void dispose() {
     _portfoliosSub?.cancel();
     _tabController.dispose();
+    for (var controller in _qtyControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -270,6 +283,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
         final defaultPortfolio = Portfolio(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           name: 'Main Profile',
+          balance: 0.0,
+          initialBudget: 0.0,
         );
         await collection
             .doc(defaultPortfolio.id)
@@ -431,6 +446,18 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
     } catch (e) {
       debugPrint('Error getting token for asset: $e');
     }
+
+    final totalCost = buyPrice * quantity;
+    if (totalCost > activePortfolio.balance) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Insufficient balance to add this asset')),
+        );
+      }
+      return;
+    }
+
+    activePortfolio.balance -= totalCost;
 
     final newAsset = Asset(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -701,6 +728,10 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
     final activePortfolio =
         _portfolios.firstWhere((p) => p.id == _activePortfolioId);
 
+    // Refund the initial cost to the balance
+    final refundAmount = asset.buyPrice * asset.quantity;
+    activePortfolio.balance += refundAmount;
+
     activePortfolio.assets.remove(asset);
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -716,6 +747,133 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
       if (!mounted) return;
       context.read<MarketDataService>().fetchUserAssets();
     }
+  }
+
+  void _handleSell(String ticker, double qty, double price) async {
+    if (_activePortfolioId == null || qty <= 0) return;
+    final activePortfolio =
+        _portfolios.firstWhere((p) => p.id == _activePortfolioId);
+
+    final existingIndex =
+        activePortfolio.assets.indexWhere((a) => a.name == ticker);
+    if (existingIndex == -1 ||
+        activePortfolio.assets[existingIndex].quantity < qty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Not enough shares to sell')),
+      );
+      return;
+    }
+
+    final oldAsset = activePortfolio.assets[existingIndex];
+    activePortfolio.balance += qty * price;
+
+    if (oldAsset.quantity == qty) {
+      activePortfolio.assets.removeAt(existingIndex);
+    } else {
+      activePortfolio.assets[existingIndex] = Asset(
+        id: oldAsset.id,
+        name: oldAsset.name,
+        buyPrice: oldAsset.buyPrice,
+        currentPrice: price,
+        quantity: oldAsset.quantity - qty,
+        fcmToken: oldAsset.fcmToken,
+        takeProfit: oldAsset.takeProfit,
+        stopLoss: oldAsset.stopLoss,
+      );
+    }
+
+    await _syncPortfolio(activePortfolio);
+  }
+
+  Future<void> _syncPortfolio(Portfolio portfolio) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('investments')
+          .doc(portfolio.id)
+          .set(portfolio.toJson());
+
+      if (mounted) {
+        context.read<MarketDataService>().fetchUserAssets();
+      }
+    } catch (e) {
+      debugPrint('Error syncing portfolio: $e');
+    }
+  }
+
+  void _showUpdateBudgetDialog(Portfolio portfolio) {
+    final controller =
+        TextEditingController(text: portfolio.initialBudget.toString());
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Update Initial Budget'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Budget (EGP)'),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final newBudget = double.tryParse(controller.text) ?? 0.0;
+              if (newBudget == 0) {
+                portfolio.initialBudget = 0.0;
+                portfolio.balance = 0.0;
+              } else {
+                // If user increases budget, add the difference to balance
+                final diff = newBudget - portfolio.initialBudget;
+                portfolio.initialBudget = newBudget;
+                portfolio.balance += diff;
+              }
+              await _syncPortfolio(portfolio);
+              if (context.mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSellActionDialog(Asset asset, double livePrice) {
+    final controller = TextEditingController(text: '1');
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Sell ${asset.name}'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Quantity'),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final qty = double.tryParse(controller.text) ?? 0;
+              _handleSell(asset.name, qty, livePrice);
+              Navigator.pop(context);
+            },
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showAddPortfolioDialog() {
@@ -975,22 +1133,24 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
             orElse: () => _portfolios.first,
           );
 
-    double totalSpent = 0;
-    double currentValue = 0;
-    double totalRoiPercentage = 0;
+    double portfolioValue = 0;
+    double totalPnlEgp = 0;
+    double totalPnlPercent = 0;
 
     final marketData = Provider.of<MarketDataService>(context).stocksData;
 
     if (activePortfolio != null) {
       for (var asset in activePortfolio.assets) {
-        totalSpent += asset.buyPrice * asset.quantity;
         final priceVal = marketData[asset.name]?['price'];
         final livePrice =
             (priceVal is num) ? priceVal.toDouble() : asset.currentPrice;
-        currentValue += livePrice * asset.quantity;
+        portfolioValue += livePrice * asset.quantity;
       }
-      if (totalSpent > 0) {
-        totalRoiPercentage = ((currentValue - totalSpent) / totalSpent) * 100;
+      
+      final currentTotalValue = activePortfolio.balance + portfolioValue;
+      totalPnlEgp = currentTotalValue - activePortfolio.initialBudget;
+      if (activePortfolio.initialBudget > 0) {
+        totalPnlPercent = (totalPnlEgp / activePortfolio.initialBudget) * 100;
       }
     }
 
@@ -1061,9 +1221,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
             padding: const EdgeInsets.fromLTRB(0, 0, 0, 100),
             children: [
               if (activePortfolio != null) ...[
-                // Redesigned Dashboard Summary Card
+                // Redesigned Broker Dashboard Summary Card
                 Card(
-                  margin: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                  margin: const EdgeInsets.fromLTRB(20, 8, 20, 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24),
                   ),
@@ -1077,51 +1237,94 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              'TOTAL PAID',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.2,
-                                color: Colors.grey.shade600,
+                            GestureDetector(
+                              onTap: () => _showUpdateBudgetDialog(activePortfolio),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'BUYING POWER (CASH)',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 1.2,
+                                      color: Colors.blueAccent.withValues(alpha: 0.8),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'EGP ${activePortfolio.balance.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: (totalRoiPercentage >= 0
-                                        ? Colors.greenAccent
-                                        : Colors.redAccent)
-                                    .withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                '${totalRoiPercentage >= 0 ? '+' : ''}${totalRoiPercentage.toStringAsFixed(2)}% ROI',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: totalRoiPercentage >= 0
-                                      ? Colors.greenAccent
-                                      : Colors.redAccent,
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: (totalPnlEgp >= 0
+                                            ? Colors.greenAccent
+                                            : Colors.redAccent)
+                                        .withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '${totalPnlPercent >= 0 ? '+' : ''}${totalPnlPercent.toStringAsFixed(2)}%',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: totalPnlEgp >= 0
+                                          ? Colors.greenAccent
+                                          : Colors.redAccent,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'EGP ${totalPnlEgp >= 0 ? '+' : ''}${totalPnlEgp.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: totalPnlEgp >= 0
+                                        ? Colors.greenAccent
+                                        : Colors.redAccent,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 24),
                         Text(
-                          '\$${totalSpent.toStringAsFixed(2)}',
+                          'PORTFOLIO VALUE',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'EGP ${portfolioValue.toStringAsFixed(2)}',
                           style: const TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.w900,
                             letterSpacing: -0.5,
                           ),
                         ),
-                        const SizedBox(height: 24),
-                        // Sparkline Graph
+                        const SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         SizedBox(
-                          height: 60,
+                          height: 100,
                           child: StreamBuilder<QuerySnapshot>(
                             stream: FirebaseFirestore.instance
                                 .collection('users')
@@ -1129,67 +1332,106 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                 .collection('investments')
                                 .doc(activePortfolio.id)
                                 .collection('portfolio_snapshots')
-                                .orderBy('timestamp')
+                                .orderBy('timestamp', descending: true)
+                                .limit(14) // Fetch last 2 weeks for trend
                                 .snapshots(),
                             builder: (context, snapshot) {
                               if (snapshot.connectionState ==
                                   ConnectionState.waiting) {
                                 return const Center(
-                                  child: SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2, color: Colors.white24),
-                                  ),
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white24),
                                 );
                               }
 
-                              List<double> dataPoints = [];
-                              if (snapshot.hasData &&
-                                  snapshot.data!.docs.isNotEmpty) {
-                                for (var doc in snapshot.data!.docs) {
-                                  final data =
-                                      doc.data() as Map<String, dynamic>;
-                                  final val = data['total_value'];
-                                  if (val is num) {
-                                    dataPoints.add(val.toDouble());
-                                  }
-                                }
-                              }
-
-                              if (dataPoints.isEmpty) {
+                              if (!snapshot.hasData ||
+                                  snapshot.data!.docs.isEmpty) {
                                 return Center(
                                   child: Text(
-                                    'No Data Yet',
+                                    'No performance data yet.',
                                     style: TextStyle(
-                                        color: Colors.grey.shade600,
-                                        fontSize: 12,
+                                        color: Colors.grey.shade700,
+                                        fontSize: 10,
                                         fontWeight: FontWeight.bold),
                                   ),
                                 );
                               }
 
-                              if (dataPoints.length == 1) {
-                                dataPoints.add(dataPoints.first);
+                              // Reverse snapshots to get chronological order [Oldest -> Newest]
+                              final docs = snapshot.data!.docs.reversed.toList();
+                              final List<FlSpot> spots = [];
+                              
+                              for (int i = 0; i < docs.length; i++) {
+                                final data = docs[i].data() as Map<String, dynamic>;
+                                final val = data['total_value'];
+                                if (val is num) {
+                                  spots.add(FlSpot(i.toDouble(), val.toDouble()));
+                                }
                               }
 
-                              return CustomPaint(
-                                painter: PortfolioPerformancePainter(
-                                  dataPoints,
-                                  totalRoiPercentage >= 0
-                                      ? Colors.greenAccent
-                                      : Colors.redAccent,
+                              if (spots.length < 2) {
+                                return Center(
+                                  child: Text(
+                                    'Not enough data for chart.',
+                                    style: TextStyle(
+                                        color: Colors.grey.shade700,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                );
+                              }
+
+                              final lineColor = totalPnlEgp >= 0
+                                  ? Colors.greenAccent
+                                  : Colors.redAccent;
+
+                              return LineChart(
+                                LineChartData(
+                                  gridData: const FlGridData(show: false),
+                                  titlesData: const FlTitlesData(show: false),
+                                  borderData: FlBorderData(show: false),
+                                  lineBarsData: [
+                                    LineChartBarData(
+                                      spots: spots,
+                                      isCurved: true,
+                                      color: lineColor,
+                                      barWidth: 3,
+                                      isStrokeCapRound: true,
+                                      dotData: const FlDotData(show: false),
+                                      belowBarData: BarAreaData(
+                                        show: true,
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            lineColor.withValues(alpha: 0.2),
+                                            lineColor.withValues(alpha: 0.0),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  lineTouchData: LineTouchData(
+                                    touchTooltipData: LineTouchTooltipData(
+                                      getTooltipColor: (_) => Colors.black.withValues(alpha: 0.8),
+                                      getTooltipItems: (touchedSpots) {
+                                        return touchedSpots.map((spot) {
+                                          return LineTooltipItem(
+                                            'EGP ${spot.y.toStringAsFixed(2)}',
+                                            const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          );
+                                        }).toList();
+                                      },
+                                    ),
+                                  ),
                                 ),
-                                child: Container(),
                               );
                             },
                           ),
-                        ),
-                        const SizedBox(height: 24),
-                        _buildSummaryMetric(
-                          label: 'CURRENT VALUE',
-                          value: '\$${currentValue.toStringAsFixed(2)}',
-                          valueColor: Colors.white,
                         ),
                       ],
                     ),
@@ -1235,6 +1477,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                           asset.currentPrice;
                   final assetRoi =
                       ((livePrice - asset.buyPrice) / asset.buyPrice) * 100;
+                  final assetProfitEgp = (livePrice - asset.buyPrice) * asset.quantity;
 
                   return Dismissible(
                     key: Key(asset.id),
@@ -1312,12 +1555,33 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                     ],
                                   ),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined,
-                                      size: 20, color: Colors.blueAccent),
-                                  onPressed: () => _showEditAssetDialog(asset),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
+                                Row(
+                                  children: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          _showSellActionDialog(asset, livePrice),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: Colors.redAccent,
+                                        minimumSize: Size.zero,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 8),
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      child: const Text('SELL',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold)),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_outlined,
+                                          size: 20, color: Colors.blueAccent),
+                                      onPressed: () =>
+                                          _showEditAssetDialog(asset),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -1328,15 +1592,16 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                _buildAssetDetail('BUY',
-                                    '\$${asset.buyPrice.toStringAsFixed(2)}'),
-                                _buildAssetDetail('CURRENT',
-                                    '\$${livePrice.toStringAsFixed(2)}',
+                                _buildAssetDetail('BUY AVG',
+                                    'EGP ${asset.buyPrice.toStringAsFixed(2)}'),
+                                _buildAssetDetail('LIVE PRICE',
+                                    'EGP ${livePrice.toStringAsFixed(2)}',
                                     color: assetRoi >= 0
                                         ? Colors.greenAccent
                                         : Colors.redAccent),
-                                _buildAssetDetail('ROI',
-                                    '${assetRoi >= 0 ? '+' : ''}${assetRoi.toStringAsFixed(1)}%',
+                                _buildAssetDetail(
+                                    'ROI',
+                                    'EGP ${assetProfitEgp >= 0 ? '+' : ''}${assetProfitEgp.toStringAsFixed(1)} (${assetRoi >= 0 ? '+' : ''}${assetRoi.toStringAsFixed(1)}%)',
                                     color: assetRoi >= 0
                                         ? Colors.greenAccent
                                         : Colors.redAccent),
@@ -1349,22 +1614,23 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                 _buildAssetDetail(
                                     'TARGET (TP)',
                                     asset.takeProfit != null
-                                        ? '\$${asset.takeProfit!.toStringAsFixed(2)}'
+                                        ? 'EGP ${asset.takeProfit!.toStringAsFixed(2)}'
                                         : 'N/A',
                                     color: Colors.greenAccent
                                         .withValues(alpha: 0.7)),
                                 _buildAssetDetail('TOTAL',
-                                    '\$${(asset.buyPrice * asset.quantity).toStringAsFixed(2)}',
+                                    'EGP ${(asset.buyPrice * asset.quantity).toStringAsFixed(2)}',
                                     color: Colors.white70),
                                 _buildAssetDetail(
                                     'STOP LOSS',
                                     asset.stopLoss != null
-                                        ? '\$${asset.stopLoss!.toStringAsFixed(2)}'
+                                        ? 'EGP ${asset.stopLoss!.toStringAsFixed(2)}'
                                         : 'N/A',
                                     color: Colors.redAccent
                                         .withValues(alpha: 0.7)),
                               ],
                             ),
+                            const SizedBox(height: 8),
                           ],
                         ),
                       ),
@@ -1815,35 +2081,6 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
     );
   }
 
-  Widget _buildSummaryMetric({
-    required String label,
-    required String value,
-    Color? valueColor,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-            color: Colors.grey.shade600,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
-            color: valueColor ?? Colors.white,
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildAssetDetail(String label, String value, {Color? color}) {
     return Column(
@@ -1872,63 +2109,3 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
   }
 }
 
-class PortfolioPerformancePainter extends CustomPainter {
-  final List<double> data;
-  final Color color;
-
-  PortfolioPerformancePainter(this.data, this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (data.length < 2) return;
-
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
-      ..strokeCap = StrokeCap.round;
-
-    final path = Path();
-    final stepX = size.width / (data.length - 1);
-    final maxData = data.reduce((a, b) => a > b ? a : b);
-    final minData = data.reduce((a, b) => a < b ? a : b);
-    final range = (maxData - minData).abs() < 0.01 ? 1.0 : (maxData - minData);
-
-    for (var i = 0; i < data.length; i++) {
-      final x = i * stepX;
-      final y = size.height - ((data[i] - minData) / range * size.height);
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-
-    // Draw shadow under the line
-    final shadowPath = Path.from(path);
-    shadowPath.lineTo(size.width, size.height);
-    shadowPath.lineTo(0, size.height);
-    shadowPath.close();
-
-    final gradient = LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-        color.withValues(alpha: 0.3),
-        color.withValues(alpha: 0.0),
-      ],
-    );
-
-    final fillPaint = Paint()
-      ..shader =
-          gradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..style = PaintingStyle.fill;
-
-    canvas.drawPath(shadowPath, fillPaint);
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant PortfolioPerformancePainter oldDelegate) =>
-      oldDelegate.data != data || oldDelegate.color != color;
-}
