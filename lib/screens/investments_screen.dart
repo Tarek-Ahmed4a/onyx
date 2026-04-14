@@ -1592,42 +1592,54 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                _buildAssetDetail('BUY AVG',
-                                    'EGP ${asset.buyPrice.toStringAsFixed(2)}'),
-                                _buildAssetDetail('LIVE PRICE',
-                                    'EGP ${livePrice.toStringAsFixed(2)}',
-                                    color: assetRoi >= 0
-                                        ? Colors.greenAccent
-                                        : Colors.redAccent),
-                                _buildAssetDetail(
-                                    'ROI',
-                                    'EGP ${assetProfitEgp >= 0 ? '+' : ''}${assetProfitEgp.toStringAsFixed(1)} (${assetRoi >= 0 ? '+' : ''}${assetRoi.toStringAsFixed(1)}%)',
-                                    color: assetRoi >= 0
-                                        ? Colors.greenAccent
-                                        : Colors.redAccent),
+                                Expanded(
+                                  child: _buildAssetDetail('BUY AVG',
+                                      'EGP ${asset.buyPrice.toStringAsFixed(2)}'),
+                                ),
+                                Expanded(
+                                  child: _buildAssetDetail('LIVE PRICE',
+                                      'EGP ${livePrice.toStringAsFixed(2)}',
+                                      color: assetRoi >= 0
+                                          ? Colors.greenAccent
+                                          : Colors.redAccent),
+                                ),
+                                Expanded(
+                                  child: _buildAssetDetail(
+                                      'ROI',
+                                      'EGP ${assetProfitEgp >= 0 ? '+' : ''}${assetProfitEgp.toStringAsFixed(1)} (${assetRoi >= 0 ? '+' : ''}${assetRoi.toStringAsFixed(1)}%)',
+                                      color: assetRoi >= 0
+                                          ? Colors.greenAccent
+                                          : Colors.redAccent),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 16),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                _buildAssetDetail(
-                                    'TARGET (TP)',
-                                    asset.takeProfit != null
-                                        ? 'EGP ${asset.takeProfit!.toStringAsFixed(2)}'
-                                        : 'N/A',
-                                    color: Colors.greenAccent
-                                        .withValues(alpha: 0.7)),
-                                _buildAssetDetail('TOTAL',
-                                    'EGP ${(asset.buyPrice * asset.quantity).toStringAsFixed(2)}',
-                                    color: Colors.white70),
-                                _buildAssetDetail(
-                                    'STOP LOSS',
-                                    asset.stopLoss != null
-                                        ? 'EGP ${asset.stopLoss!.toStringAsFixed(2)}'
-                                        : 'N/A',
-                                    color: Colors.redAccent
-                                        .withValues(alpha: 0.7)),
+                                Expanded(
+                                  child: _buildAssetDetail(
+                                      'TARGET (TP)',
+                                      asset.takeProfit != null
+                                          ? 'EGP ${asset.takeProfit!.toStringAsFixed(2)}'
+                                          : 'N/A',
+                                      color: Colors.greenAccent
+                                          .withValues(alpha: 0.7)),
+                                ),
+                                Expanded(
+                                  child: _buildAssetDetail('TOTAL',
+                                      'EGP ${(asset.buyPrice * asset.quantity).toStringAsFixed(2)}',
+                                      color: Colors.white70),
+                                ),
+                                Expanded(
+                                  child: _buildAssetDetail(
+                                      'STOP LOSS',
+                                      asset.stopLoss != null
+                                          ? 'EGP ${asset.stopLoss!.toStringAsFixed(2)}'
+                                          : 'N/A',
+                                      color: Colors.redAccent
+                                          .withValues(alpha: 0.7)),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 8),
@@ -2085,27 +2097,31 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
   Widget _buildAssetDetail(String label, String value, {Color? color}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           label,
           style: TextStyle(
-            fontSize: 9,
+            fontSize: 8,
             fontWeight: FontWeight.bold,
-            letterSpacing: 1,
+            letterSpacing: 0.5,
             color: Colors.grey.shade600,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: color ?? Colors.white,
+        const SizedBox(height: 2),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: color ?? Colors.white,
+            ),
           ),
         ),
       ],
     );
   }
 }
-
