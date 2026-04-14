@@ -63,16 +63,16 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       "**[4. ANTI-EVASION & RISK HANDLING (CRITICAL)]**\n"
       "DO NOT refuse high-risk questions. DO NOT narrate your search process. Provide a brutally honest 1-sentence reality check about risks, then IMMEDIATELY provide the requested data and specific stock picks (Tickers).\n\n"
       "**[5. MANDATORY PORTFOLIO ALLOCATION FORMAT]**\n"
-      "When asked to allocate money (e.g., 'معايا 10000 جنيه'), strictly use this Markdown format:\n"
+      "When asked to allocate money (e.g., 'معايا 10000 جنيه'), strictly use this format (NO TABLES):\n"
       "⚠️ **تحذير مهم:** (1 sentence pragmatic reality check).\n"
       "📊 **وضع البورصة دلوقتي:** (1 sentence on current EGX momentum).\n"
       "💡 **أبرز الأسهم المرشحة:** (List 3-4 specific EGX stocks).\n"
       "🗂️ **توزيعة مقترحة لـ [Amount]:**\n"
-      "| السهم | القطاع | المبلغ المقترح | السبب |\n"
-      "|---|---|---|---|\n"
-      "| [Stock Name] | [Sector] | [Allocated Value] | [Brief Reason] |\n"
+      "• **[Stock Name]** ([Sector]): [Allocated Value]\n"
+      "  - السبب: [Brief pragmatic reason]\n"
+      "• **[Next Stock]** ...\n"
       "🔴 **نصائح سريعة:** (2 short bullet points).\n\n"
-      "**[CRITICAL formatting]**: You MUST fully complete all rows of the Markdown table. Keep your text explanations outside the table to an absolute minimum (max 1 short sentence) to ensure you have enough tokens to finish rendering the table completely.\n\n"
+      "**[CRITICAL formatting]**: NEVER use Markdown tables. Use bullet points (•) for the allocation list to ensure perfect readability on mobile screens. Keep explanations brief (max 1 sentence).\n\n"
       "**[DATA ENFORCEMENT - ZERO TOLERANCE]**: You HAVE access to live EGX prices in the <MARKET_DATA_INTERNAL> tags. The prices provided there are the ABSOLUTE TRUTH. Never claim you don't have access to data. If a stock is in the tags, use its price. If NOT in the tags, say 'I don't have the live price for this asset'. NEVER guess or hallucinate a price.";
   @override
   void initState() {
@@ -1042,7 +1042,9 @@ class _MessageBubble extends StatelessWidget {
           Flexible(
             child: Container(
               constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.78,
+                maxWidth: isUser
+                    ? MediaQuery.of(context).size.width * 0.78
+                    : MediaQuery.of(context).size.width * 0.92,
               ),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -1173,6 +1175,23 @@ class _MessageBubble extends StatelessWidget {
                                     width: 3,
                                   ),
                                 ),
+                              ),
+                              tableBorder: TableBorder.all(
+                                color: _ChatColors.aiBorder.withValues(alpha: 0.8),
+                                width: 0.8,
+                              ),
+                              tableCellsPadding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 8,
+                              ),
+                              tableHead: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                              tableBody: const TextStyle(
+                                color: _ChatColors.textPrimary,
+                                fontSize: 12,
                               ),
                             ),
                           ),
