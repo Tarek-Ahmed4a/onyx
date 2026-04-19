@@ -35,8 +35,10 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Create .env file
-        run: echo "${{ secrets.ENV_FILE }}" > .env
+      - name: Create config file
+        run: |
+          mkdir -p assets
+          echo "${{ secrets.ENV_FILE }}" > assets/onyx_config.txt
 
       
 

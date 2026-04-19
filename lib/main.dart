@@ -51,12 +51,13 @@ void main() async {
   Future.microtask(() async {
     try {
       if (!kIsWeb) {
-        FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+        FirebaseMessaging.onBackgroundMessage(
+            _firebaseMessagingBackgroundHandler);
       }
       FirebaseMessaging messaging = FirebaseMessaging.instance;
       NotificationSettings settings = await messaging.requestPermission();
       debugPrint('User granted permission: ${settings.authorizationStatus}');
-      
+
       String? token = await messaging.getToken();
       if (token != null) {
         debugPrint("🚀 FCM TOKEN: $token");
@@ -128,12 +129,18 @@ class FinanceApp extends StatelessWidget {
               bodyLarge: TextStyle(color: Color(0xFFE0E0E0)),
               bodyMedium: TextStyle(color: Color(0xFFE0E0E0)),
               bodySmall: TextStyle(color: Color(0xFFA0A0A0)),
-              titleLarge: TextStyle(color: Color(0xFFFFFFFF), fontWeight: FontWeight.w600),
-              titleMedium: TextStyle(color: Color(0xFFFFFFFF), fontWeight: FontWeight.w600),
-              titleSmall: TextStyle(color: Color(0xFFFFFFFF), fontWeight: FontWeight.w600),
-              headlineLarge: TextStyle(color: Color(0xFFFFFFFF), fontWeight: FontWeight.w700),
-              headlineMedium: TextStyle(color: Color(0xFFFFFFFF), fontWeight: FontWeight.w700),
-              headlineSmall: TextStyle(color: Color(0xFFFFFFFF), fontWeight: FontWeight.w700),
+              titleLarge: TextStyle(
+                  color: Color(0xFFFFFFFF), fontWeight: FontWeight.w600),
+              titleMedium: TextStyle(
+                  color: Color(0xFFFFFFFF), fontWeight: FontWeight.w600),
+              titleSmall: TextStyle(
+                  color: Color(0xFFFFFFFF), fontWeight: FontWeight.w600),
+              headlineLarge: TextStyle(
+                  color: Color(0xFFFFFFFF), fontWeight: FontWeight.w700),
+              headlineMedium: TextStyle(
+                  color: Color(0xFFFFFFFF), fontWeight: FontWeight.w700),
+              headlineSmall: TextStyle(
+                  color: Color(0xFFFFFFFF), fontWeight: FontWeight.w700),
             ),
           ),
           appBarTheme: const AppBarTheme(
@@ -301,7 +308,6 @@ class _MainScaffoldState extends State<MainScaffold> {
     }
   }
 
-
   @override
   void dispose() {
     _pageController.dispose();
@@ -417,15 +423,18 @@ class _MainScaffoldState extends State<MainScaffold> {
                       },
                       items: const [
                         BottomNavigationBarItem(
-                          icon: Icon(Icons.assignment_turned_in), // Market Analysis (Tasks)
+                          icon: Icon(Icons
+                              .assignment_turned_in), // Market Analysis (Tasks)
                           label: '',
                         ),
                         BottomNavigationBarItem(
-                          icon: Icon(Icons.trending_up), // My Portfolio (Investments)
+                          icon: Icon(
+                              Icons.trending_up), // My Portfolio (Investments)
                           label: '',
                         ),
                         BottomNavigationBarItem(
-                          icon: SizedBox(width: 24, height: 24), // Center placeholder
+                          icon: SizedBox(
+                              width: 24, height: 24), // Center placeholder
                           label: '',
                         ),
                         BottomNavigationBarItem(
@@ -446,7 +455,8 @@ class _MainScaffoldState extends State<MainScaffold> {
                         HapticFeedback.mediumImpact();
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const ChatScreen()),
+                          MaterialPageRoute(
+                              builder: (context) => const ChatScreen()),
                         );
                       },
                       backgroundColor: Theme.of(context).colorScheme.primary,
