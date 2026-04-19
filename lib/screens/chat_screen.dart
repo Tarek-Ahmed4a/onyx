@@ -13,17 +13,17 @@ import '../services/onyx_ai_router_service.dart';
 // ─────────────────────────────────────────────────────────────
 
 class _ChatColors {
-  static const Color background = Color(0xFF0A0A0F);
-  static const Color surfaceLight = Color(0xFF1C1C28);
-  static const Color userBubble = Color(0xFF6C3FEE);
-  static const Color userBubbleEnd = Color(0xFF4A2DBA);
-  static const Color aiBubble = Color(0xFF1A1A26);
-  static const Color aiBorder = Color(0xFF2A2A3A);
-  static const Color accentGlow = Color(0xFF8B5CF6);
-  static const Color textPrimary = Color(0xFFF0F0F5);
-  static const Color textSecondary = Color(0xFF9090A8);
-  static const Color inputBg = Color(0xFF16161F);
-  static const Color inputBorder = Color(0xFF2A2A3A);
+  static const Color background = Color(0xFF000000);
+  static const Color surfaceLight = Color(0xFF151515);
+  static const Color userBubble = Color(0xFF2A2A2A);
+  static const Color userBubbleEnd = Color(0xFF1F1F1F);
+  static const Color aiBubble = Color(0xFF0D0D0D);
+  static const Color aiBorder = Color(0xFF333333);
+  static const Color accentGlow = Color(0xFFFFFFFF);
+  static const Color textPrimary = Color(0xFFEEEEEE);
+  static const Color textSecondary = Color(0xFF888888);
+  static const Color inputBg = Color(0xFF0D0D0D);
+  static const Color inputBorder = Color(0xFF333333);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -52,28 +52,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   // Animation controllers for slide-up / fade-in per message.
   final List<AnimationController> _messageAnimControllers = [];
 
-  // ── ONYX System Prompt ────────────────────────────────────
-  static const String _systemPrompt =
-      "You are ONYX, an elite algorithmic trading assistant and financial expert. \n\n"
-      "**[1. PERSONA & TONE (THE 'NO BS' APPROACH)]**\n"
-      "Speak exactly like a senior Egyptian software architect and financial expert. Be pragmatic, straightforward, and tell it like it is. No sugar-coating. No fluff. No pseudo-questions. Use full sentences with real clarity. Sound smart, grounded, and direct, like you’re actually helping. Don't flatter the user; always tell the truth. Use natural Egyptian tech/trading slang gracefully (e.g., 'يا هندسة', 'من الآخر', 'بص', 'الزتونة'). NEVER sound like a generic AI or apologize.\n\n"
-      "**[2. EXTREME BREVITY (NO YAPPING)]**\n"
-      "Since your token limit is open, you are strictly bound by brevity. Get straight to the point immediately. Deliver high-value information in the absolute minimum number of words. If a 3-word answer works, do not use 10. The user's time is money.\n\n"
-      "Assume all queries about markets/stocks refer to the Egyptian Stock Exchange (EGX).\n\n"
-      "**[4. ANTI-EVASION & RISK HANDLING (CRITICAL)]**\n"
-      "DO NOT refuse high-risk questions. DO NOT narrate your search process. Provide a brutally honest 1-sentence reality check about risks, then IMMEDIATELY provide the requested data and specific stock picks (Tickers).\n\n"
-      "**[5. MANDATORY PORTFOLIO ALLOCATION FORMAT]**\n"
-      "When asked to allocate money (e.g., 'معايا 10000 جنيه'), strictly use this format (NO TABLES):\n"
-      "⚠️ **تحذير مهم:** (1 sentence pragmatic reality check).\n"
-      "📊 **وضع البورصة دلوقتي:** (1 sentence on current EGX momentum).\n"
-      "💡 **أبرز الأسهم المرشحة:** (List 3-4 specific EGX stocks).\n"
-      "🗂️ **توزيعة مقترحة لـ [Amount]:**\n"
-      "• **[Stock Name]** ([Sector]): [Allocated Value]\n"
-      "  - السبب: [Brief pragmatic reason]\n"
-      "• **[Next Stock]** ...\n"
-      "🔴 **نصائح سريعة:** (2 short bullet points).\n\n"
-      "**[CRITICAL formatting]**: NEVER use Markdown tables. Use bullet points (•) for the allocation list to ensure perfect readability on mobile screens. Keep explanations brief (max 1 sentence).\n\n"
-      "**[DATA ENFORCEMENT - ZERO TOLERANCE]**: You HAVE access to live EGX prices in the <MARKET_DATA_INTERNAL> tags. The prices provided there are the ABSOLUTE TRUTH. Never claim you don't have access to data. If a stock is in the tags, use its price. If NOT in the tags, say 'I don't have the live price for this asset'. NEVER guess or hallucinate a price.";
+
   @override
   void initState() {
     super.initState();
@@ -102,141 +81,10 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   // Determines whether the user's message should route to the
   // deep analysis model vs. the fast general chat model.
 
-  /// Returns true if the message looks like a stock analysis request:
-  /// contains an analysis keyword AND a recognised EGX ticker.
-  bool _isAnalysisRequest(String text) {
-    final lower = text.toLowerCase();
-    final hasKeyword = lower.contains('حلل') ||
-        lower.contains('تحليل') ||
-        lower.contains('analyze') ||
-        lower.contains('analyse') ||
-        lower.contains('analysis') ||
-        lower.contains('أداء') ||
-        lower.contains('تقييم');
-    return hasKeyword && _extractTicker(text) != null;
-  }
-
   // ─── TICKER EXTRACTION ────────────────────────────────────
-
-  /// Maps common Arabic/English keywords to EGX ticker symbols.
-  String? _extractTicker(String message) {
-    final lower = message.toLowerCase();
-    const Map<String, String> tickerKeywords = {
-      // البنوك والمالية
-      'تجاري': 'COMI.CA', 'cib': 'COMI.CA',
-      'فوري': 'FWRY.CA', 'fawry': 'FWRY.CA',
-      'بلتون': 'BTFH.CA', 'btfh': 'BTFH.CA',
-      'القلعة': 'CCAP.CA', 'ccap': 'CCAP.CA', 'qalaa': 'CCAP.CA',
-      'ابو ظبي': 'ADIB.CA', 'adib': 'ADIB.CA',
-      'إي فاينانس': 'EFIH.CA', 'efih': 'EFIH.CA',
-      'هيرميس': 'HRHO.CA', 'hrho': 'HRHO.CA', 'efg': 'HRHO.CA',
-      'فالمور': 'VLMR.CA', 'vlmr': 'VLMR.CA',
-      // العقارات والمقاولات
-      'طلعت': 'TMGH.CA', 'مصطفى': 'TMGH.CA', 'tmg': 'TMGH.CA',
-      'بالم هيلز': 'PHDC.CA', 'phdc': 'PHDC.CA',
-      'مصر الجديدة': 'HELI.CA', 'heli': 'HELI.CA',
-      'اوراسكوم للانشاء': 'ORAS.CA', 'oras': 'ORAS.CA',
-      'اوراسكوم للتنمية': 'ORHD.CA', 'orhd': 'ORHD.CA',
-      'اعمار': 'EMFD.CA', 'emfd': 'EMFD.CA',
-      // البتروكيماويات والأسمدة
-      'ابو قير': 'ABUK.CA', 'abuk': 'ABUK.CA',
-      'اموك': 'AMOC.CA', 'amoc': 'AMOC.CA',
-      'كيما': 'EGCH.CA', 'kima': 'EGCH.CA',
-      // الصناعة والاستهلاك
-      'إيديتا': 'EFID.CA', 'edita': 'EFID.CA', 'efid': 'EFID.CA',
-      'جي بي كورب': 'GBCO.CA', 'غبور': 'GBCO.CA', 'gbco': 'GBCO.CA',
-      'الشرقية': 'EAST.CA', 'دخان': 'EAST.CA', 'east': 'EAST.CA',
-      'النساجون': 'ORWE.CA', 'orwe': 'ORWE.CA',
-      'جهينة': 'JUFO.CA', 'jufo': 'JUFO.CA',
-      'مصر للالومنيوم': 'EGAL.CA', 'egal': 'EGAL.CA',
-      'العربية للأسمنت': 'ARCC.CA', 'arcc': 'ARCC.CA',
-      'أسمنت قنا': 'MCQE.CA', 'mcqe': 'MCQE.CA',
-      // التكنولوجيا والاتصالات
-      'المصرية للاتصالات': 'ETEL.CA', 'we': 'ETEL.CA', 'etel': 'ETEL.CA',
-      'راية': 'RAYA.CA', 'raya': 'RAYA.CA',
-      'اوراسكوم للاستثمار': 'OIH.CA', 'oih': 'OIH.CA',
-      // الرعاية الصحية
-      'ابن سينا': 'ISPH.CA', 'isph': 'ISPH.CA',
-      'راميدا': 'RMDA.CA', 'rmda': 'RMDA.CA',
-    };
-
-    for (final entry in tickerKeywords.entries) {
-      if (lower.contains(entry.key)) {
-        return entry.value;
-      }
-    }
-    return null;
-  }
 
   // ─── CONTEXT BUILDERS ─────────────────────────────────────
 
-  /// Builds a compact string of the top 25 EGX assets for the AI context.
-  String _buildOptimizedMarketScan(MarketDataService service) {
-    if (!service.hasData) return "Market Data is currently unavailable.";
-
-    final List<String> lines = [];
-    final stocks = service.stocksData;
-    
-    // Get all tickers to provide full EGX100 visibility as requested
-    final tickers = stocks.keys.toList()..sort();
-    final topTickers = tickers.take(100);
-
-    for (final t in topTickers) {
-      final data = stocks[t];
-      if (data == null) continue;
-      
-      final price = data['price'] ?? '?';
-      final change = data['change'] ?? '0';
-      final rsi = data['rsi'] ?? '50';
-      final macd = data['macd'] ?? 'Neutral';
-      
-      lines.add("$t: $price ($change%), RSI: $rsi, MACD: $macd");
-    }
-
-    return lines.join(" | ");
-  }
-
-  /// Extracted helper to identify stock mentions in Arabic and English.
-  List<String> _extractAllMentionedTickers(String text, MarketDataService service) {
-    final Set<String> foundTickers = {};
-    final words = text.toLowerCase();
-
-    // 1. Check for English Tickers (e.g. COMI)
-    for (final ticker in service.stocksData.keys) {
-      final symbol = ticker.split('.')[0].toLowerCase();
-      if (words.contains(symbol)) {
-        foundTickers.add(ticker);
-      }
-    }
-
-    // 2. Map Arabic Names to Tickers
-    final Map<String, String> arabicMap = {
-      'تجاري': 'COMI.CA',
-      'طلعت': 'TMGH.CA',
-      'مصطفي': 'TMGH.CA',
-      'مصطفى': 'TMGH.CA',
-      'شرقية': 'EAST.CA',
-      'دخان': 'EAST.CA',
-      'أوراسكوم': 'ORAS.CA',
-      'انشاء': 'ORAS.CA',
-      'فوري': 'FWRY.CA',
-      'هرماس': 'HRHO.CA',
-      'بيلتون': 'BTEL.CA',
-      'أبو قير': 'ABUK.CA',
-      'القلعة': 'CCAP.CA',
-      'إعمار': 'EMFD.CA',
-      'موبكو': 'MFPC.CA',
-      'سويدي': 'SWDY.CA',
-    };
-
-    arabicMap.forEach((arabic, ticker) {
-      if (words.contains(arabic)) {
-        foundTickers.add(ticker);
-      }
-    });
-
-    return foundTickers.toList();
-  }
 
   /// Retrieves the user's portfolio data from Firestore for prompt injection.
   Future<String> _getPortfolioContext() async {
@@ -274,75 +122,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
-  Future<String> _buildSystemInstruction(
-      String userText, MarketDataService service) async {
-    final portfolioContext = await _getPortfolioContext();
-
-    // 1. Identify ALL mentioned tickers (Arabic or English)
-    final mentionedTickers = _extractAllMentionedTickers(userText, service);
-    
-    // 2. Build High-Priority Context for these assets
-    String priorityContext = '';
-    if (mentionedTickers.isNotEmpty) {
-      priorityContext = "\n<PRIORITY_LIVE_DATA>\n";
-      for (final ticker in mentionedTickers) {
-        final stockData = service.getStockData(ticker);
-        if (stockData != null) {
-          priorityContext +=
-              "[EXACT_LIVE_DATA: $ticker is at ${stockData['price']} (${stockData['change']}%), Vol: ${stockData['volume']}, RSI: ${stockData['rsi']}, MACD: ${stockData['macd']}]\n";
-        }
-      }
-      priorityContext += "</PRIORITY_LIVE_DATA>\n";
-    }
-
-    final newsContext = service.news.isNotEmpty
-        ? "\n<MARKET_NEWS_INTERNAL>\n${service.news.join('\n')}\n</MARKET_NEWS_INTERNAL>\n"
-        : "";
-
-    final macroContext = service.macro.isNotEmpty
-        ? "\n<MARKET_MACRO_INTERNAL>\n"
-            "EGX100 Index: ${service.macro['egx100']}\n"
-            "USD/EGP Rate: ${service.macro['usd_egp']}\n"
-            "Gold (GC=F): ${service.macro['gold']}\n"
-            "Market Breadth: ${service.breadth}\n"
-            "</MARKET_MACRO_INTERNAL>\n"
-        : "";
-
-    return """
-$_systemPrompt
-
-$priorityContext
-$portfolioContext
-$newsContext
-$macroContext
-""";
-  }
-
-  /// Builds the Gemini `contents` array from current message history,
-  /// strictly enforcing alternating 'user' and 'model' roles.
-  List<Map<String, dynamic>> _buildContents() {
-    final List<Map<String, dynamic>> filtered = [];
-    for (final msg in _messages) {
-      final role = msg.isUser ? 'user' : 'model';
-      // Gemini API strictly requires starting with 'user' and alternating.
-      if (filtered.isEmpty) {
-        if (role == 'user') {
-          filtered.add({
-            'role': role,
-            'parts': [{'text': msg.text}],
-          });
-        }
-      } else {
-        if (filtered.last['role'] != role) {
-          filtered.add({
-            'role': role,
-            'parts': [{'text': msg.text}],
-          });
-        }
-      }
-    }
-    return filtered;
-  }
 
   // ─── SEND MESSAGE (MAIN ENTRY POINT) ──────────────────────
 
@@ -362,35 +141,17 @@ $macroContext
     _scrollToBottom();
 
     try {
-      // Build shared context.
-      final systemInstruction = await _buildSystemInstruction(text, service);
-      final contents = _buildContents();
+      setState(() {
+        _statusMessage = '🧠 Analyzing intent...';
+      });
 
-      // ── Intelligent routing ──────────────────────────────
-      // If the message is a stock deep-dive → analysisModel
-      // Otherwise → fast chatModel
-      final AiResponse response;
+      final portfolioData = await _getPortfolioContext();
 
-      if (_isAnalysisRequest(text)) {
-        debugPrint('🤖 ChatScreen: Routing to ANALYSIS model');
-        setState(() {
-          _statusMessage = '🔬 Deep analysis mode...';
-        });
-        response = await _router.analyzeStock(
-          text,
-          systemInstruction: systemInstruction,
-          conversationHistory: contents,
-        );
-      } else {
-        final marketScan = _buildOptimizedMarketScan(service);
-        response = await _router.sendChatMessage(
-          text,
-          systemInstruction: systemInstruction,
-          conversationHistory: contents,
-          enableGrounding: false,
-          localMarketData: marketScan,
-        );
-      }
+      final AiResponse response = await _router.sendMessage(
+        text,
+        marketDataService: service,
+        portfolioData: portfolioData,
+      );
 
       // ── Handle success ───────────────────────────────────
       setState(() {
@@ -1177,7 +938,8 @@ class _MessageBubble extends StatelessWidget {
                                 ),
                               ),
                               tableBorder: TableBorder.all(
-                                color: _ChatColors.aiBorder.withValues(alpha: 0.8),
+                                color:
+                                    _ChatColors.aiBorder.withValues(alpha: 0.8),
                                 width: 0.8,
                               ),
                               tableCellsPadding: const EdgeInsets.symmetric(

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'market_data_service.dart';
 
 // ─────────────────────────────────────────────────────────────
 // AI RESPONSE MODEL
@@ -91,6 +92,28 @@ class OnyxAiRouterService {
   /// Concise summarization — Gemini 3.1 Flash Lite Preview
   static const String _summaryModel = 'models/gemini-3.1-flash-lite-preview';
 
+  static const String _routerPrompt = '''You are the Router for the ONYX financial system. Your job is to classify the user's intent. Read the user's message and strictly output a JSON object. Do NOT output any other text. Rules:
+1. General question/greeting -> {"intent": "general_chat", "reply": "Your response in Arabic"}
+2. Needs financial analysis, recommendations, or mentions a stock -> {"intent": "call_expert", "stock_symbol": "SYMBOL_OR_NULL"}''';
+
+  static const String _nemotronExpertPrompt = '''[SYSTEM PERSONA & RULES]
+You are ONYX, an elite AI financial analyst for the EGX. You receive data inside <MARKET_DATA>, <MARKET_NEWS>, and <USER_PORTFOLIO>.
+1. NO HALLUCINATION: Base analysis ONLY on context. Do not invent indicators.
+2. STRICT RISK MANAGEMENT: Every trade MUST have an exit strategy. Buy orders MUST use the provided 'Resistance' as Target Price (TP) and 'Support' as Stop-Loss (SL).
+3. NO MATH: Read Portfolio values as provided. Calculate shares strictly as (Amount/Price).
+[STRICT OUTPUT FORMATTING - TEXT BLOCKS ONLY]
+NO Markdown tables. Answer precisely:
+نظرة عامة:
+• وضع السوق: [1 sentence]
+• حالة المحفظة: [1 sentence]
+
+أوامر التداول والتخصيص:
+**[Stock Symbol] - [Action: شراء/بيع/احتفاظ]**
+• السعر اللحظي: [Price] ج.م
+• الكمية المقترحة: [Number] سهم (بإجمالي [Amount] ج.م تقريباً)
+• الهدف وإيقاف الخسارة: هدف [Resistance] / إيقاف [Support]
+• التبرير: [1 sentence logic]''';
+
   // ── API Key Management ────────────────────────────────────
 
   static const String _baseUrl =
@@ -142,6 +165,121 @@ class OnyxAiRouterService {
   // ─────────────────────────────────────────────────────────
   // PUBLIC API — Task-Specific Methods
   // ─────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> _detectIntent(String userMessage) async {
+    final body = <String, dynamic>{
+      'systemInstruction': {
+        'parts': [
+          {'text': _routerPrompt}
+        ]
+      },
+      'contents': [
+        {
+          'role': 'user',
+          'parts': [
+            {'text': userMessage}
+          ]
+        }
+      ],
+      'generationConfig': {
+        'temperature': 0.1,
+        'responseMimeType': 'application/json',
+      },
+    };
+
+    try {
+      final response = await _callModelWithRetry(_chatModel, body);
+      var text = response.text.trim();
+      if (text.startsWith('```json')) {
+        text = text.replaceAll('```json', '').replaceAll('```', '').trim();
+      }
+      return json.decode(text);
+    } catch (e) {
+      debugPrint('Intent parsing failed: $e');
+      return {'intent': 'general_chat', 'reply': 'عذراً، لم أفهم طلبك. هل تسأل عن سهم معين؟'};
+    }
+  }
+
+  Future<String> _callNemotronDeepAnalysis(String contextData, String userMessage) async {
+    final apiKey = dotenv.env['OPENROUTER_API_KEY'];
+    if (apiKey == null || apiKey.isEmpty) {
+      return "Missing OpenRouter API Key in .env file.";
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
+        headers: {
+          'Authorization': 'Bearer $apiKey',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'model': 'nvidia/nemotron-3-super-120b-a12b:free',
+          'temperature': 0.2,
+          'messages': [
+            {'role': 'system', 'content': _nemotronExpertPrompt},
+            {'role': 'user', 'content': '$contextData\n\nUser Question: $userMessage'}
+          ]
+        }),
+      ).timeout(const Duration(seconds: 45));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final content = data['choices'][0]['message']['content'];
+        return content ?? 'No analysis returned.';
+      } else {
+        throw 'OpenRouter API Error: \${response.statusCode} - \${response.body}';
+      }
+    } catch (e) {
+      debugPrint('Nemotron deep analysis error: \$e');
+      throw const AiException('فشل في الاتصال بمحلل السوق العميق: \$e');
+    }
+  }
+
+  /// **Main Orchestrator** 
+  Future<AiResponse> sendMessage(
+      String userMessage, {
+      required MarketDataService marketDataService,
+      required String portfolioData,
+  }) async {
+    try {
+      final intentJson = await _detectIntent(userMessage);
+      final intent = intentJson['intent'] ?? 'general_chat';
+
+      if (intent == 'general_chat') {
+        final reply = intentJson['reply'] ?? 'أهلاً بك!';
+        return AiResponse(text: reply, modelName: 'Gemini Router');
+      } else if (intent == 'call_expert') {
+        final stockSymbol = intentJson['stock_symbol'];
+        
+        String marketData = '';
+        if (stockSymbol != null && stockSymbol != 'SYMBOL_OR_NULL' && stockSymbol.toString().isNotEmpty) {
+          marketData = marketDataService.buildMarketDataContext(stockSymbol); // returns <MARKET_DATA_INTERNAL>
+        }
+        if (marketData.isEmpty) {
+           marketData = '<MARKET_DATA>\n${marketDataService.generateOptimizedMarketScan()}\n</MARKET_DATA>';
+        } else {
+           marketData = marketData.replaceAll('MARKET_DATA_INTERNAL', 'MARKET_DATA');
+        }
+
+        final marketNews = '<MARKET_NEWS>\n${marketDataService.news.join("\\n")}\n</MARKET_NEWS>';
+        final userPortContext = '<USER_PORTFOLIO>\n$portfolioData\n</USER_PORTFOLIO>';
+
+        final contextData = '$marketData\n$marketNews\n$userPortContext';
+
+        final nemotronRes = await _callNemotronDeepAnalysis(contextData, userMessage);
+        return AiResponse(text: nemotronRes, modelName: 'Nvidia Nemotron');
+      }
+      
+      return const AiResponse(text: 'عذراً لا استطيع الخدمة الان', modelName: 'System');
+    } catch (e) {
+      if (e is AiQuotaException || e is AiServerException || e is AiException) {
+        rethrow;
+      }
+      debugPrint('sendMessage Orchestrator Error: $e');
+      throw AiException('حدث خطأ أثناء المعالجة: $e');
+    }
+  }
 
   /// **General Chat** — Uses [_chatModel] (Gemini 2.5 Flash).
   ///

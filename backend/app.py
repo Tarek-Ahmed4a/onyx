@@ -143,6 +143,8 @@ MARKET_DATA_CACHE = {
         "price": 0.0,
         "rsi": 50.0,
         "macd": "Neutral",
+        "support": 0.0,
+        "resistance": 0.0,
         "source": "Initializing",
         "deque": deque(maxlen=100)
     }
@@ -204,6 +206,62 @@ def _fetch_mubasher_news():
     except Exception as e:
         print(f"News Fetch Error: {e}")
     return []
+
+def get_stock_news_mubasher(ticker_symbol, limit=3):
+    url = f"https://www.mubasher.info/markets/EGX/stocks/{ticker_symbol.upper()}/news"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8'
+    }
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        news_items = []
+        articles = soup.find_all('div', class_='md:w-2/3')
+        
+        for article in articles:
+            if len(news_items) >= limit:
+                break
+            title_tag = article.find('a')
+            if title_tag:
+                title = title_tag.get_text(strip=True)
+                time_tag = article.find('time')
+                date = time_tag.get_text(strip=True) if time_tag else "Recent"
+                news_items.append(f"[{date}] {title}")
+                
+        if not news_items:
+            return ["لا توجد أخبار حديثة لهذا السهم"]
+        return news_items
+    except Exception as e:
+        print(f"[Scraping Error] {ticker_symbol}: {e}")
+        return ["السعر اللحظي متوفر لكن الأخبار غير متاحة حالياً"]
+
+def get_macro_news_enterprise(limit=3):
+    url = "https://enterprise.press/arabic/"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8'
+    }
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        macro_news = []
+        headlines = soup.find_all(['h2', 'h3'])
+        
+        for item in headlines:
+            text = item.get_text(strip=True)
+            if len(text) > 25 and not any(text in news for news in macro_news):
+                macro_news.append(f"[اقتصاد عام] {text}")
+            if len(macro_news) >= limit:
+                break
+        return macro_news if macro_news else []
+    except Exception as e:
+        print(f"[Enterprise Error]: {e}")
+        return []
 
 def _fetch_macro_indicators():
     """Fetches USD/EGP, Gold, and EGX100 via yfinance."""
@@ -369,6 +427,16 @@ def _fetch_single_ticker_aggressive(ticker):
             history_series = pd.Series(list(history_dq))
             data["rsi"] = round(calculate_rsi(history_series), 2)
             data["macd"] = calculate_macd(history_series)
+            
+            recent_max = history_series.max()
+            recent_min = history_series.min()
+            current = data["price"]
+            
+            res = recent_max if current < recent_max else current * 1.05
+            sup = recent_min if current > recent_min else current * 0.95
+            
+            data["support"] = round(float(sup), 2)
+            data["resistance"] = round(float(res), 2)
             
             # Ensure RSI is finite
             if not math.isfinite(data["rsi"]): data["rsi"] = 50.0
@@ -630,6 +698,16 @@ scheduler.start()
 
 @app.route('/api/egx/all')
 def get_all():
+    ticker_symbol = request.args.get('ticker_symbol') or request.args.get('ticker')
+    market_news_str = ""
+    if ticker_symbol:
+        macro_news = get_macro_news_enterprise(limit=2)
+        clean_ticker = ticker_symbol.upper().replace('.CA', '')
+        stock_news = get_stock_news_mubasher(clean_ticker, limit=3)
+        
+        combined_news = macro_news + stock_news
+        market_news_str = "\n".join(combined_news)
+        
     # If the app just started and cache is empty of prices, force one refresh
     all_zero = all(v['price'] == 0.0 for v in MARKET_DATA_CACHE.values())
     if all_zero: refresh_market_data()
@@ -642,6 +720,8 @@ def get_all():
             "price": v["price"],
             "rsi": v["rsi"],
             "macd": v["macd"],
+            "support": v.get("support", 0.0),
+            "resistance": v.get("resistance", 0.0),
             "source": v["source"]
         }
         # Final pass: check for any accidental NaN values
@@ -654,6 +734,7 @@ def get_all():
         "news": NEWS_CACHE,
         "macro": MACRO_CACHE,
         "breadth": _calculate_market_breadth(),
+        "market_news": market_news_str,
         "last_updated": datetime.utcnow().isoformat()
     })
 

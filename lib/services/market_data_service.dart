@@ -64,6 +64,8 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
             "price": _parseNum(data["price"]),
             "rsi": _parseNum(data["rsi"], defaultVal: 50.0),
             "macd": data["macd"] ?? "Neutral",
+            "support": _parseNum(data["support"]),
+            "resistance": _parseNum(data["resistance"]),
             "change": _parseNum(data["change"]),
             "volume": _parseNum(data["volume"]),
             "source": data["source"] ?? "Unknown",
@@ -187,6 +189,8 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
                     "price": _parseNum(data["price"]),
                     "rsi": _parseNum(data["rsi"], defaultVal: 50.0),
                     "macd": data["macd"] ?? "Neutral",
+                    "support": _parseNum(data["support"]),
+                    "resistance": _parseNum(data["resistance"]),
                     "change": _parseNum(data["change"]),
                     "volume": _parseNum(data["volume"]),
                     "source": data["source"] ?? "Unknown",
@@ -263,9 +267,11 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
         final price = info['price'] ?? '?';
         final rsi = info['rsi'] ?? '?';
         final macd = info['macd'] ?? 'Unknown';
+        final support = info['support'] ?? '0';
+        final resistance = info['resistance'] ?? '0';
         final change = info['change'] ?? '0';
         final volume = info['volume'] ?? '0';
-        buffer.write('$ticker: Price=$price, Change=$change%, Vol=$volume, RSI=$rsi, MACD=$macd | ');
+        buffer.write('$ticker: Price=$price, Sup=$support, Res=$resistance, Change=$change%, Vol=$volume, RSI=$rsi, MACD=$macd | ');
       }
     });
 
@@ -297,7 +303,9 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
         if (isOversold || isOverbought || isMacdSignal) {
           final change = info['change'] ?? '0';
           final vol = info['volume'] ?? '0';
-          signals.add('$ticker: Price=${info['price']}, Chg=$change%, Vol=$vol, RSI=${rsi.toStringAsFixed(1)}, MACD=$macd');
+          final support = info['support'] ?? '0';
+          final resistance = info['resistance'] ?? '0';
+          signals.add('$ticker: Price=${info['price']}, Sup=$support, Res=$resistance, Chg=$change%, Vol=$vol, RSI=${rsi.toStringAsFixed(1)}, MACD=$macd');
         }
       }
     });
@@ -318,11 +326,13 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
     final price = data['price'] ?? '?';
     final rsi = data['rsi'] ?? '?';
     final macd = data['macd'] ?? 'Unknown';
+    final support = data['support'] ?? '0';
+    final resistance = data['resistance'] ?? '0';
     final change = data['change'] ?? '0';
     final volume = data['volume'] ?? '0';
 
     final context =
-        '[SYSTEM CONTEXT] ASSET: $ticker | LIVE PRICE: $price ($change%) | VOL: $volume | TECHNICALS: RSI = $rsi, MACD = $macd [END CONTEXT]';
+        '[SYSTEM CONTEXT] ASSET: $ticker | LIVE PRICE: $price ($change%) | SUPPORT: $support | RESISTANCE: $resistance | VOL: $volume | TECHNICALS: RSI = $rsi, MACD = $macd [END CONTEXT]';
 
     return '<MARKET_DATA_INTERNAL>\n$context\n</MARKET_DATA_INTERNAL>';
   }
