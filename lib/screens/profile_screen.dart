@@ -108,6 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           EliteHeader(
             title: 'Settings',
@@ -167,6 +168,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const SizedBox(height: 10),
           const Center(
             child: CircleAvatar(
               radius: 40,

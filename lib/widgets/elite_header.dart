@@ -38,7 +38,7 @@ class EliteHeader extends StatelessWidget {
     final displayName = user?.displayName ?? 'Onyx User';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -64,7 +64,7 @@ class EliteHeader extends StatelessWidget {
                   Row(mainAxisSize: MainAxisSize.min, children: actions!),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
           ],
           if (showGreeting) ...[
             Row(
@@ -87,7 +87,7 @@ class EliteHeader extends StatelessWidget {
                 if (actions != null) ...actions!,
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Shimmer.fromColors(
               baseColor: Colors.white,
               highlightColor: Colors.white.withValues(alpha: 0.5),
@@ -100,7 +100,7 @@ class EliteHeader extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
           ],
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
