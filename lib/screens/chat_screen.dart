@@ -8,8 +8,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/market_data_service.dart';
 import '../services/onyx_ai_router_service.dart';
 import '../widgets/elite_header.dart';
-import 'calendar_screen.dart';
-import 'profile_screen.dart';
 
 // ─────────────────────────────────────────────────────────────
 // CONSTANTS & THEME TOKENS
@@ -269,51 +267,37 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   controller: _scrollController,
                   physics: const BouncingScrollPhysics(),
                   slivers: [
-                    SliverToBoxAdapter(
+                    SliverAppBar(
+                      backgroundColor: Colors.transparent,
+                      elevation: 0,
+                      floating: true,
+                      pinned: false,
+                      leading: IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      actions: [
+                        IconButton(
+                          onPressed: _clearChat,
+                          icon: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                            ),
+                            child: const Icon(Icons.delete_sweep_rounded, size: 18, color: Colors.redAccent),
+                          ),
+                          tooltip: 'Clear Chat',
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                    ),
+                    const SliverToBoxAdapter(
                       child: EliteHeader(
                         title: 'ONYX AI',
                         showGreeting: false,
-                        showBackButton: true,
-                        onBack: () => Navigator.pop(context),
-                        actions: [
-                          IconButton(
-                            icon: const Icon(Icons.calendar_today_outlined,
-                                color: Colors.white, size: 20),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => const CalendarScreen()),
-                              );
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.account_circle_outlined,
-                                color: Colors.white, size: 20),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => const ProfileScreen()),
-                              );
-                            },
-                          ),
-                          IconButton(
-                            onPressed: _clearChat,
-                            icon: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.05),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                              ),
-                              child: const Icon(Icons.delete_sweep_rounded, size: 18, color: Colors.redAccent),
-                            ),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            tooltip: 'Clear Chat',
-                          ),
-                        ],
+                        showBackButton: false,
                       ),
                     ),
                     _buildSliverMessageList(),

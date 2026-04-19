@@ -204,11 +204,15 @@ NO Markdown tables. Answer precisely:
   }
 
   Future<String> _callNemotronDeepAnalysis(String contextData, String userMessage) async {
-    final apiKey = (dotenv.env['OPENROUTER_API_KEY'] ?? '').trim();
-    if (apiKey.isEmpty) {
-      debugPrint('❌ OnyxAiRouter: OPENROUTER_API_KEY is missing or empty in .env');
-      return "Missing OpenRouter API Key in .env file. Please ensure it is set as OPENROUTER_API_KEY.";
+    final rawKey = dotenv.env['OPENROUTER_API_KEY'];
+    final apiKey = (rawKey ?? '').trim();
+    
+    if (apiKey.isEmpty || apiKey.contains('sk-or-v1-YOUR')) {
+      debugPrint('❌ OnyxAiRouter: OPENROUTER_API_KEY is missing or invalid in .env');
+      return "Missing or invalid OpenRouter API Key in .env file. Please ensure it is correctly defined as OPENROUTER_API_KEY.";
     }
+
+    debugPrint('🧠 Calling OpenRouter Nemotron (Key Length: ${apiKey.length})');
 
     try {
       final response = await http.post(
