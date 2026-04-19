@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../widgets/connectivity_indicator.dart';
+import '../widgets/elite_header.dart';
+import '../widgets/elite_card.dart';
 
 class MarketOpportunitiesScreen extends StatelessWidget {
   const MarketOpportunitiesScreen({super.key});
@@ -21,35 +23,8 @@ class MarketOpportunitiesScreen extends StatelessWidget {
         builder: (context, snapshot) {
           return CustomScrollView(
             slivers: [
-              SliverAppBar(
-                expandedHeight: 120.0,
-                floating: false,
-                pinned: true,
-                backgroundColor: Colors.black,
-                flexibleSpace: FlexibleSpaceBar(
-                  centerTitle: false,
-                  titlePadding: const EdgeInsets.only(left: 16.0, bottom: 16.0),
-                  title: const Text(
-                    'Opportunity Radar',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  background: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.blueAccent.withValues(alpha: 0.2),
-                          Colors.black,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+              const SliverToBoxAdapter(
+                child: EliteHeader(title: 'Opportunity Radar'),
               ),
               if (snapshot.connectionState == ConnectionState.waiting)
                 const SliverFillRemaining(
@@ -137,17 +112,9 @@ class _SignalCard extends StatelessWidget {
         icon = Icons.info_outline;
     }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    return EliteCard(
+      glowColor: accentColor,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF121212),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: accentColor.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -136,11 +136,25 @@ class FinanceApp extends StatelessWidget {
               headlineSmall: TextStyle(color: Color(0xFFFFFFFF), fontWeight: FontWeight.w700),
             ),
           ),
-          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-            backgroundColor: Colors.transparent, // For Glassmorphism
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.transparent,
             elevation: 0,
-            selectedItemColor: Color(0xFFFFFFFF), // Active icons
+            centerTitle: false,
+            titleTextStyle: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
+              color: Colors.white,
+            ),
+          ),
+          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            selectedItemColor: Colors.white,
             unselectedItemColor: Color(0xFF757575),
+            type: BottomNavigationBarType.fixed,
+            showSelectedLabels: false,
+            showUnselectedLabels: false,
           ),
           useMaterial3: true,
           pageTransitionsTheme: const PageTransitionsTheme(

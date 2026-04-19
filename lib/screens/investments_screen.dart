@@ -7,6 +7,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../widgets/premium_empty_state.dart';
 import '../widgets/custom_toast.dart';
+import '../widgets/elite_header.dart';
+import '../widgets/elite_card.dart';
+import '../widgets/animated_amount.dart';
 import 'package:provider/provider.dart';
 import '../services/market_data_service.dart';
 import '../widgets/connectivity_indicator.dart';
@@ -1272,139 +1275,119 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
             children: [
               if (activePortfolio != null) ...[
                 // Redesigned Premium Glass/Gradient Summary Card
-                Container(
-                  margin: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF232323),
-                        Color(0xFF101010),
-                      ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.8),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            GestureDetector(
-                              onTap: () => _showUpdateBudgetDialog(activePortfolio),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'BUYING POWER (CASH)',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 1.2,
-                                      color: Colors.blueAccent.withValues(alpha: 0.8),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'EGP ${activePortfolio.balance.toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
+                EliteCard(
+                  glowColor: totalPnlEgp >= 0 ? Colors.greenAccent : Colors.redAccent,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          GestureDetector(
+                            onTap: () => _showUpdateBudgetDialog(activePortfolio),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: (totalPnlEgp >= 0
-                                            ? Colors.greenAccent
-                                            : Colors.redAccent)
-                                        .withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    '${totalPnlPercent >= 0 ? '+' : ''}${totalPnlPercent.toStringAsFixed(2)}%',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: totalPnlEgp >= 0
-                                          ? Colors.greenAccent
-                                          : Colors.redAccent,
-                                    ),
+                                Text(
+                                  'BUYING POWER (CASH)',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1.2,
+                                    color: Colors.blueAccent.withValues(alpha: 0.8),
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
-                                  'EGP ${totalPnlEgp >= 0 ? '+' : ''}${totalPnlEgp.toStringAsFixed(2)}',
+                                AnimatedAmount(
+                                  value: activePortfolio.balance,
+                                  prefix: 'EGP ',
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: (totalPnlEgp >= 0
+                                          ? Colors.greenAccent
+                                          : Colors.redAccent)
+                                      .withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: AnimatedAmount(
+                                  value: totalPnlPercent,
+                                  prefix: totalPnlPercent >= 0 ? '+' : '',
+                                  suffix: '%',
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.bold,
                                     color: totalPnlEgp >= 0
                                         ? Colors.greenAccent
                                         : Colors.redAccent,
                                   ),
                                 ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'PORTFOLIO VALUE',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.2,
-                            color: Colors.grey.shade600,
+                              ),
+                              const SizedBox(height: 4),
+                              AnimatedAmount(
+                                value: totalPnlEgp,
+                                prefix: 'EGP ${totalPnlEgp >= 0 ? '+' : ''}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: totalPnlEgp >= 0
+                                      ? Colors.greenAccent
+                                      : Colors.redAccent,
+                                ),
+                              ),
+                            ],
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'PORTFOLIO VALUE',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.2,
+                          color: Colors.grey.shade600,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'EGP ${portfolioValue.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
-                          ),
+                      ),
+                      const SizedBox(height: 4),
+                      AnimatedAmount(
+                        value: portfolioValue,
+                        prefix: 'EGP ',
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.5,
                         ),
-                        const SizedBox(height: 16),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 100,
-                          child: StreamBuilder<QuerySnapshot>(
-                            stream: FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(FirebaseAuth.instance.currentUser?.uid)
-                                .collection('investments')
-                                .doc(activePortfolio.id)
-                                .collection('portfolio_snapshots')
-                                .orderBy('timestamp', descending: true)
-                                .limit(14) // Fetch last 2 weeks for trend
-                                .snapshots(),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState ==
-                                  ConnectionState.waiting) {
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        height: 100,
+                        child: StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(FirebaseAuth.instance.currentUser?.uid)
+                              .collection('investments')
+                              .doc(activePortfolio.id)
+                              .collection('portfolio_snapshots')
+                              .orderBy('timestamp', descending: true)
+                              .limit(14) // Fetch last 2 weeks for trend
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
                                 return Shimmer.fromColors(
                                   baseColor: Colors.white.withValues(alpha: 0.05),
                                   highlightColor: Colors.white.withValues(alpha: 0.1),
@@ -1510,8 +1493,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                       ],
                     ),
                   ),
-                ),
-              ] else ...[
+                ] else ...[
                 const SizedBox(height: 64),
                 const Center(
                   child: Text(
@@ -1557,175 +1539,130 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                     key: Key(asset.id),
                     direction: DismissDirection.endToStart,
                     background: Container(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 10),
+                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                       decoration: BoxDecoration(
                         color: Colors.redAccent.withValues(alpha: 0.8),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child:
-                          const Icon(Icons.delete_outline, color: Colors.white),
+                      child: const Icon(Icons.delete_outline, color: Colors.white),
                     ),
                     onDismissed: (_) => _deleteAsset(asset),
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 10),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
-                        color: Theme.of(context).cardTheme.color,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.4),
-                            blurRadius: 15,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.03),
-                          width: 1,
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        knownFunds[asset.name] ??
-                                            knownStocks[asset.name] ??
-                                            asset.name,
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 0.5,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          Text(
-                                            asset.name,
-                                            style: TextStyle(
-                                              color: Colors.grey.shade500,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            'Qty: ${asset.quantity}',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.grey.shade500,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Row(
+                    child: EliteCard(
+                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          _showSellActionDialog(asset, livePrice),
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: Colors.redAccent,
-                                        minimumSize: Size.zero,
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 8),
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
+                                    Text(
+                                      knownFunds[asset.name] ?? knownStocks[asset.name] ?? asset.name,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 0.5,
                                       ),
-                                      child: const Text('SELL',
-                                          style: TextStyle(
-                                              fontWeight: FontWeight.bold)),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      icon: const Icon(Icons.edit_outlined,
-                                          size: 20, color: Colors.blueAccent),
-                                      onPressed: () =>
-                                          _showEditAssetDialog(asset),
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          asset.name,
+                                          style: TextStyle(
+                                            color: Colors.grey.shade500,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Qty: ${asset.quantity}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey.shade500,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
-                              ],
-                            ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16.0),
-                              child: Divider(color: Colors.white10, height: 1),
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: _buildAssetDetail('BUY AVG',
-                                      'EGP ${asset.buyPrice.toStringAsFixed(2)}'),
-                                ),
-                                Expanded(
-                                  child: _buildAssetDetail('LIVE PRICE',
-                                      'EGP ${livePrice.toStringAsFixed(2)}',
-                                      color: assetRoi >= 0
-                                          ? Colors.greenAccent
-                                          : Colors.redAccent),
-                                ),
-                                Expanded(
-                                  child: _buildAssetDetail(
-                                      'ROI',
-                                      'EGP ${assetProfitEgp >= 0 ? '+' : ''}${assetProfitEgp.toStringAsFixed(1)} (${assetRoi >= 0 ? '+' : ''}${assetRoi.toStringAsFixed(1)}%)',
-                                      color: assetRoi >= 0
-                                          ? Colors.greenAccent
-                                          : Colors.redAccent),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: _buildAssetDetail(
-                                      'TARGET (TP)',
-                                      asset.takeProfit != null
-                                          ? 'EGP ${asset.takeProfit!.toStringAsFixed(2)}'
-                                          : 'N/A',
-                                      color: Colors.greenAccent
-                                          .withValues(alpha: 0.7)),
-                                ),
-                                Expanded(
-                                  child: _buildAssetDetail('TOTAL',
-                                      'EGP ${(asset.buyPrice * asset.quantity).toStringAsFixed(2)}',
-                                      color: Colors.white70),
-                                ),
-                                Expanded(
-                                  child: _buildAssetDetail(
-                                      'STOP LOSS',
-                                      asset.stopLoss != null
-                                          ? 'EGP ${asset.stopLoss!.toStringAsFixed(2)}'
-                                          : 'N/A',
-                                      color: Colors.redAccent
-                                          .withValues(alpha: 0.7)),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                        ),
+                              ),
+                              Row(
+                                children: [
+                                  TextButton(
+                                    onPressed: () => _showSellActionDialog(asset, livePrice),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.redAccent,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    child: const Text('SELL', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blueAccent),
+                                    onPressed: () => _showEditAssetDialog(asset),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16.0),
+                            child: Divider(color: Colors.white10, height: 1),
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: _buildAssetDetail('BUY AVG', 'EGP ${asset.buyPrice.toStringAsFixed(2)}'),
+                              ),
+                              Expanded(
+                                child: _buildAssetDetail('LIVE PRICE', 'EGP ${livePrice.toStringAsFixed(2)}',
+                                    color: assetRoi >= 0 ? Colors.greenAccent : Colors.redAccent),
+                              ),
+                              Expanded(
+                                child: _buildAssetDetail(
+                                    'ROI',
+                                    'EGP ${assetProfitEgp >= 0 ? '+' : ''}${assetProfitEgp.toStringAsFixed(1)} (${assetRoi >= 0 ? '+' : ''}${assetRoi.toStringAsFixed(1)}%)',
+                                    color: assetRoi >= 0 ? Colors.greenAccent : Colors.redAccent),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: _buildAssetDetail(
+                                    'TARGET (TP)',
+                                    asset.takeProfit != null ? 'EGP ${asset.takeProfit!.toStringAsFixed(2)}' : 'N/A',
+                                    color: Colors.greenAccent.withValues(alpha: 0.7)),
+                              ),
+                              Expanded(
+                                child: _buildAssetDetail('TOTAL', 'EGP ${(asset.buyPrice * asset.quantity).toStringAsFixed(2)}',
+                                    color: Colors.white70),
+                              ),
+                              Expanded(
+                                child: _buildAssetDetail(
+                                    'STOP LOSS',
+                                    asset.stopLoss != null ? 'EGP ${asset.stopLoss!.toStringAsFixed(2)}' : 'N/A',
+                                    color: Colors.redAccent.withValues(alpha: 0.7)),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -2082,9 +2019,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
       ),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Investments',
-              style: TextStyle(fontWeight: FontWeight.bold)),
           backgroundColor: Colors.transparent,
+          elevation: 0,
           actions: [
             IconButton(
               icon: const Icon(Icons.calendar_today_outlined,
@@ -2120,18 +2056,25 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
             ],
           ),
         ),
-        body: Stack(
-          children: [
-            TabBarView(
-              controller: _tabController,
+      body: Column(
+        children: [
+          const EliteHeader(title: 'Investments'),
+          Expanded(
+            child: Stack(
               children: [
-                myPortfolioView,
-                marketStatusView,
+                TabBarView(
+                  controller: _tabController,
+                  children: [
+                    myPortfolioView,
+                    marketStatusView,
+                  ],
+                ),
+                const ConnectivityIndicator(),
               ],
             ),
-            const ConnectivityIndicator(),
-          ],
-        ),
+          ),
+        ],
+      ),
         floatingActionButton:
             (_tabController.index == 0 && _activePortfolioId != null)
                 ? Padding(

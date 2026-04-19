@@ -7,6 +7,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/premium_empty_state.dart';
 import '../widgets/custom_toast.dart';
+import '../widgets/elite_header.dart';
+import '../widgets/elite_card.dart';
 import 'profile_screen.dart';
 import 'calendar_screen.dart';
 import '../models/note_model.dart';
@@ -517,11 +519,10 @@ class _TasksScreenState extends State<TasksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
 
-    if (user == null) {
+    if (uid == null) {
       return Scaffold(
-        backgroundColor: Colors.black,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -529,22 +530,21 @@ class _TasksScreenState extends State<TasksScreen> {
               const Icon(Icons.lock_outline, size: 64, color: Colors.grey),
               const SizedBox(height: 16),
               const Text(
-                'Tasks Locked',
+                'Access Restricted',
                 style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white),
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(height: 8),
               const Text(
-                'Please sign in to manage your tasks and notes.',
+                'Please sign in to manage your personal workspace.',
                 style: TextStyle(color: Colors.grey),
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () async {
-                  await FirebaseAuth.instance.signOut();
-                },
+                onPressed: () => FirebaseAuth.instance.signOut(),
                 child: const Text('Sign In'),
               ),
             ],
@@ -554,23 +554,32 @@ class _TasksScreenState extends State<TasksScreen> {
     }
 
     if (_isLoading) {
-      return ListView.builder(
-        itemCount: 5,
-        padding: const EdgeInsets.only(top: 80, left: 16, right: 16),
-        itemBuilder: (context, index) {
-          return Shimmer.fromColors(
-            baseColor: Colors.white.withValues(alpha: 0.05),
-            highlightColor: Colors.white.withValues(alpha: 0.1),
-            child: Container(
-              height: 70,
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(16),
+      return Scaffold(
+        body: Column(
+          children: [
+            const EliteHeader(title: 'Workspace'),
+            Expanded(
+              child: ListView.builder(
+                itemCount: 5,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemBuilder: (context, index) {
+                  return Shimmer.fromColors(
+                    baseColor: Colors.white.withValues(alpha: 0.05),
+                    highlightColor: Colors.white.withValues(alpha: 0.1),
+                    child: Container(
+                      height: 70,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
-          );
-        },
+          ],
+        ),
       );
     }
 
@@ -590,8 +599,7 @@ class _TasksScreenState extends State<TasksScreen> {
             return Padding(
               padding: const EdgeInsets.only(left: 8.0),
               child: ActionChip(
-                label:
-                    const Text('+ New', style: TextStyle(color: Colors.white)),
+                label: const Text('+ New', style: TextStyle(color: Colors.white)),
                 backgroundColor: Colors.transparent,
                 side: BorderSide(color: Theme.of(context).colorScheme.primary),
                 onPressed: _showAddCategoryDialog,
@@ -600,7 +608,7 @@ class _TasksScreenState extends State<TasksScreen> {
           }
 
           final category = _categories[index];
-          final isActive = category.id == _activeCategoryId;
+          final isSelected = category.id == _activeCategoryId;
 
           return Padding(
             padding: const EdgeInsets.only(right: 8.0),
@@ -608,21 +616,7 @@ class _TasksScreenState extends State<TasksScreen> {
               onLongPress: () => _deleteCategory(category),
               child: ChoiceChip(
                 label: Text(category.name),
-                selected: isActive,
-                selectedColor:
-                    Theme.of(context).colorScheme.primary.withAlpha(51),
-                backgroundColor: Theme.of(context).cardColor,
-                labelStyle: TextStyle(
-                  color: isActive
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).textTheme.bodyMedium?.color,
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                ),
-                side: BorderSide(
-                  color: isActive
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.transparent,
-                ),
+                selected: isSelected,
                 onSelected: (selected) {
                   if (selected) {
                     setState(() {
@@ -630,6 +624,20 @@ class _TasksScreenState extends State<TasksScreen> {
                     });
                   }
                 },
+                backgroundColor: Colors.transparent,
+                selectedColor: Theme.of(context).colorScheme.primary,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.black : Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+                side: BorderSide(
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.grey.shade800,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           );
@@ -637,132 +645,121 @@ class _TasksScreenState extends State<TasksScreen> {
       ),
     );
 
-    final tasksListView = activeCategory.items.isEmpty
+    final filteredTasks = activeCategory.items;
+
+    final tasksListView = filteredTasks.isEmpty
         ? const PremiumEmptyState(
-            icon: Icons.task_alt,
-            title: 'No Tasks Yet',
-            subtitle: 'Tap the + button to add your first task to this category.',
+            icon: Icons.checklist_rtl_rounded,
+            title: 'All Tasks Done!',
+            subtitle: 'You are all caught up for this category. Add a new task to keep the momentum going.',
           )
         : ListView.builder(
-            padding: const EdgeInsets.only(top: 8, bottom: 80),
-            itemCount: activeCategory.items.length,
+            padding: const EdgeInsets.only(bottom: 100),
+            itemCount: filteredTasks.length,
             itemBuilder: (context, index) {
-              final task = activeCategory.items[index];
+              final task = filteredTasks[index];
               return Dismissible(
                 key: Key(task.id),
                 direction: DismissDirection.endToStart,
                 background: Container(
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.red.shade400,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: const Icon(Icons.delete, color: Colors.white),
                 ),
                 onDismissed: (_) => _deleteTask(task),
-                child: Card(
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 1,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8.0, vertical: 4.0),
-                    child: Row(
-                      children: [
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(24),
-                            onTap: () => _toggleTask(task),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12.0),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                width: 24,
-                                height: 24,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: task.isCompleted
-                                        ? Theme.of(context).colorScheme.primary
-                                        : Colors.grey.shade600,
-                                    width: 2,
-                                  ),
-                                  color: task.isCompleted
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Colors.transparent,
-                                ),
-                                child: task.isCompleted
-                                    ? const Icon(
-                                        Icons.check,
-                                        size: 16,
-                                        color: Color(0xFF1E1E1E),
-                                      )
-                                    : null,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                task.title,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  decoration: task.isCompleted
-                                      ? TextDecoration.lineThrough
-                                      : null,
-                                  color: task.isCompleted
-                                      ? Colors.grey.shade500
-                                      : Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.color,
-                                ),
-                              ),
-                              if (task.scheduledAt != null) ...[
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.alarm,
-                                      size: 14,
-                                      color: task.isCompleted
-                                          ? Colors.grey.shade500
-                                          : Theme.of(context)
-                                              .colorScheme
-                                              .primary,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '${task.scheduledAt!.month}/${task.scheduledAt!.day} at ${TimeOfDay.fromDateTime(task.scheduledAt!).format(context)}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: task.isCompleted
-                                            ? Colors.grey.shade500
-                                            : Theme.of(context)
-                                                .colorScheme
-                                                .primary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                child: EliteCard(
+                   margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                   child: Row(
+                     children: [
+                       Material(
+                         color: Colors.transparent,
+                         child: InkWell(
+                           borderRadius: BorderRadius.circular(24),
+                           onTap: () => _toggleTask(task),
+                           child: Padding(
+                             padding: const EdgeInsets.all(12.0),
+                             child: AnimatedContainer(
+                               duration: const Duration(milliseconds: 200),
+                               width: 20,
+                               height: 20,
+                               decoration: BoxDecoration(
+                                 shape: BoxShape.circle,
+                                 border: Border.all(
+                                   color: task.isCompleted
+                                       ? Theme.of(context).colorScheme.primary
+                                       : Colors.grey.shade600,
+                                   width: 2,
+                                 ),
+                                 color: task.isCompleted
+                                     ? Theme.of(context).colorScheme.primary
+                                     : Colors.transparent,
+                               ),
+                               child: task.isCompleted
+                                   ? const Icon(
+                                       Icons.check,
+                                       size: 14,
+                                       color: Color(0xFF1E1E1E),
+                                     )
+                                   : null,
+                             ),
+                           ),
+                         ),
+                       ),
+                       Expanded(
+                         child: Column(
+                           crossAxisAlignment: CrossAxisAlignment.start,
+                           children: [
+                             Text(
+                               task.title,
+                               style: TextStyle(
+                                 fontSize: 16,
+                                 fontWeight: FontWeight.bold,
+                                 decoration: task.isCompleted
+                                     ? TextDecoration.lineThrough
+                                     : null,
+                                 color: task.isCompleted
+                                     ? Colors.grey.shade500
+                                     : Colors.white,
+                               ),
+                             ),
+                             if (task.scheduledAt != null) ...[
+                               const SizedBox(height: 4),
+                               Row(
+                                 children: [
+                                   Icon(
+                                     Icons.alarm,
+                                     size: 12,
+                                     color: task.isCompleted
+                                         ? Colors.grey.shade500
+                                         : Theme.of(context)
+                                             .colorScheme
+                                             .primary,
+                                   ),
+                                   const SizedBox(width: 4),
+                                   Text(
+                                     '${task.scheduledAt!.month}/${task.scheduledAt!.day} at ${TimeOfDay.fromDateTime(task.scheduledAt!).format(context)}',
+                                     style: TextStyle(
+                                       fontSize: 10,
+                                       fontWeight: FontWeight.bold,
+                                       color: task.isCompleted
+                                           ? Colors.grey.shade600
+                                           : Colors.grey.shade400,
+                                     ),
+                                   ),
+                                 ],
+                               ),
+                             ],
+                           ],
+                         ),
+                       ),
+                     ],
+                   ),
+                 ),
               );
             },
           );
@@ -787,8 +784,7 @@ class _TasksScreenState extends State<TasksScreen> {
             subtitle: 'Start writing your thoughts and ideas. Tap + to create a note.',
           )
         : MasonryGridView.builder(
-            padding:
-                const EdgeInsets.only(top: 8, bottom: 80, left: 16, right: 16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
             gridDelegate: const SliverSimpleGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
             ),
@@ -810,15 +806,10 @@ class _TasksScreenState extends State<TasksScreen> {
                   child: const Icon(Icons.delete, color: Colors.white),
                 ),
                 onDismissed: (_) => _deleteNote(note),
-                child: Card(
+                child: EliteCard(
                   margin: EdgeInsets.zero,
-                  color: Colors.grey[850],
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 2,
+                  padding: const EdgeInsets.all(12),
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -828,50 +819,43 @@ class _TasksScreenState extends State<TasksScreen> {
                         ),
                       ),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (note.title.isNotEmpty)
-                            Text(
-                              note.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          if (note.title.isNotEmpty && note.content.isNotEmpty)
-                            const SizedBox(height: 8),
-                          if (note.content.isNotEmpty)
-                            Text(
-                              note.content,
-                              maxLines: 4,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.color
-                                    ?.withAlpha(200),
-                              ),
-                            ),
-                          const SizedBox(height: 12),
-                          Align(
-                            alignment: Alignment.bottomRight,
-                            child: Text(
-                              '${note.date.month}/${note.date.day}/${note.date.year}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey.shade500,
-                              ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (note.title.isNotEmpty)
+                          Text(
+                            note.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ],
-                      ),
+                        if (note.title.isNotEmpty && note.content.isNotEmpty)
+                          const SizedBox(height: 8),
+                        if (note.content.isNotEmpty)
+                          Text(
+                            note.content,
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade400,
+                            ),
+                          ),
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.bottomRight,
+                          child: Text(
+                            '${note.date.month}/${note.date.day}/${note.date.year}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -908,20 +892,17 @@ class _TasksScreenState extends State<TasksScreen> {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
+        backgroundColor: Colors.black,
         appBar: AppBar(
-          title: const Text('Tasks & Notes',
-              style: TextStyle(fontWeight: FontWeight.bold)),
           backgroundColor: Colors.transparent,
           elevation: 0,
           actions: [
             IconButton(
-              icon: const Icon(Icons.calendar_today_outlined,
-                  color: Colors.white),
+              icon: const Icon(Icons.calendar_today_outlined, color: Colors.white),
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                      builder: (context) => const CalendarScreen()),
+                  MaterialPageRoute(builder: (context) => const CalendarScreen()),
                 );
               },
             ),
@@ -945,12 +926,20 @@ class _TasksScreenState extends State<TasksScreen> {
             ],
           ),
         ),
-        body: TabBarView(
+        body: Column(
           children: [
-            tasksView,
-            notesView,
+            const EliteHeader(title: 'Workspace'),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  tasksView,
+                  notesView,
+                ],
+              ),
+            ),
           ],
         ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
         floatingActionButton: Builder(
           builder: (context) {
             final tabController = DefaultTabController.of(context);

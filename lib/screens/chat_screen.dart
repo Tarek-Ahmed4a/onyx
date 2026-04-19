@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/market_data_service.dart';
 import '../services/onyx_ai_router_service.dart';
+import '../widgets/elite_header.dart';
 
 // ─────────────────────────────────────────────────────────────
 // CONSTANTS & THEME TOKENS
@@ -15,15 +16,14 @@ import '../services/onyx_ai_router_service.dart';
 class _ChatColors {
   static const Color background = Color(0xFF000000);
   static const Color surfaceLight = Color(0xFF151515);
-  static const Color userBubble = Color(0xFF2A2A2A);
-  static const Color userBubbleEnd = Color(0xFF1F1F1F);
-  static const Color aiBubble = Color(0xFF0D0D0D);
-  static const Color aiBorder = Color(0xFF333333);
-  static const Color accentGlow = Color(0xFFFFFFFF);
+  static const Color userBubble = Color(0xFF1E1E1E);
+  static const Color aiBubble = Color(0xFF0A0A0A);
+  static const Color aiBorder = Color(0xFF222222);
+  static const Color accentGlow = Colors.blueAccent;
   static const Color textPrimary = Color(0xFFEEEEEE);
   static const Color textSecondary = Color(0xFF888888);
   static const Color inputBg = Color(0xFF0D0D0D);
-  static const Color inputBorder = Color(0xFF333333);
+  static const Color inputBorder = Color(0xFF222222);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -257,16 +257,34 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _ChatColors.background,
-      extendBodyBehindAppBar: true,
-      appBar: _buildAppBar(),
       body: Stack(
         children: [
           _buildBackgroundDecoration(),
           Column(
             children: [
-              SizedBox(
-                  height:
-                      MediaQuery.of(context).padding.top + kToolbarHeight + 8),
+              EliteHeader(
+                title: 'ONYX AI',
+                showGreeting: false,
+                showBackButton: true,
+                onBack: () => Navigator.pop(context),
+                actions: [
+                  IconButton(
+                    onPressed: _clearChat,
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                      ),
+                      child: const Icon(Icons.delete_sweep_rounded, size: 18, color: Colors.redAccent),
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    tooltip: 'Clear Chat',
+                  ),
+                ],
+              ),
               Expanded(child: _buildMessageList()),
               _buildInputBar(),
             ],
@@ -278,94 +296,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   // ─── APP BAR (No Model Switcher — routing is automatic) ───
 
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      backgroundColor: _ChatColors.background.withValues(alpha: 0.85),
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      flexibleSpace: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(color: Colors.transparent),
-        ),
-      ),
-      leading: IconButton(
-        icon: Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: _ChatColors.surfaceLight.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Icon(Icons.arrow_back_ios_new_rounded,
-              size: 16, color: _ChatColors.textPrimary),
-        ),
-        onPressed: () => Navigator.pop(context),
-      ),
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  _ChatColors.accentGlow.withValues(alpha: 0.25),
-                  _ChatColors.accentGlow.withValues(alpha: 0.08),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.auto_awesome_rounded,
-                size: 16, color: _ChatColors.accentGlow),
-          ),
-          const SizedBox(width: 10),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'ONYX',
-                style: TextStyle(
-                  color: _ChatColors.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              Text(
-                'AI Financial Assistant',
-                style: TextStyle(
-                  color: _ChatColors.textSecondary,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w400,
-                  letterSpacing: 0.3,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      centerTitle: true,
-      actions: [
-        IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: _ChatColors.surfaceLight.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.delete_sweep_rounded,
-                size: 18, color: _ChatColors.textSecondary),
-          ),
-          onPressed: _clearChat,
-          tooltip: 'Clear Chat',
-        ),
-        const SizedBox(width: 4),
-      ],
-    );
-  }
+
 
   // ─── BACKGROUND ───────────────────────────────────────────
 
@@ -476,26 +407,27 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             ),
             child: const Icon(
               Icons.auto_awesome_rounded,
-              size: 40,
+              size: 32,
               color: _ChatColors.accentGlow,
             ),
           ),
           const SizedBox(height: 24),
           const Text(
-            'ONYX Assistant',
+            'ONYX AI',
             style: TextStyle(
-              color: _ChatColors.textPrimary,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Your elite financial AI companion',
+            'How can I help you today?',
             style: TextStyle(
-              color: _ChatColors.textSecondary.withValues(alpha: 0.7),
+              color: Colors.grey.shade500,
               fontSize: 14,
+              fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 32),
@@ -810,10 +742,10 @@ class _MessageBubble extends StatelessWidget {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 gradient: isUser
-                    ? const LinearGradient(
+                    ? LinearGradient(
                         colors: [
                           _ChatColors.userBubble,
-                          _ChatColors.userBubbleEnd
+                          _ChatColors.userBubble.withValues(alpha: 0.7)
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -1077,8 +1009,11 @@ class _MessageBubble extends StatelessWidget {
       width: 32,
       height: 32,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [_ChatColors.userBubble, _ChatColors.userBubbleEnd],
+        gradient: LinearGradient(
+          colors: [
+            _ChatColors.userBubble,
+            _ChatColors.userBubble.withValues(alpha: 0.7)
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
