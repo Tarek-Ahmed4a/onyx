@@ -1,7 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/premium_empty_state.dart';
+import '../widgets/custom_toast.dart';
 import '../models/wallet_model.dart';
 import 'profile_screen.dart';
 import 'calendar_screen.dart';
@@ -103,8 +107,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   void _deleteWallet(Wallet wallet) {
     if (_wallets.length <= 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cannot delete the last wallet.')),
+      CustomToast.show(
+        context: context,
+        message: 'Cannot delete the last wallet.',
+        icon: Icons.warning_amber_rounded,
+        color: Colors.orangeAccent,
       );
       return;
     }
@@ -252,7 +259,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               final inc = double.tryParse(incomeCtrl.text) ?? 0;
               
               if ((n + w + s) != 100.0) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Percentages must sum exactly to 100.')));
+                  CustomToast.show(
+                    context: context,
+                    message: 'Percentages must sum exactly to 100.',
+                    icon: Icons.error_outline,
+                    color: Colors.redAccent,
+                  );
                   return;
               }
               
@@ -322,8 +334,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     final double? amount =
                         double.tryParse(amountController.text);
                     if (amount != null) {
+                      HapticFeedback.lightImpact();
                       _addExpense(selectedCategory, amount);
                       Navigator.pop(context);
+                      CustomToast.show(
+                        context: context,
+                        message: 'Expense added successfully',
+                        icon: Icons.check_circle_outline,
+                        color: Colors.greenAccent,
+                      );
                     }
                   }
                 },
@@ -344,9 +363,16 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: const Color(0xFF0F0F0F),
+        color: Theme.of(context).cardTheme.color,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.05),
+          color: Colors.white.withValues(alpha: 0.03),
           width: 1,
         ),
       ),
@@ -488,7 +514,24 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }
 
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Colors.white));
+      return ListView.builder(
+        itemCount: 4,
+        padding: const EdgeInsets.only(top: 80, left: 20, right: 20),
+        itemBuilder: (context, index) {
+          return Shimmer.fromColors(
+            baseColor: Colors.white.withValues(alpha: 0.05),
+            highlightColor: Colors.white.withValues(alpha: 0.1),
+            child: Container(
+              height: index == 0 ? 200 : 100, // First card is dashboard
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(24),
+              ),
+            ),
+          );
+        },
+      );
     }
 
     final activeWallet = _wallets.firstWhere(
@@ -613,13 +656,30 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 padding: const EdgeInsets.fromLTRB(0, 0, 0, 100),
                 children: [
                   // Unified Summary Card
-                  Card(
+                  Container(
                     margin: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                    shape: RoundedRectangleBorder(
+                    decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(24),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFF232323),
+                          Color(0xFF101010),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.8),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        width: 1.5,
+                      ),
                     ),
-                    elevation: 0,
-                    color: const Color(0xFF1A1A1A),
                     child: Padding(
                       padding: const EdgeInsets.all(24.0),
                       child: Column(
@@ -729,9 +789,16 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
-                          color: const Color(0xFF0F0F0F),
+                          color: Theme.of(context).cardTheme.color,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.05),
+                            color: Colors.white.withValues(alpha: 0.03),
                             width: 1,
                           ),
                         ),
@@ -775,6 +842,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         ),
                       );
                     }),
+                  ] else ...[
+                    const PremiumEmptyState(
+                      icon: Icons.receipt_long_outlined,
+                      title: 'No Expenses Yet',
+                      subtitle: 'Your modern financial journey starts here. Add your first expense!',
+                    ),
                   ],
 
                   const SizedBox(height: 40),
@@ -785,11 +858,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showAddExpenseDialog(context);
-        },
-        child: const Icon(Icons.add),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 90.0),
+        child: FloatingActionButton(
+          onPressed: () {
+            _showAddExpenseDialog(context);
+          },
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }

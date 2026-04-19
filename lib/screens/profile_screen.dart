@@ -12,6 +12,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _backgroundAlertsEnabled = true;
+  bool _appLockEnabled = false;
   bool _isLoadingPrefs = true;
 
   @override
@@ -24,6 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _backgroundAlertsEnabled = prefs.getBool('background_alerts_enabled') ?? true;
+      _appLockEnabled = prefs.getBool('app_lock_enabled') ?? false;
       _isLoadingPrefs = false;
     });
   }
@@ -41,6 +43,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // Unsubscribe logic could be added here
       debugPrint("FCM Topic Unsubscription not implemented in this UI demo.");
     }
+  }
+
+  Future<void> _toggleAppLock(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('app_lock_enabled', value);
+    setState(() {
+      _appLockEnabled = value;
+    });
   }
 
   @override
@@ -131,13 +141,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.grey.shade800),
             ),
-            child: SwitchListTile(
-              title: const Text('Alpha Signals & Radar'),
-              subtitle: const Text('Receive push alerts for Volume Spikes & Trend Breakouts'),
-              value: _backgroundAlertsEnabled,
-              onChanged: _isLoadingPrefs ? null : _toggleBackgroundAlerts,
-              secondary: const Icon(Icons.radar),
-              activeThumbColor: Colors.white,
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: const Text('Alpha Signals & Radar'),
+                  subtitle: const Text('Receive push alerts for Volume Spikes & Trend Breakouts'),
+                  value: _backgroundAlertsEnabled,
+                  onChanged: _isLoadingPrefs ? null : _toggleBackgroundAlerts,
+                  secondary: const Icon(Icons.radar),
+                  activeThumbColor: Colors.white,
+                ),
+                const Divider(color: Colors.white10, height: 1),
+                SwitchListTile(
+                  title: const Text('App Lock'),
+                  subtitle: const Text('Secure access with Biometrics / FaceID'),
+                  value: _appLockEnabled,
+                  onChanged: _isLoadingPrefs ? null : _toggleAppLock,
+                  secondary: const Icon(Icons.fingerprint),
+                  activeThumbColor: Colors.white,
+                ),
+              ],
             ),
           ),
           

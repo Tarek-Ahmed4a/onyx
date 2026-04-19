@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import '../widgets/premium_empty_state.dart';
+import '../widgets/custom_toast.dart';
 import 'package:provider/provider.dart';
 import '../services/market_data_service.dart';
 import '../widgets/connectivity_indicator.dart';
@@ -366,15 +370,22 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
 
       if (mounted) {
         setState(() => _activePortfolioId = newPortfolio.id);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Portfolio "${newPortfolio.name}" created')),
+        HapticFeedback.lightImpact();
+        CustomToast.show(
+          context: context,
+          message: 'Portfolio "${newPortfolio.name}" created',
+          icon: Icons.check_circle_outline,
+          color: Colors.greenAccent,
         );
       }
     } catch (e) {
       debugPrint('Error adding portfolio: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create portfolio: $e')),
+        CustomToast.show(
+          context: context,
+          message: 'Failed to create portfolio: $e',
+          icon: Icons.error_outline,
+          color: Colors.redAccent,
         );
       }
     }
@@ -382,8 +393,11 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
 
   void _deletePortfolio(Portfolio portfolio) {
     if (_portfolios.length <= 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cannot delete the last profile.')),
+      CustomToast.show(
+        context: context,
+        message: 'Cannot delete the last profile.',
+        icon: Icons.warning_amber_rounded,
+        color: Colors.orangeAccent,
       );
       return;
     }
@@ -450,8 +464,11 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
     final totalCost = buyPrice * quantity;
     if (totalCost > activePortfolio.balance) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Insufficient balance to add this asset')),
+        CustomToast.show(
+          context: context,
+          message: 'Insufficient balance to add this asset',
+          icon: Icons.account_balance_wallet_outlined,
+          color: Colors.redAccent,
         );
       }
       return;
@@ -488,15 +505,22 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Asset "${newAsset.name}" added')),
+          HapticFeedback.lightImpact();
+          CustomToast.show(
+            context: context,
+            message: 'Asset "${newAsset.name}" added',
+            icon: Icons.check_circle_outline,
+            color: Colors.greenAccent,
           );
         }
       } catch (e) {
         debugPrint('Error adding asset: $e');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to add asset: $e')),
+          CustomToast.show(
+            context: context,
+            message: 'Failed to add asset: $e',
+            icon: Icons.error_outline,
+            color: Colors.redAccent,
           );
         }
       }
@@ -545,15 +569,22 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Asset "${name.trim()}" updated')),
+          HapticFeedback.lightImpact();
+          CustomToast.show(
+            context: context,
+            message: 'Asset "${name.trim()}" updated',
+            icon: Icons.check_circle_outline,
+            color: Colors.greenAccent,
           );
         }
       } catch (e) {
         debugPrint('Error updating asset: $e');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to update asset: $e')),
+          CustomToast.show(
+            context: context,
+            message: 'Failed to update asset: $e',
+            icon: Icons.error_outline,
+            color: Colors.redAccent,
           );
         }
       }
@@ -758,8 +789,11 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
         activePortfolio.assets.indexWhere((a) => a.name == ticker);
     if (existingIndex == -1 ||
         activePortfolio.assets[existingIndex].quantity < qty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Not enough shares to sell')),
+      CustomToast.show(
+        context: context,
+        message: 'Not enough shares to sell',
+        icon: Icons.warning_amber_rounded,
+        color: Colors.orangeAccent,
       );
       return;
     }
@@ -1122,8 +1156,24 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
     }
 
     if (_isLoading) {
-      return const Center(
-          child: CircularProgressIndicator(color: Colors.white));
+      return ListView.builder(
+        itemCount: 4,
+        padding: const EdgeInsets.only(top: 80, left: 20, right: 20),
+        itemBuilder: (context, index) {
+          return Shimmer.fromColors(
+            baseColor: Colors.white.withValues(alpha: 0.05),
+            highlightColor: Colors.white.withValues(alpha: 0.1),
+            child: Container(
+              height: index == 0 ? 220 : 120, // First card is bigger (dashboard)
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+          );
+        },
+      );
     }
 
     final activePortfolio = _portfolios.isEmpty
@@ -1221,14 +1271,31 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
             padding: const EdgeInsets.fromLTRB(0, 0, 0, 100),
             children: [
               if (activePortfolio != null) ...[
-                // Redesigned Broker Dashboard Summary Card
-                Card(
+                // Redesigned Premium Glass/Gradient Summary Card
+                Container(
                   margin: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                  shape: RoundedRectangleBorder(
+                  decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(24),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF232323),
+                        Color(0xFF101010),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.8),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      width: 1.5,
+                    ),
                   ),
-                  elevation: 0,
-                  color: const Color(0xFF1A1A1A),
                   child: Padding(
                     padding: const EdgeInsets.all(24.0),
                     child: Column(
@@ -1338,9 +1405,16 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                             builder: (context, snapshot) {
                               if (snapshot.connectionState ==
                                   ConnectionState.waiting) {
-                                return const Center(
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white24),
+                                return Shimmer.fromColors(
+                                  baseColor: Colors.white.withValues(alpha: 0.05),
+                                  highlightColor: Colors.white.withValues(alpha: 0.1),
+                                  child: Container(
+                                    height: 100,
+                                    decoration: BoxDecoration(
+                                      color: Colors.black,
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
                                 );
                               }
 
@@ -1500,9 +1574,16 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                           horizontal: 20, vertical: 10),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(24),
-                        color: const Color(0xFF0F0F0F),
+                        color: Theme.of(context).cardTheme.color,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.4),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.05),
+                          color: Colors.white.withValues(alpha: 0.03),
                           width: 1,
                         ),
                       ),
@@ -1650,13 +1731,12 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                   );
                 }),
               if (activePortfolio != null && activePortfolio.assets.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(40.0),
-                  child: Center(
-                    child: Text(
-                      'No assets added yet.',
-                      style: TextStyle(color: Colors.grey.shade600),
-                    ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: PremiumEmptyState(
+                    icon: Icons.pie_chart_outline_rounded,
+                    title: 'Empty Portfolio',
+                    subtitle: 'Your investment journey is just a click away. Add your first asset to track its performance!',
                   ),
                 ),
               const SizedBox(height: 40),
@@ -2054,10 +2134,13 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
         ),
         floatingActionButton:
             (_tabController.index == 0 && _activePortfolioId != null)
-                ? FloatingActionButton(
-                    heroTag: null,
-                    onPressed: _showAddAssetDialog,
-                    child: const Icon(Icons.add),
+                ? Padding(
+                    padding: const EdgeInsets.only(bottom: 90.0),
+                    child: FloatingActionButton(
+                      heroTag: null,
+                      onPressed: _showAddAssetDialog,
+                      child: const Icon(Icons.add),
+                    ),
                   )
                 : null,
       ),

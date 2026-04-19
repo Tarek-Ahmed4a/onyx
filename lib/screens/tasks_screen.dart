@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/premium_empty_state.dart';
+import '../widgets/custom_toast.dart';
 import 'profile_screen.dart';
 import 'calendar_screen.dart';
 import '../models/note_model.dart';
@@ -184,8 +188,11 @@ class _TasksScreenState extends State<TasksScreen> {
 
   void _deleteCategory(TaskCategory category) {
     if (_categories.length <= 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cannot delete the last list.')),
+      CustomToast.show(
+        context: context,
+        message: 'Cannot delete the last list.',
+        icon: Icons.warning_amber_rounded,
+        color: Colors.orangeAccent,
       );
       return;
     }
@@ -245,10 +252,17 @@ class _TasksScreenState extends State<TasksScreen> {
       scheduledAt: scheduledAt,
     );
 
+    HapticFeedback.lightImpact();
     activeCategory.items.add(newTask);
     if (scheduledAt != null) {
       _scheduleNotification(newTask);
     }
+    CustomToast.show(
+      context: context,
+      message: 'Task added',
+      icon: Icons.add_task,
+      color: Colors.blueAccent,
+    );
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
@@ -281,6 +295,7 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   void _toggleTask(TaskItem task) async {
+    HapticFeedback.selectionClick();
     task.isCompleted = !task.isCompleted;
 
     if (task.isCompleted) {
@@ -539,8 +554,24 @@ class _TasksScreenState extends State<TasksScreen> {
     }
 
     if (_isLoading) {
-      return const Center(
-          child: CircularProgressIndicator(color: Colors.white));
+      return ListView.builder(
+        itemCount: 5,
+        padding: const EdgeInsets.only(top: 80, left: 16, right: 16),
+        itemBuilder: (context, index) {
+          return Shimmer.fromColors(
+            baseColor: Colors.white.withValues(alpha: 0.05),
+            highlightColor: Colors.white.withValues(alpha: 0.1),
+            child: Container(
+              height: 70,
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          );
+        },
+      );
     }
 
     final activeCategory = _categories.firstWhere(
@@ -607,11 +638,10 @@ class _TasksScreenState extends State<TasksScreen> {
     );
 
     final tasksListView = activeCategory.items.isEmpty
-        ? Center(
-            child: Text(
-              'No tasks yet. Add one!',
-              style: TextStyle(color: Colors.grey.shade500),
-            ),
+        ? const PremiumEmptyState(
+            icon: Icons.task_alt,
+            title: 'No Tasks Yet',
+            subtitle: 'Tap the + button to add your first task to this category.',
           )
         : ListView.builder(
             padding: const EdgeInsets.only(top: 8, bottom: 80),
@@ -751,11 +781,10 @@ class _TasksScreenState extends State<TasksScreen> {
         .toList();
 
     final notesGrid = filteredNotes.isEmpty
-        ? Center(
-            child: Text(
-              'No notes found.',
-              style: TextStyle(color: Colors.grey.shade500),
-            ),
+        ? const PremiumEmptyState(
+            icon: Icons.note_alt_outlined,
+            title: 'No Notes Found',
+            subtitle: 'Start writing your thoughts and ideas. Tap + to create a note.',
           )
         : MasonryGridView.builder(
             padding:
@@ -929,18 +958,21 @@ class _TasksScreenState extends State<TasksScreen> {
               animation: tabController,
               builder: (context, child) {
                 final isNotesTab = tabController.index == 1;
-                return FloatingActionButton(
-                  onPressed: isNotesTab
-                      ? () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => NoteDetailScreen(
-                                onSave: _saveNoteFromDetail,
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 90.0),
+                  child: FloatingActionButton(
+                    onPressed: isNotesTab
+                        ? () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => NoteDetailScreen(
+                                  onSave: _saveNoteFromDetail,
+                                ),
                               ),
-                            ),
-                          )
-                      : _showAddTaskDialog,
-                  child: Icon(isNotesTab ? Icons.edit_note : Icons.add),
+                            )
+                        : _showAddTaskDialog,
+                    child: Icon(isNotesTab ? Icons.edit_note : Icons.add),
+                  ),
                 );
               },
             );

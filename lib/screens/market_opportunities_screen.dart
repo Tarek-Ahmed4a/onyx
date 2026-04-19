@@ -27,6 +27,8 @@ class MarketOpportunitiesScreen extends StatelessWidget {
                 pinned: true,
                 backgroundColor: Colors.black,
                 flexibleSpace: FlexibleSpaceBar(
+                  centerTitle: false,
+                  titlePadding: const EdgeInsets.only(left: 16.0, bottom: 16.0),
                   title: const Text(
                     'Opportunity Radar',
                     style: TextStyle(
