@@ -107,8 +107,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+      body: CustomScrollView(
+        slivers: [
           SliverAppBar(
             title: const Text('Settings', style: TextStyle(fontWeight: FontWeight.bold)),
             backgroundColor: Colors.black,
@@ -138,16 +138,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
               showGreeting: false,
             ),
           ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            sliver: uid == null
+                ? SliverToBoxAdapter(child: _buildAccessRestricted())
+                : _buildProfileSliverContent(),
+          ),
         ],
-        body: uid == null
-            ? _buildAccessRestricted()
-            : _buildProfileContent(),
       ),
     );
   }
 
   Widget _buildAccessRestricted() {
-    return Center(
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.6,
+      alignment: Alignment.center,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -172,146 +177,190 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileContent() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _buildProfileSliverContent() {
+    return SliverList(
+      delegate: SliverChildListDelegate([
+        const SizedBox(height: 10),
+        const Center(
+          child: CircleAvatar(
+            radius: 40,
+            backgroundColor: Color(0xFF1E1E1E),
+            child: Icon(Icons.person, size: 40, color: Colors.white),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: Text(
+            FirebaseAuth.instance.currentUser?.displayName ?? 'Onyx User',
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              letterSpacing: -0.5,
+            ),
+          ),
+        ),
+        const SizedBox(height: 32),
+        
+        // Personal Information Section
+        const Text(
+          'PERSONAL INFORMATION',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 12),
+        EliteCard(
+          glowColor: Colors.purpleAccent,
+          margin: EdgeInsets.zero,
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  labelText: 'Display Name',
+                  labelStyle: const TextStyle(fontSize: 12),
+                  hintText: 'Enter your name',
+                  prefixIcon: const Icon(Icons.person_outline, size: 20),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _isUpdatingName ? null : _updateName,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: 0.05),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                  ),
+                ),
+                child: _isUpdatingName 
+                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Update Name', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 32),
+        
+        // Settings Section
+        const Text(
+          'SETTINGS',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 12),
+        EliteCard(
+          glowColor: Colors.blueAccent,
+          margin: EdgeInsets.zero,
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            children: [
+              _buildSettingRow(
+                icon: Icons.radar_rounded,
+                color: Colors.blueAccent,
+                title: 'Alpha Signals & Radar',
+                subtitle: 'Push alerts for Volume Spikes & Breakouts',
+                value: _backgroundAlertsEnabled,
+                onChanged: _isLoadingPrefs ? null : _toggleBackgroundAlerts,
+              ),
+              const Divider(color: Colors.white10, height: 16),
+              _buildSettingRow(
+                icon: Icons.fingerprint_rounded,
+                color: Colors.greenAccent,
+                title: 'App Lock',
+                subtitle: 'Secure access with Biometrics / FaceID',
+                value: _appLockEnabled,
+                onChanged: _isLoadingPrefs ? null : _toggleAppLock,
+              ),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 48),
+        
+        // Sign Out Button
+        ElevatedButton(
+          onPressed: () => _confirmSignOut(),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.redAccent,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.5)),
+            ),
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.logout_rounded),
+              SizedBox(width: 12),
+              Text('Sign Out', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+      ]),
+    );
+  }
+
+  Widget _buildSettingRow({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool>? onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+      child: Row(
         children: [
-          const SizedBox(height: 10),
-          const Center(
-            child: CircleAvatar(
-              radius: 40,
-              backgroundColor: Color(0xFF1E1E1E),
-              child: Icon(Icons.person, size: 40, color: Colors.white),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
+            child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(height: 16),
-          Center(
-            child: Text(
-              FirebaseAuth.instance.currentUser?.displayName ?? 'Onyx User',
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                letterSpacing: -0.5,
-              ),
-            ),
-          ),
-          const SizedBox(height: 32),
-          
-          // Personal Information Section
-          const Text(
-            'PERSONAL INFORMATION',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 12),
-          EliteCard(
-            glowColor: Colors.purpleAccent,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _nameController,
-                    decoration: InputDecoration(
-                      labelText: 'Display Name',
-                      hintText: 'Enter your name',
-                      prefixIcon: const Icon(Icons.person_outline, size: 20),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isUpdatingName ? null : _updateName,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white.withValues(alpha: 0.05),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-                        ),
-                      ),
-                      child: _isUpdatingName 
-                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Text('Update Name', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 32),
-          
-          // Settings Section
-          const Text(
-            'SETTINGS',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 12),
-          EliteCard(
-            glowColor: Colors.blueAccent,
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                SwitchListTile(
-                  title: const Text('Alpha Signals & Radar', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Receive push alerts for Volume Spikes & Trend Breakouts', style: TextStyle(fontSize: 12)),
-                  value: _backgroundAlertsEnabled,
-                  onChanged: _isLoadingPrefs ? null : _toggleBackgroundAlerts,
-                  activeThumbColor: Colors.blueAccent,
-                  secondary: const Icon(Icons.radar_rounded, color: Colors.blueAccent),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
                 ),
-                const Divider(color: Colors.white10, height: 1),
-                SwitchListTile(
-                  title: const Text('App Lock', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Secure access with Biometrics / FaceID', style: TextStyle(fontSize: 12)),
-                  value: _appLockEnabled,
-                  onChanged: _isLoadingPrefs ? null : _toggleAppLock,
-                  activeThumbColor: Colors.greenAccent,
-                  secondary: const Icon(Icons.fingerprint_rounded, color: Colors.greenAccent),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                 ),
               ],
             ),
           ),
-          
-          const SizedBox(height: 48),
-          
-          // Sign Out Button
-          ElevatedButton(
-            onPressed: () => _confirmSignOut(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              foregroundColor: Colors.redAccent,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.5)),
-              ),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.logout_rounded),
-                SizedBox(width: 12),
-                Text('Sign Out', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
-            ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: color,
           ),
-          const SizedBox(height: 24),
         ],
       ),
     );
