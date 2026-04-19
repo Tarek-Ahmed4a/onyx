@@ -107,13 +107,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          EliteHeader(
-            title: 'Settings',
-            showBackButton: true,
-            showGreeting: false,
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            title: const Text('Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Colors.black,
+            floating: true,
+            pinned: true,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
             actions: [
               IconButton(
                 icon: const Icon(Icons.calendar_today_outlined, color: Colors.white),
@@ -126,12 +131,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ],
           ),
-          Expanded(
-            child: uid == null
-                ? _buildAccessRestricted()
-                : _buildProfileContent(),
+          const SliverToBoxAdapter(
+            child: EliteHeader(
+              title: 'Preferences & Profile',
+              showBackButton: false,
+              showGreeting: false,
+            ),
           ),
         ],
+        body: uid == null
+            ? _buildAccessRestricted()
+            : _buildProfileContent(),
       ),
     );
   }
