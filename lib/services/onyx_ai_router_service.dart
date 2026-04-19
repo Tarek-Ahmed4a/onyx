@@ -208,8 +208,8 @@ NO Markdown tables. Answer precisely:
     final apiKey = (rawKey ?? '').trim();
     
     if (apiKey.isEmpty || apiKey.contains('sk-or-v1-YOUR')) {
-      debugPrint('❌ OnyxAiRouter: OPENROUTER_API_KEY is missing or invalid in .env');
-      return "Missing or invalid OpenRouter API Key in .env file. Please ensure it is correctly defined as OPENROUTER_API_KEY.";
+      debugPrint('❌ OnyxAiRouter: OPENROUTER_API_KEY is missing or invalid in assets/onyx_config.txt');
+      return "[V2] Missing or invalid OpenRouter API Key. Please verify assets/onyx_config.txt and do a cold restart.";
     }
 
     debugPrint('🧠 Calling OpenRouter Nemotron (Key Length: ${apiKey.length})');

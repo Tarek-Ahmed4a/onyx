@@ -32,7 +32,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    await dotenv.load(fileName: ".env");
+    await dotenv.load(fileName: "assets/onyx_config.txt");
   } catch (e) {
     debugPrint("Failed to load .env file: $e");
   }
