@@ -5,6 +5,7 @@ import '../services/notification_service.dart';
 import '../widgets/elite_header.dart';
 import '../widgets/elite_card.dart';
 import '../widgets/custom_toast.dart';
+import 'calendar_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -108,10 +109,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: Colors.black,
       body: Column(
         children: [
-          const EliteHeader(
+          EliteHeader(
             title: 'Settings',
             showBackButton: true,
             showGreeting: false,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.calendar_today_outlined, color: Colors.white),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CalendarScreen()),
+                  );
+                },
+              ),
+            ],
           ),
           Expanded(
             child: uid == null

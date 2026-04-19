@@ -134,7 +134,10 @@ NO Markdown tables. Answer precisely:
       dotenv.env['GEMINI_API_KEY_3'] ?? '',
       dotenv.env['GEMINI_API_KEY_4'] ?? '',
       dotenv.env['GEMINI_API_KEY_5'] ?? '',
-    ].where((k) => k.isNotEmpty && !k.contains('YOUR_')).toList();
+    ]
+        .map((k) => k.trim())
+        .where((k) => k.isNotEmpty && !k.contains('YOUR_'))
+        .toList();
 
     debugPrint(
         '🤖 OnyxAiRouter: Loaded ${_apiKeys.length} valid API keys.');
@@ -201,9 +204,10 @@ NO Markdown tables. Answer precisely:
   }
 
   Future<String> _callNemotronDeepAnalysis(String contextData, String userMessage) async {
-    final apiKey = dotenv.env['OPENROUTER_API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) {
-      return "Missing OpenRouter API Key in .env file.";
+    final apiKey = (dotenv.env['OPENROUTER_API_KEY'] ?? '').trim();
+    if (apiKey.isEmpty) {
+      debugPrint('❌ OnyxAiRouter: OPENROUTER_API_KEY is missing or empty in .env');
+      return "Missing OpenRouter API Key in .env file. Please ensure it is set as OPENROUTER_API_KEY.";
     }
 
     try {

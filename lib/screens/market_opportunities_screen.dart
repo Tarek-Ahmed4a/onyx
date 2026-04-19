@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import '../widgets/connectivity_indicator.dart';
 import '../widgets/elite_header.dart';
 import '../widgets/elite_card.dart';
+import 'calendar_screen.dart';
+import 'profile_screen.dart';
 
 class MarketOpportunitiesScreen extends StatelessWidget {
   const MarketOpportunitiesScreen({super.key});
@@ -16,16 +18,47 @@ class MarketOpportunitiesScreen extends StatelessWidget {
         children: [
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
-            .collection('market_signals')
-            .orderBy('timestamp', descending: true)
-            .limit(50)
-            .snapshots(),
-        builder: (context, snapshot) {
-          return CustomScrollView(
-            slivers: [
-              const SliverToBoxAdapter(
-                child: EliteHeader(title: 'Opportunity Radar'),
-              ),
+                .collection('market_signals')
+                .orderBy('timestamp', descending: true)
+                .limit(50)
+                .snapshots(),
+            builder: (context, snapshot) {
+              return CustomScrollView(
+                slivers: [
+                  SliverAppBar(
+                    title: const Text('Radar', style: TextStyle(fontWeight: FontWeight.bold)),
+                    backgroundColor: Colors.black,
+                    floating: true,
+                    pinned: true,
+                    elevation: 0,
+                    actions: [
+                      IconButton(
+                        icon: const Icon(Icons.calendar_today_outlined,
+                            color: Colors.white),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const CalendarScreen()),
+                          );
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.account_circle_outlined,
+                            color: Colors.white),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const ProfileScreen()),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  const SliverToBoxAdapter(
+                    child: EliteHeader(title: 'Signals & Opportunities'),
+                  ),
               if (snapshot.connectionState == ConnectionState.waiting)
                 const SliverFillRemaining(
                   child: Center(

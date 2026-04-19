@@ -2018,62 +2018,65 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
         ),
       ),
       child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.calendar_today_outlined,
-                  color: Colors.white),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const CalendarScreen()),
-                );
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.account_circle_outlined,
-                  color: Colors.white),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const ProfileScreen()),
-                );
-              },
-            ),
-          ],
-          bottom: TabBar(
-            controller: _tabController,
-            indicatorColor: const Color(0xFFFFFFFF),
-            labelColor: const Color(0xFFFFFFFF),
-            unselectedLabelColor: const Color(0xFF888888),
-            tabs: const [
-              Tab(text: 'My Wallet'),
-              Tab(text: 'Market Status'),
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            title: const Text('Investments', style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Colors.black,
+            floating: true,
+            pinned: true,
+            elevation: 0,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.calendar_today_outlined,
+                    color: Colors.white),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const CalendarScreen()),
+                  );
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.account_circle_outlined,
+                    color: Colors.white),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const ProfileScreen()),
+                  );
+                },
+              ),
             ],
-          ),
-        ),
-      body: Column(
-        children: [
-          const EliteHeader(title: 'Investments'),
-          Expanded(
-            child: Stack(
-              children: [
-                TabBarView(
-                  controller: _tabController,
-                  children: [
-                    myPortfolioView,
-                    marketStatusView,
-                  ],
-                ),
-                const ConnectivityIndicator(),
+            bottom: TabBar(
+              controller: _tabController,
+              indicatorColor: const Color(0xFFFFFFFF),
+              labelColor: const Color(0xFFFFFFFF),
+              unselectedLabelColor: const Color(0xFF888888),
+              tabs: const [
+                Tab(text: 'My Wallet'),
+                Tab(text: 'Market Status'),
               ],
             ),
           ),
+          const SliverToBoxAdapter(
+            child: EliteHeader(title: 'Portfolio & Assets'),
+          ),
         ],
+        body: Stack(
+          children: [
+            TabBarView(
+              controller: _tabController,
+              children: [
+                myPortfolioView,
+                marketStatusView,
+              ],
+            ),
+            const ConnectivityIndicator(),
+          ],
+        ),
       ),
         floatingActionButton:
             (_tabController.index == 0 && _activePortfolioId != null)

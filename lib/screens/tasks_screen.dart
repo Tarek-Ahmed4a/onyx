@@ -893,51 +893,54 @@ class _TasksScreenState extends State<TasksScreen> {
       length: 2,
       child: Scaffold(
         backgroundColor: Colors.black,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.calendar_today_outlined, color: Colors.white),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CalendarScreen()),
-                );
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.account_circle_outlined, color: Colors.white),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                );
-              },
-            ),
-          ],
-          bottom: const TabBar(
-            indicatorColor: Color(0xFFFFFFFF),
-            labelColor: Color(0xFFFFFFFF),
-            unselectedLabelColor: Color(0xFF888888),
-            tabs: [
-              Tab(text: 'To-Do'),
-              Tab(text: 'Notes'),
-            ],
-          ),
-        ),
-        body: Column(
-          children: [
-            const EliteHeader(title: 'Workspace'),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  tasksView,
-                  notesView,
+        body: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+            SliverAppBar(
+              title: const Text('Tasks', style: TextStyle(fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.black,
+              floating: true,
+              pinned: true,
+              elevation: 0,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.calendar_today_outlined, color: Colors.white),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const CalendarScreen()),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.account_circle_outlined, color: Colors.white),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                    );
+                  },
+                ),
+              ],
+              bottom: const TabBar(
+                indicatorColor: Color(0xFFFFFFFF),
+                labelColor: Color(0xFFFFFFFF),
+                unselectedLabelColor: Color(0xFF888888),
+                tabs: [
+                  Tab(text: 'To-Do'),
+                  Tab(text: 'Notes'),
                 ],
               ),
             ),
+            const SliverToBoxAdapter(
+              child: EliteHeader(title: 'Workspace & Tasks'),
+            ),
           ],
+          body: TabBarView(
+            children: [
+              tasksView,
+              notesView,
+            ],
+          ),
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         floatingActionButton: Builder(

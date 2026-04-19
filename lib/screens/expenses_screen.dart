@@ -656,40 +656,46 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: const Text('Expenses', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_today_outlined, color: Colors.white),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const CalendarScreen()),
-              );
-            },
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            title: const Text('Expenses', style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Colors.black,
+            elevation: 0,
+            floating: true,
+            pinned: true,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.calendar_today_outlined, color: Colors.white),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CalendarScreen()),
+                  );
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.account_circle_outlined, color: Colors.white),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                  );
+                },
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.account_circle_outlined, color: Colors.white),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
-            },
+          const SliverToBoxAdapter(
+            child: EliteHeader(title: 'Wallet & Expenses'),
+          ),
+          SliverToBoxAdapter(
+            child: walletSelector,
           ),
         ],
-      ),
-      body: Column(
-        children: [
-          const EliteHeader(title: 'Wallet & Expenses'),
-          walletSelector,
-          Expanded(
-            child: ListView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.only(bottom: 100),
-              children: [
+        body: ListView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 100),
+          children: [
                 ...[
                   EliteCard(
                     glowColor: Colors.blueAccent,
@@ -873,8 +879,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               ],
             ),
           ),
-        ],
-      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 90.0),

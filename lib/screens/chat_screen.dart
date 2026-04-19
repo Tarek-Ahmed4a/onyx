@@ -8,6 +8,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/market_data_service.dart';
 import '../services/onyx_ai_router_service.dart';
 import '../widgets/elite_header.dart';
+import 'calendar_screen.dart';
+import 'profile_screen.dart';
 
 // ─────────────────────────────────────────────────────────────
 // CONSTANTS & THEME TOKENS
@@ -262,30 +264,62 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           _buildBackgroundDecoration(),
           Column(
             children: [
-              EliteHeader(
-                title: 'ONYX AI',
-                showGreeting: false,
-                showBackButton: true,
-                onBack: () => Navigator.pop(context),
-                actions: [
-                  IconButton(
-                    onPressed: _clearChat,
-                    icon: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+              Expanded(
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  physics: const BouncingScrollPhysics(),
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: EliteHeader(
+                        title: 'ONYX AI',
+                        showGreeting: false,
+                        showBackButton: true,
+                        onBack: () => Navigator.pop(context),
+                        actions: [
+                          IconButton(
+                            icon: const Icon(Icons.calendar_today_outlined,
+                                color: Colors.white, size: 20),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => const CalendarScreen()),
+                              );
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.account_circle_outlined,
+                                color: Colors.white, size: 20),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => const ProfileScreen()),
+                              );
+                            },
+                          ),
+                          IconButton(
+                            onPressed: _clearChat,
+                            icon: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                              ),
+                              child: const Icon(Icons.delete_sweep_rounded, size: 18, color: Colors.redAccent),
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            tooltip: 'Clear Chat',
+                          ),
+                        ],
                       ),
-                      child: const Icon(Icons.delete_sweep_rounded, size: 18, color: Colors.redAccent),
                     ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    tooltip: 'Clear Chat',
-                  ),
-                ],
+                    _buildSliverMessageList(),
+                  ],
+                ),
               ),
-              Expanded(child: _buildMessageList()),
               _buildInputBar(),
             ],
           ),
@@ -343,51 +377,57 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   // ─── MESSAGE LIST ─────────────────────────────────────────
 
-  Widget _buildMessageList() {
+  Widget _buildSliverMessageList() {
     if (_messages.isEmpty && !_isLoading) {
-      return _buildEmptyState();
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: _buildEmptyState(),
+      );
     }
 
-    return ListView.builder(
-      controller: _scrollController,
+    return SliverPadding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      itemCount: _messages.length + (_isLoading ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index == _messages.length && _isLoading) {
-          return _buildTypingIndicator();
-        }
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            if (index == _messages.length && _isLoading) {
+              return _buildTypingIndicator();
+            }
 
-        final msg = _messages[index];
-        final animController = index < _messageAnimControllers.length
-            ? _messageAnimControllers[index]
-            : null;
+            final msg = _messages[index];
+            final animController = index < _messageAnimControllers.length
+                ? _messageAnimControllers[index]
+                : null;
 
-        Widget bubble = _MessageBubble(
-          message: msg,
-          userName: FirebaseAuth.instance.currentUser?.displayName ?? 'U',
-        );
+            Widget bubble = _MessageBubble(
+              message: msg,
+              userName: FirebaseAuth.instance.currentUser?.displayName ?? 'U',
+            );
 
-        if (animController != null) {
-          return SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.15),
-              end: Offset.zero,
-            ).animate(CurvedAnimation(
-              parent: animController,
-              curve: Curves.easeOutCubic,
-            )),
-            child: FadeTransition(
-              opacity: CurvedAnimation(
-                parent: animController,
-                curve: Curves.easeOut,
-              ),
-              child: bubble,
-            ),
-          );
-        }
+            if (animController != null) {
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.15),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animController,
+                  curve: Curves.easeOutCubic,
+                )),
+                child: FadeTransition(
+                  opacity: CurvedAnimation(
+                    parent: animController,
+                    curve: Curves.easeOut,
+                  ),
+                  child: bubble,
+                ),
+              );
+            }
 
-        return bubble;
-      },
+            return bubble;
+          },
+          childCount: _messages.length + (_isLoading ? 1 : 0),
+        ),
+      ),
     );
   }
 
