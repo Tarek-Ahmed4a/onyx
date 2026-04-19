@@ -939,7 +939,7 @@ class _TasksScreenState extends State<TasksScreen> {
             ),
           ],
         ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         floatingActionButton: Builder(
           builder: (context) {
             final tabController = DefaultTabController.of(context);
