@@ -1602,12 +1602,12 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                     onPressed: () => _showSellActionDialog(asset, livePrice),
                                     style: TextButton.styleFrom(
                                       foregroundColor: Colors.redAccent,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     ),
                                     child: const Text('SELL', style: TextStyle(fontWeight: FontWeight.bold)),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 4),
                                   IconButton(
                                     icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blueAccent),
                                     onPressed: () => _showEditAssetDialog(asset),
