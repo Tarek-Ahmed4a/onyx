@@ -265,6 +265,20 @@ NO Markdown tables. Answer precisely:
       required MarketDataService marketDataService,
       required String portfolioData,
   }) async {
+    // ── Diagnostic Command ──────────────────────────────────
+    final cmd = userMessage.trim().toLowerCase();
+    if (cmd == 'debug_status' || cmd == '/status' || cmd == 'status') {
+      final report = '🛠️ **ONYX System Diagnostic**\n'
+          '───────────────────\n'
+          '• **Gemini Pool**: ${ApiKeys.geminiKeys.length} keys loaded ${ApiKeys.isLoaded ? "✅" : "⚠️"}\n'
+          '• **OpenRouter**: ${ApiKeys.openRouterApiKey.isNotEmpty ? "Active ✅" : "Missing ❌"}\n'
+          '• **Tavily Search**: ${ApiKeys.tavilyApiKey.isNotEmpty ? "Active ✅" : "Missing ❌"}\n'
+          '• **Intent Engine**: Ready 🧠\n'
+          '───────────────────\n'
+          'Source: `assets/onyx_config.txt`';
+      return AiResponse(text: report, modelName: 'System Diagnostic');
+    }
+
     try {
       final intentJson = await _detectIntent(userMessage);
       final intent = intentJson['intent'] ?? 'general_chat';
