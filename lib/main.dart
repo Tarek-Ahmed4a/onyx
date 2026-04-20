@@ -311,7 +311,7 @@ class _MainScaffoldState extends State<MainScaffold> {
     _pageController.dispose();
 
     // Stop automatic updates when leaving the main app area
-    // Use try-catch or listen:false for safety in dispose
+    // Use Try-catch or listen:false for safety in dispose
     try {
       Provider.of<MarketDataService>(context, listen: false)
           .stopPeriodicRefresh();
