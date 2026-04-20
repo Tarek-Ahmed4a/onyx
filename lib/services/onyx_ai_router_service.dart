@@ -226,7 +226,7 @@ NO Markdown tables. Answer precisely:
   }
 
   Future<String> _callNemotronDeepAnalysis(String contextData, String userMessage) async {
-    const apiKey = ApiKeys.openRouterApiKey;
+    final apiKey = ApiKeys.openRouterApiKey;
     debugPrint('[AI] OpenRouter Nemotron call starting...');
 
     try {
@@ -557,7 +557,7 @@ NO Markdown tables. Answer precisely:
   // ─────────────────────────────────────────────────────────
 
   Future<String> _fetchMarketContext(String userQuery) async {
-    const apiKey = ApiKeys.tavilyApiKey;
+    final apiKey = ApiKeys.tavilyApiKey;
     if (apiKey.isEmpty) return '';
 
     try {

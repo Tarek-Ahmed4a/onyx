@@ -21,6 +21,7 @@ import 'screens/investments_screen.dart';
 import 'screens/expenses_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/chat_screen.dart';
+import 'config/api_keys.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -30,6 +31,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load API keys from Git-ignored config file
+  await ApiKeys.load();
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,

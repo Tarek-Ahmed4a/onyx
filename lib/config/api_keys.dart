@@ -1,26 +1,72 @@
 // ─────────────────────────────────────────────────────────────
-// ONYX API KEYS — Hardcoded Configuration
+// ONYX API KEYS — Runtime Configuration Store
 // ─────────────────────────────────────────────────────────────
-// This eliminates all flutter_dotenv / asset-loading issues
-// by keeping API keys as compile-time constants.
+// Keys are loaded at startup from the Git-ignored config file
+// (assets/onyx_config.txt). NEVER hardcode secrets here.
 // ─────────────────────────────────────────────────────────────
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class ApiKeys {
-  ApiKeys._(); // Prevent instantiation
+  ApiKeys._();
 
   // ── Gemini API Keys (Round-Robin Pool) ────────────────────
-  static const List<String> geminiKeys = [
-    'AIzaSyDP8FpjGx24bVt5oy8CLCfdXJKFJ9WZTPI',
-    'AIzaSyDuNJ2NWx1f9JuEjY2wklgwQbvgSWD6kXc',
-    'AIzaSyBMrxEt_j_jIbUGiUb6iuNWG-Bn4yGT8Zc',
-    'AIzaSyCwQ3akH5Ljsr6CKrSkza1_SSI-SEttEaU',
-    'AIzaSyBZBnbWwLJwSr0fY0GvMZUfEww9moSaDgk',
-  ];
+  static List<String> geminiKeys = [];
 
   // ── External Service Keys ─────────────────────────────────
-  static const String openRouterApiKey =
-      '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';
+  static String openRouterApiKey = '';
+  static String tavilyApiKey = '';
 
-  static const String tavilyApiKey =
-      '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';
+  /// Whether keys have been successfully loaded.
+  static bool get isLoaded => geminiKeys.isNotEmpty;
+
+  /// Loads all API keys from the bundled config file.
+  /// Called once in main() before runApp().
+  static Future<void> load() async {
+    try {
+      final raw = await rootBundle.loadString('assets/onyx_config.txt');
+      final Map<String, String> parsed = {};
+
+      for (final line in raw.split('\n')) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty || trimmed.startsWith('#')) continue;
+
+        final eqIdx = trimmed.indexOf('=');
+        if (eqIdx == -1) continue;
+
+        final key = trimmed.substring(0, eqIdx).trim();
+        var value = trimmed.substring(eqIdx + 1).trim();
+
+        // Strip surrounding quotes if present
+        if ((value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.substring(1, value.length - 1);
+        }
+
+        if (value.isNotEmpty) {
+          parsed[key] = value;
+        }
+      }
+
+      // Populate Gemini keys
+      geminiKeys = [
+        parsed['GEMINI_API_KEY_1'],
+        parsed['GEMINI_API_KEY_2'],
+        parsed['GEMINI_API_KEY_3'],
+        parsed['GEMINI_API_KEY_4'],
+        parsed['GEMINI_API_KEY_5'],
+      ].whereType<String>().where((k) => k.isNotEmpty).toList();
+
+      // Populate external keys
+      openRouterApiKey = parsed['OPENROUTER_API_KEY'] ?? '';
+      tavilyApiKey = parsed['TAVILY_API_KEY'] ?? '';
+
+      debugPrint('🔐 ApiKeys: Loaded ${geminiKeys.length} Gemini keys, '
+          'OpenRouter=${openRouterApiKey.isNotEmpty ? "✅" : "❌"}, '
+          'Tavily=${tavilyApiKey.isNotEmpty ? "✅" : "❌"}');
+    } catch (e) {
+      debugPrint('🔐 ApiKeys: FAILED to load config — $e');
+    }
+  }
 }
