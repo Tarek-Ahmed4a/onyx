@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'market_data_service.dart';
@@ -204,21 +205,33 @@ NO Markdown tables. Answer precisely:
   }
 
   Future<String> _callNemotronDeepAnalysis(String contextData, String userMessage) async {
-    final rawKey = dotenv.env['OPENROUTER_API_KEY'];
+    String? apiKey = dotenv.env['OPENROUTER_API_KEY']?.trim();
     
-    if (rawKey == null || rawKey.isEmpty) {
+    // Fallback: manually parse config file if dotenv didn't load the key
+    if (apiKey == null || apiKey.isEmpty) {
+      debugPrint('⚠️ dotenv miss — falling back to manual parse');
+      try {
+        final raw = await rootBundle.loadString('assets/onyx_config.txt');
+        for (final line in raw.split(RegExp(r'[\r\n]+'))) {
+          final trimmed = line.trim();
+          if (trimmed.startsWith('OPENROUTER_API_KEY=')) {
+            apiKey = trimmed.split('=').sublist(1).join('=').replaceAll('"', '').trim();
+            break;
+          }
+        }
+      } catch (e) {
+        debugPrint('❌ Manual config parse failed: $e');
+      }
+    }
+
+    if (apiKey == null || apiKey.isEmpty) {
       final loadedKeys = dotenv.env.keys.join(', ');
-      debugPrint('❌ OnyxAiRouter: OPENROUTER_API_KEY is missing. Found keys: $loadedKeys');
-      return "[V2.1] Key NOT found. Loaded keys: $loadedKeys. Please verify assets/onyx_config.txt";
+      debugPrint('❌ OPENROUTER_API_KEY not found anywhere. dotenv keys: $loadedKeys');
+      return "[V3] Key NOT found even after fallback. dotenv keys: $loadedKeys";
     }
 
-    final apiKey = rawKey.trim();
-    if (apiKey.contains('sk-or-v1-YOUR')) {
-      return "[V2.1] Invalid placeholder detected. Please update assets/onyx_config.txt with your real key.";
-    }
-
-    final partialKey = apiKey.length > 10 ? '${apiKey.substring(0, 10)}...' : 'Short Key';
-    debugPrint('🧠 Calling OpenRouter Nemotron (Partial Key: $partialKey)');
+    final partialKey = apiKey.length > 10 ? '${apiKey.substring(0, 10)}...' : 'Short';
+    debugPrint('🧠 Calling OpenRouter Nemotron (Key: $partialKey)');
 
     try {
       final response = await http.post(
