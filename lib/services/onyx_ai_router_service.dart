@@ -92,9 +92,12 @@ class OnyxAiRouterService {
   /// Concise summarization — Gemini 3.1 Flash Lite Preview
   static const String _summaryModel = 'models/gemini-3.1-flash-lite-preview';
 
-  static const String _routerPrompt = '''You are the Router for the ONYX financial system. Your job is to classify the user's intent. Read the user's message and strictly output a JSON object. Do NOT output any other text. Rules:
-1. General question/greeting -> {"intent": "general_chat", "reply": "Your response in Arabic"}
-2. Needs financial analysis, recommendations, or mentions a stock -> {"intent": "call_expert", "stock_symbol": "SYMBOL_OR_NULL"}''';
+  static const String _routerPrompt = '''You are the Router for the ONYX financial system. Your job is to classify the user's intent from their message (which is usually in Arabic). 
+Rules:
+1. If the user mentions a specific stock (e.g. Fawry, CIB, فوري, حديد عز) or asks for recommendations/market status -> Output: {"intent": "call_expert", "stock_symbol": "SYMBOL_OR_NULL"}
+2. If it's just a greeting or general non-financial talk -> Output: {"intent": "general_chat", "reply": "Your friendly response in Arabic"}
+
+STRICT: Output ONLY the JSON. No conversational filler.''';
 
   static const String _nemotronExpertPrompt = '''[SYSTEM PERSONA & RULES]
 You are ONYX, an elite AI financial analyst for the EGX. You receive data inside <MARKET_DATA>, <MARKET_NEWS>, and <USER_PORTFOLIO>.
@@ -179,28 +182,52 @@ NO Markdown tables. Answer precisely:
       ],
       'generationConfig': {
         'temperature': 0.1,
-        'responseMimeType': 'application/json',
       },
     };
 
     try {
       final response = await _callModelWithRetry(_chatModel, body);
-      var text = response.text.trim();
-      if (text.startsWith('```json')) {
-        text = text.replaceAll('```json', '').replaceAll('```', '').trim();
-      }
-      return json.decode(text);
+      final text = response.text.trim();
+      final extracted = _tryExtractJson(text);
+      if (extracted != null) return extracted;
+      
+      throw 'Invalid JSON format: $text';
     } catch (e) {
       debugPrint('Intent parsing failed: $e');
-      return {'intent': 'general_chat', 'reply': 'عذراً، لم أفهم طلبك. هل تسأل عن سهم معين؟'};
+      return {
+        'intent': 'general_chat', 
+        'reply': 'عذراً، لم أفهم طلبك بدقة ($e). هل تسأل عن سهم محدد؟'
+      };
     }
+  }
+
+  /// Robustly extracts the first JSON object found within a string.
+  Map<String, dynamic>? _tryExtractJson(String text) {
+    try {
+      // 1. Try direct parse
+      return json.decode(text);
+    } catch (_) {
+      try {
+        // 2. Try cleaning markdown backticks
+        final cleaned = text.replaceAll('```json', '').replaceAll('```', '').trim();
+        return json.decode(cleaned);
+      } catch (_) {
+        // 3. Regex find first { ... } block
+        final regex = RegExp(r'\{.*\}', dotAll: true);
+        final match = regex.firstMatch(text);
+        if (match != null) {
+          try {
+            return json.decode(match.group(0)!);
+          } catch (_) {}
+        }
+      }
+    }
+    return null;
   }
 
   Future<String> _callNemotronDeepAnalysis(String contextData, String userMessage) async {
     const apiKey = ApiKeys.openRouterApiKey;
-
     debugPrint('[AI] OpenRouter Nemotron call starting...');
-
 
     try {
       final response = await http.post(
@@ -224,11 +251,11 @@ NO Markdown tables. Answer precisely:
         final content = data['choices'][0]['message']['content'];
         return content ?? 'No analysis returned.';
       } else {
-        throw 'OpenRouter API Error: \${response.statusCode} - \${response.body}';
+        throw 'OpenRouter API Error: ${response.statusCode} - ${response.body}';
       }
     } catch (e) {
-      debugPrint('Nemotron deep analysis error: \$e');
-      throw const AiException('فشل في الاتصال بمحلل السوق العميق: \$e');
+      debugPrint('Nemotron deep analysis error: $e');
+      throw AiException('فشل في الاتصال بمحلل السوق العميق: $e');
     }
   }
 
