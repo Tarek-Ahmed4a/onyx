@@ -26,9 +26,9 @@ class EliteCard extends StatelessWidget {
         boxShadow: [
           if (glowColor != null)
             BoxShadow(
-              color: glowColor!.withValues(alpha: 0.15),
-              blurRadius: 20,
-              spreadRadius: -5,
+              color: glowColor!.withValues(alpha: 0.3),
+              blurRadius: 25,
+              spreadRadius: -2,
             ),
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.4),
@@ -44,18 +44,22 @@ class EliteCard extends StatelessWidget {
           child: Container(
             padding: padding ?? const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E).withValues(alpha: 0.7),
+              color: glowColor != null 
+                  ? glowColor!.withValues(alpha: 0.15) 
+                  : const Color(0xFF1E1E1E).withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.05),
-                width: 1,
+                color: glowColor != null 
+                    ? glowColor!.withValues(alpha: 0.3) 
+                    : Colors.white.withValues(alpha: 0.05),
+                width: 1.5,
               ),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Colors.white.withValues(alpha: 0.05),
-                  Colors.white.withValues(alpha: 0.01),
+                  Colors.white.withValues(alpha: 0.08),
+                  Colors.white.withValues(alpha: 0.02),
                 ],
               ),
             ),

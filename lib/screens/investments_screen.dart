@@ -5,17 +5,19 @@ import 'package:shimmer/shimmer.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:provider/provider.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../widgets/premium_empty_state.dart';
 import '../widgets/custom_toast.dart';
 import '../widgets/elite_header.dart';
 import '../widgets/elite_card.dart';
+import '../widgets/elite_dialog.dart';
 import '../widgets/animated_amount.dart';
-import 'package:provider/provider.dart';
-import '../services/market_data_service.dart';
 import '../widgets/connectivity_indicator.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'profile_screen.dart';
+import '../widgets/elite_selection_sheet.dart';
+import '../services/market_data_service.dart';
 import 'calendar_screen.dart';
+import 'profile_screen.dart';
 
 const Map<String, String> knownFunds = {
   'NMF': 'صندوق NM أسهم شريعة',
@@ -350,48 +352,65 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
   }
 
   void _addPortfolio(String name) async {
-    if (name.trim().isEmpty) return;
+    if (name.isEmpty) return;
     final newPortfolio = Portfolio(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name.trim(),
+      balance: 0.0,
+      initialBudget: 0.0,
     );
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
 
-    try {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
       await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
           .collection('investments')
           .doc(newPortfolio.id)
           .set(newPortfolio.toJson());
-
-      // Update local asset cache for alerts
+      
       if (mounted) {
-        context.read<MarketDataService>().fetchUserAssets();
-      }
-
-      if (mounted) {
-        setState(() => _activePortfolioId = newPortfolio.id);
-        HapticFeedback.lightImpact();
-        CustomToast.show(
-          context: context,
-          message: 'Portfolio "${newPortfolio.name}" created',
-          icon: Icons.check_circle_outline,
-          color: Colors.greenAccent,
-        );
-      }
-    } catch (e) {
-      debugPrint('Error adding portfolio: $e');
-      if (mounted) {
-        CustomToast.show(
-          context: context,
-          message: 'Failed to create portfolio: $e',
-          icon: Icons.error_outline,
-          color: Colors.redAccent,
-        );
+        setState(() {
+          _activePortfolioId = newPortfolio.id;
+        });
       }
     }
+  }
+
+  void _showAddPortfolioDialog() {
+    final controller = TextEditingController();
+    EliteDialog.show(
+      context: context,
+      title: 'New Portfolio',
+      glowColor: Theme.of(context).colorScheme.primary,
+      content: TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          labelText: 'PORTFOLIO NAME',
+          labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: 0.05),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        ),
+        autofocus: true,
+        textCapitalization: TextCapitalization.words,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('CANCEL'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (controller.text.trim().isNotEmpty) {
+              _addPortfolio(controller.text.trim());
+              Navigator.pop(context);
+            }
+          },
+          child: const Text('SAVE'),
+        ),
+      ],
+    );
   }
 
   void _deletePortfolio(Portfolio portfolio) {
@@ -530,6 +549,176 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
     }
   }
 
+  void _showAddAssetDialog() {
+    final nameController = TextEditingController();
+    final buyPriceController = TextEditingController();
+    final currentPriceController = TextEditingController();
+    final quantityController = TextEditingController();
+    final takeProfitController = TextEditingController();
+    final stopLossController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final marketData = context.read<MarketDataService>().stocksData;
+
+    EliteDialog.show(
+      context: context,
+      title: 'Acquire Asset',
+      glowColor: Theme.of(context).colorScheme.primary,
+      content: StatefulBuilder(builder: (context, setDialogState) {
+        return Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              InkWell(
+                onTap: () async {
+                  final result = await EliteSelectionSheet.show<String>(
+                    context: context,
+                    title: 'Select Asset Ticker',
+                    items: marketData.keys.toList(),
+                    labelBuilder: (ticker) => ticker,
+                    subtitleBuilder: (ticker) => marketData[ticker]?['name'] ?? '',
+                    allowCustomEntry: true,
+                    selectedItem: nameController.text.isNotEmpty ? nameController.text : null,
+                  );
+                  if (result != null) {
+                    setDialogState(() {
+                      nameController.text = result;
+                      final price = marketData[result]?['price'];
+                      if (price != null) currentPriceController.text = price.toString();
+                    });
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.search, size: 20, color: Colors.white54),
+                      const SizedBox(width: 12),
+                      Text(
+                        nameController.text.isEmpty ? 'SELECT ASSET TICKER' : nameController.text,
+                        style: TextStyle(
+                          color: nameController.text.isEmpty ? Colors.white54 : Colors.white,
+                          fontWeight: nameController.text.isEmpty ? FontWeight.normal : FontWeight.bold,
+                          fontSize: 12,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.arrow_drop_down, color: Colors.white54),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: buyPriceController,
+                      decoration: InputDecoration(
+                        labelText: 'BUY PRICE',
+                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: quantityController,
+                      decoration: InputDecoration(
+                        labelText: 'QUANTITY',
+                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: currentPriceController,
+                decoration: InputDecoration(
+                  labelText: 'CURRENT MARKET PRICE',
+                  labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.05),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: takeProfitController,
+                      decoration: InputDecoration(
+                        labelText: 'TARGET PRICE',
+                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: stopLossController,
+                      decoration: InputDecoration(
+                        labelText: 'STOP LOSS',
+                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      }),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
+        FilledButton(
+          onPressed: () {
+            if (formKey.currentState!.validate()) {
+              _addAsset(
+                nameController.text.toUpperCase(),
+                double.parse(buyPriceController.text),
+                double.parse(currentPriceController.text),
+                double.parse(quantityController.text),
+                double.tryParse(takeProfitController.text),
+                double.tryParse(stopLossController.text),
+              );
+              Navigator.pop(context);
+            }
+          },
+          child: const Text('SAVE'),
+        ),
+      ],
+    );
+  }
+
   void _updateAsset(
       Asset oldAsset,
       String name,
@@ -596,164 +785,172 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
 
   void _showEditAssetDialog(Asset asset) {
     final nameController = TextEditingController(text: asset.name);
-    final buyPriceController =
-        TextEditingController(text: asset.buyPrice.toString());
-    final currentPriceController =
-        TextEditingController(text: asset.currentPrice.toString());
-    final quantityController =
-        TextEditingController(text: asset.quantity.toString());
-    final takeProfitController =
-        TextEditingController(text: asset.takeProfit?.toString() ?? '');
-    final stopLossController =
-        TextEditingController(text: asset.stopLoss?.toString() ?? '');
+    final buyPriceController = TextEditingController(text: asset.buyPrice.toString());
+    final currentPriceController = TextEditingController(text: asset.currentPrice.toString());
+    final quantityController = TextEditingController(text: asset.quantity.toString());
+    final takeProfitController = TextEditingController(text: asset.takeProfit?.toString() ?? '');
+    final stopLossController = TextEditingController(text: asset.stopLoss?.toString() ?? '');
     final formKey = GlobalKey<FormState>();
 
     final marketData = context.read<MarketDataService>().stocksData;
 
-    showDialog(
+    EliteDialog.show(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Asset'),
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Autocomplete<String>(
-                  initialValue: TextEditingValue(text: asset.name),
-                  optionsBuilder: (TextEditingValue textEditingValue) {
-                    if (textEditingValue.text == '') {
-                      return const Iterable<String>.empty();
-                    }
-                    return marketData.keys.where((String option) {
-                      return option
-                          .contains(textEditingValue.text.toUpperCase());
+      title: 'Modify Asset',
+      glowColor: Theme.of(context).colorScheme.primary,
+      content: StatefulBuilder(builder: (context, setDialogState) {
+        return Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              InkWell(
+                onTap: () async {
+                  final result = await EliteSelectionSheet.show<String>(
+                    context: context,
+                    title: 'Select Asset Ticker',
+                    items: marketData.keys.toList(),
+                    labelBuilder: (ticker) => ticker,
+                    subtitleBuilder: (ticker) => marketData[ticker]?['name'] ?? '',
+                    allowCustomEntry: true,
+                    selectedItem: nameController.text.isNotEmpty ? nameController.text : null,
+                  );
+                  if (result != null) {
+                    setDialogState(() {
+                      nameController.text = result;
+                      final price = marketData[result]?['price'];
+                      if (price != null) currentPriceController.text = price.toString();
                     });
-                  },
-                  onSelected: (String selection) {
-                    nameController.text = selection;
-                    final price = marketData[selection]?['price'];
-                    if (price != null) {
-                      currentPriceController.text = price.toString();
-                    }
-                  },
-                  fieldViewBuilder:
-                      (context, controller, focusNode, onFieldSubmitted) {
-                    controller.addListener(() {
-                      nameController.text = controller.text;
-                    });
-                    return TextFormField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      onFieldSubmitted: (value) => onFieldSubmitted(),
-                      decoration: const InputDecoration(
-                        labelText: 'Asset Name (e.g., COMI.CA)',
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.search, size: 20, color: Colors.white54),
+                      const SizedBox(width: 12),
+                      Text(
+                        nameController.text.isEmpty ? 'SELECT ASSET TICKER' : nameController.text,
+                        style: TextStyle(
+                          color: nameController.text.isEmpty ? Colors.white54 : Colors.white,
+                          fontWeight: nameController.text.isEmpty ? FontWeight.normal : FontWeight.bold,
+                          fontSize: 12,
+                          letterSpacing: 1,
+                        ),
                       ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                              ? 'Required'
-                              : null,
-                      textCapitalization: TextCapitalization.characters,
-                    );
-                  },
+                      const Spacer(),
+                      const Icon(Icons.arrow_drop_down, color: Colors.white54),
+                    ],
+                  ),
                 ),
-                TextFormField(
-                  controller: buyPriceController,
-                  decoration: const InputDecoration(labelText: 'Buy Price'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    if (double.tryParse(value) == null) return 'Invalid number';
-                    return null;
-                  },
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: buyPriceController,
+                      decoration: InputDecoration(
+                        labelText: 'BUY PRICE',
+                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: quantityController,
+                      decoration: InputDecoration(
+                        labelText: 'QUANTITY',
+                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: currentPriceController,
+                decoration: InputDecoration(
+                  labelText: 'CURRENT MARKET PRICE',
+                  labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.05),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
-                TextFormField(
-                  controller: currentPriceController,
-                  decoration: const InputDecoration(labelText: 'Current Price'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    if (double.tryParse(value) == null) return 'Invalid number';
-                    return null;
-                  },
-                ),
-                TextFormField(
-                  controller: quantityController,
-                  decoration: const InputDecoration(labelText: 'Quantity'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    if (double.tryParse(value) == null) return 'Invalid number';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: takeProfitController,
-                  decoration: const InputDecoration(
-                      labelText: 'Target Price (Take Profit)'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) {
-                    if (value != null &&
-                        value.isNotEmpty &&
-                        double.tryParse(value) == null) {
-                      return 'Invalid number';
-                    }
-                    return null;
-                  },
-                ),
-                TextFormField(
-                  controller: stopLossController,
-                  decoration:
-                      const InputDecoration(labelText: 'Stop Loss Price'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) {
-                    if (value != null &&
-                        value.isNotEmpty &&
-                        double.tryParse(value) == null) {
-                      return 'Invalid number';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: takeProfitController,
+                      decoration: InputDecoration(
+                        labelText: 'TARGET PRICE',
+                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: stopLossController,
+                      decoration: InputDecoration(
+                        labelText: 'STOP LOSS',
+                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
+        );
+      }),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
+        FilledButton(
+          onPressed: () {
+            if (formKey.currentState!.validate()) {
+              _updateAsset(
+                asset,
+                nameController.text.toUpperCase(),
+                double.parse(buyPriceController.text),
+                double.parse(currentPriceController.text),
+                double.parse(quantityController.text),
+                double.tryParse(takeProfitController.text),
+                double.tryParse(stopLossController.text),
+              );
+              Navigator.pop(context);
+            }
+          },
+          child: const Text('SAVE'),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                _updateAsset(
-                  asset,
-                  nameController.text,
-                  double.parse(buyPriceController.text),
-                  double.parse(currentPriceController.text),
-                  double.parse(quantityController.text),
-                  takeProfitController.text.isNotEmpty
-                      ? double.parse(takeProfitController.text)
-                      : null,
-                  stopLossController.text.isNotEmpty
-                      ? double.parse(stopLossController.text)
-                      : null,
-                );
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Update'),
-          ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -913,210 +1110,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
     );
   }
 
-  void _showAddPortfolioDialog() {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('New Profile'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: 'Profile Name'),
-          autofocus: true,
-          textCapitalization: TextCapitalization.sentences,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              _addPortfolio(controller.text);
-              Navigator.pop(context);
-            },
-            child: const Text('Done'),
-          ),
-        ],
-      ),
-    );
-  }
 
-  void _showAddAssetDialog() {
-    final nameController = TextEditingController();
-    final buyPriceController = TextEditingController();
-    final currentPriceController = TextEditingController();
-    final quantityController = TextEditingController();
-    final takeProfitController = TextEditingController();
-    final stopLossController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    final marketData = context.read<MarketDataService>().stocksData;
-
-    nameController.addListener(() {
-      final ticker = nameController.text.trim().toUpperCase();
-      // Only auto-fill if we have exactly matched a ticker or if the user stopped typing
-      if (marketData.containsKey(ticker)) {
-        final price = marketData[ticker]['price'];
-        if (price != null) {
-          final priceStr = price.toString();
-          if (currentPriceController.text != priceStr) {
-            currentPriceController.text = priceStr;
-          }
-        }
-      }
-    });
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Asset'),
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Autocomplete<String>(
-                  optionsBuilder: (TextEditingValue textEditingValue) {
-                    if (textEditingValue.text == '') {
-                      return const Iterable<String>.empty();
-                    }
-                    return marketData.keys.where((String option) {
-                      return option
-                          .contains(textEditingValue.text.toUpperCase());
-                    });
-                  },
-                  onSelected: (String selection) {
-                    nameController.text = selection;
-                    // Trigger price update immediately on selection
-                    final price = marketData[selection]?['price'];
-                    if (price != null) {
-                      currentPriceController.text = price.toString();
-                    }
-                  },
-                  fieldViewBuilder:
-                      (context, controller, focusNode, onFieldSubmitted) {
-                    // Sync the autocomplete's internal controller with our nameController
-                    controller.addListener(() {
-                      nameController.text = controller.text;
-                    });
-                    return TextFormField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      onFieldSubmitted: (value) => onFieldSubmitted(),
-                      decoration: const InputDecoration(
-                        labelText: 'Asset Name (e.g., COMI.CA)',
-                        hintText: 'Start typing to search...',
-                      ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                              ? 'Required'
-                              : null,
-                      textCapitalization: TextCapitalization.characters,
-                    );
-                  },
-                ),
-                TextFormField(
-                  controller: buyPriceController,
-                  decoration: const InputDecoration(labelText: 'Buy Price'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    if (double.tryParse(value) == null) return 'Invalid number';
-                    return null;
-                  },
-                ),
-                TextFormField(
-                  controller: currentPriceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Current Price',
-                    hintText: 'Auto-fills if ticker is recognized',
-                  ),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    if (double.tryParse(value) == null) return 'Invalid number';
-                    return null;
-                  },
-                ),
-                TextFormField(
-                  controller: quantityController,
-                  decoration: const InputDecoration(labelText: 'Quantity'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    if (double.tryParse(value) == null) return 'Invalid number';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: takeProfitController,
-                  decoration: const InputDecoration(
-                      labelText: 'Target Price (Take Profit)'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) {
-                    if (value != null &&
-                        value.isNotEmpty &&
-                        double.tryParse(value) == null) {
-                      return 'Invalid number';
-                    }
-                    return null;
-                  },
-                ),
-                TextFormField(
-                  controller: stopLossController,
-                  decoration:
-                      const InputDecoration(labelText: 'Stop Loss Price'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) {
-                    if (value != null &&
-                        value.isNotEmpty &&
-                        double.tryParse(value) == null) {
-                      return 'Invalid number';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                _addAsset(
-                  nameController.text,
-                  double.parse(buyPriceController.text),
-                  double.parse(currentPriceController.text),
-                  double.parse(quantityController.text),
-                  takeProfitController.text.isNotEmpty
-                      ? double.parse(takeProfitController.text)
-                      : null,
-                  stopLossController.text.isNotEmpty
-                      ? double.parse(stopLossController.text)
-                      : null,
-                );
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1165,7 +1159,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
         itemBuilder: (context, index) {
           return Shimmer.fromColors(
             baseColor: Colors.white.withValues(alpha: 0.05),
-            highlightColor: Colors.white.withValues(alpha: 0.1),
+            highlightColor: Colors.white.withValues(alpha: 0.05),
             child: Container(
               height: index == 0 ? 220 : 120, // First card is bigger (dashboard)
               margin: const EdgeInsets.only(bottom: 16),
@@ -1294,7 +1288,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                     fontSize: 10,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 1.2,
-                                    color: Colors.blueAccent.withValues(alpha: 0.8),
+                                    color: Colors.blueAccent.withValues(alpha: 0.05),
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -1320,7 +1314,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                   color: (totalPnlEgp >= 0
                                           ? Colors.greenAccent
                                           : Colors.redAccent)
-                                      .withValues(alpha: 0.1),
+                                      .withValues(alpha: 0.05),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: AnimatedAmount(
@@ -1390,7 +1384,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                 ConnectionState.waiting) {
                                 return Shimmer.fromColors(
                                   baseColor: Colors.white.withValues(alpha: 0.05),
-                                  highlightColor: Colors.white.withValues(alpha: 0.1),
+                                  highlightColor: Colors.white.withValues(alpha: 0.05),
                                   child: Container(
                                     height: 100,
                                     decoration: BoxDecoration(
@@ -1461,8 +1455,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                           begin: Alignment.topCenter,
                                           end: Alignment.bottomCenter,
                                           colors: [
-                                            lineColor.withValues(alpha: 0.2),
-                                            lineColor.withValues(alpha: 0.0),
+                                            lineColor.withValues(alpha: 0.05),
+                                            lineColor.withValues(alpha: 0.05),
                                           ],
                                         ),
                                       ),
@@ -1470,7 +1464,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                   ],
                                   lineTouchData: LineTouchData(
                                     touchTooltipData: LineTouchTooltipData(
-                                      getTooltipColor: (_) => Colors.black.withValues(alpha: 0.8),
+                                      getTooltipColor: (_) => Colors.black.withValues(alpha: 0.05),
                                       getTooltipItems: (touchedSpots) {
                                         return touchedSpots.map((spot) {
                                           return LineTooltipItem(
@@ -1541,7 +1535,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                     background: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                       decoration: BoxDecoration(
-                        color: Colors.redAccent.withValues(alpha: 0.8),
+                        color: Colors.redAccent.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       alignment: Alignment.centerRight,
@@ -1555,7 +1549,6 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                       child: Column(
                         children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Expanded(
                                 child: Column(
@@ -1573,51 +1566,56 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                     ),
                                     const SizedBox(height: 4),
                                     Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(
-                                          asset.name,
-                                          style: TextStyle(
-                                            color: Colors.grey.shade500,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              asset.name,
+                                              style: TextStyle(
+                                                color: Colors.grey.shade500,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'Qty: ${asset.quantity}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.grey.shade500,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Qty: ${asset.quantity}',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.grey.shade500,
-                                          ),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            TextButton(
+                                              onPressed: () => _showSellActionDialog(asset, livePrice),
+                                              style: TextButton.styleFrom(
+                                                foregroundColor: Colors.redAccent,
+                                                padding: EdgeInsets.zero,
+                                                minimumSize: Size.zero,
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                visualDensity: VisualDensity.compact,
+                                              ),
+                                              child: const Text('SELL', style: TextStyle(fontWeight: FontWeight.bold)),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            IconButton(
+                                              icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blueAccent),
+                                              onPressed: () => _showEditAssetDialog(asset),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
                                   ],
                                 ),
-                              ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  TextButton(
-                                    onPressed: () => _showSellActionDialog(asset, livePrice),
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: Colors.redAccent,
-                                      padding: EdgeInsets.zero,
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      visualDensity: VisualDensity.compact,
-                                    ),
-                                    child: const Text('SELL', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blueAccent),
-                                    onPressed: () => _showEditAssetDialog(asset),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                  ),
-                                ],
                               ),
                             ],
                           ),
@@ -1651,7 +1649,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                 child: _buildAssetDetail(
                                     'TARGET (TP)',
                                     asset.takeProfit != null ? 'EGP ${asset.takeProfit!.toStringAsFixed(2)}' : 'N/A',
-                                    color: Colors.greenAccent.withValues(alpha: 0.7)),
+                                    color: Colors.greenAccent),
                               ),
                               Expanded(
                                 child: _buildAssetDetail('TOTAL', 'EGP ${(asset.buyPrice * asset.quantity).toStringAsFixed(2)}',
@@ -1661,7 +1659,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                 child: _buildAssetDetail(
                                     'STOP LOSS',
                                     asset.stopLoss != null ? 'EGP ${asset.stopLoss!.toStringAsFixed(2)}' : 'N/A',
-                                    color: Colors.redAccent.withValues(alpha: 0.7)),
+                                    color: Colors.redAccent),
                               ),
                             ],
                           ),
@@ -1859,9 +1857,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                             Positioned.fill(
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.03),
+                                  color: Colors.white.withValues(alpha: 0.05),
                                   border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.08),
+                                    color: Colors.white.withValues(alpha: 0.05),
                                     width: 1,
                                   ),
                                   borderRadius: BorderRadius.circular(20),
@@ -1946,7 +1944,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                           decoration: BoxDecoration(
-                                            color: sentimentColor.withValues(alpha: 0.1),
+                                            color: sentimentColor.withValues(alpha: 0.05),
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: Text(
@@ -1965,7 +1963,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                           decoration: BoxDecoration(
-                                            color: Colors.black.withValues(alpha: 0.3),
+                                            color: Colors.black.withValues(alpha: 0.05),
                                             borderRadius: BorderRadius.circular(4),
                                             border: Border.all(
                                               color: Colors.white.withValues(alpha: 0.05),

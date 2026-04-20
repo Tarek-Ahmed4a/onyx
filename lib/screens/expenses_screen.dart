@@ -8,7 +8,9 @@ import '../widgets/premium_empty_state.dart';
 import '../widgets/custom_toast.dart';
 import '../widgets/elite_header.dart';
 import '../widgets/elite_card.dart';
+import '../widgets/elite_dialog.dart';
 import '../widgets/animated_amount.dart';
+import '../widgets/elite_selection_sheet.dart';
 import '../models/wallet_model.dart';
 import 'profile_screen.dart';
 import 'calendar_screen.dart';
@@ -204,45 +206,51 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   void _showAddWalletDialog() {
     final controller = TextEditingController();
-    showDialog(
+    EliteDialog.show(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('New Wallet'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: 'Wallet Name'),
-          textCapitalization: TextCapitalization.words,
+      title: 'New Vault',
+      glowColor: Theme.of(context).colorScheme.primary,
+      content: TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          labelText: 'VAULT NAME',
+          labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: 0.05),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              if (controller.text.trim().isEmpty) return;
-              final newWallet = Wallet(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  name: controller.text.trim(),
-              );
-              
-              final uid = FirebaseAuth.instance.currentUser?.uid;
-              if (uid != null) {
-                  await FirebaseFirestore.instance.collection('users').doc(uid).collection('profiles').doc(newWallet.id).set(newWallet.toJson());
-              }
-              
-              if (!context.mounted) return;
-              Navigator.pop(context);
-              if (mounted) {
-                  setState(() {
-                      _activeWalletId = newWallet.id;
-                  });
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
+        autofocus: true,
+        textCapitalization: TextCapitalization.words,
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('CANCEL'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            if (controller.text.trim().isEmpty) return;
+            final newWallet = Wallet(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                name: controller.text.trim(),
+            );
+            
+            final uid = FirebaseAuth.instance.currentUser?.uid;
+            if (uid != null) {
+                await FirebaseFirestore.instance.collection('users').doc(uid).collection('profiles').doc(newWallet.id).set(newWallet.toJson());
+            }
+            
+            if (!mounted) return;
+            Navigator.pop(context);
+            if (mounted) {
+                setState(() {
+                    _activeWalletId = newWallet.id;
+                });
+            }
+          },
+          child: const Text('CREATE'),
+        ),
+      ],
     );
   }
 
@@ -252,74 +260,88 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final savingsCtrl = TextEditingController(text: wallet.savingsRatio.toStringAsFixed(0));
     final incomeCtrl = TextEditingController(text: wallet.initialIncome.toStringAsFixed(2));
 
-    showDialog(
+    EliteDialog.show(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Wallet Settings'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+      title: 'Vault Configurations',
+      glowColor: Theme.of(context).colorScheme.primary,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: incomeCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'MONTHLY REVENUE (\$)',
+              labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+              fillColor: Colors.white.withValues(alpha: 0.05),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text('ALLOCATION RATIO (%)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1)),
+          const SizedBox(height: 12),
+          Row(
             children: [
-              TextField(
-                controller: incomeCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Monthly Income (\$)'),
-              ),
-              const SizedBox(height: 16),
-              const Text('Rule Breakdown (%)', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(child: TextField(controller: needsCtrl, decoration: const InputDecoration(labelText: 'Needs'), keyboardType: TextInputType.number)),
-                  const SizedBox(width: 8),
-                  Expanded(child: TextField(controller: wantsCtrl, decoration: const InputDecoration(labelText: 'Wants'), keyboardType: TextInputType.number)),
-                  const SizedBox(width: 8),
-                  Expanded(child: TextField(controller: savingsCtrl, decoration: const InputDecoration(labelText: 'Savings'), keyboardType: TextInputType.number)),
-                ],
-              ),
+              Expanded(child: TextField(
+                controller: needsCtrl, 
+                decoration: InputDecoration(labelText: 'ALLOCATION', labelStyle: const TextStyle(fontSize: 9), filled: true, fillColor: Colors.white.withValues(alpha: 0.03), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)), 
+                keyboardType: TextInputType.number
+              )),
+              const SizedBox(width: 8),
+              Expanded(child: TextField(
+                controller: wantsCtrl, 
+                decoration: InputDecoration(labelText: 'WANTS', labelStyle: const TextStyle(fontSize: 9), filled: true, fillColor: Colors.white.withValues(alpha: 0.03), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)), 
+                keyboardType: TextInputType.number
+              )),
+              const SizedBox(width: 8),
+              Expanded(child: TextField(
+                controller: savingsCtrl, 
+                decoration: InputDecoration(labelText: 'SAVINGS', labelStyle: const TextStyle(fontSize: 9), filled: true, fillColor: Colors.white.withValues(alpha: 0.03), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)), 
+                keyboardType: TextInputType.number
+              )),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              final n = double.tryParse(needsCtrl.text) ?? 0;
-              final w = double.tryParse(wantsCtrl.text) ?? 0;
-              final s = double.tryParse(savingsCtrl.text) ?? 0;
-              final inc = double.tryParse(incomeCtrl.text) ?? 0;
-              
-              if ((n + w + s) != 100.0) {
-                  CustomToast.show(
-                    context: context,
-                    message: 'Percentages must sum exactly to 100.',
-                    icon: Icons.error_outline,
-                    color: Colors.redAccent,
-                  );
-                  return;
-              }
-              
-              wallet.needsRatio = n;
-              wallet.wantsRatio = w;
-              wallet.savingsRatio = s;
-              wallet.initialIncome = inc;
-
-              final uid = FirebaseAuth.instance.currentUser?.uid;
-              if (uid != null) {
-                  await FirebaseFirestore.instance.collection('users').doc(uid).collection('profiles').doc(wallet.id).set(wallet.toJson());
-              }
-              
-              if (!context.mounted) return;
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
           ),
         ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('CANCEL'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            final n = double.tryParse(needsCtrl.text) ?? 0;
+            final w = double.tryParse(wantsCtrl.text) ?? 0;
+            final s = double.tryParse(savingsCtrl.text) ?? 0;
+            final inc = double.tryParse(incomeCtrl.text) ?? 0;
+            
+            if ((n + w + s) != 100.0) {
+                CustomToast.show(
+                  context: context,
+                  message: 'Ratios must equal 100%.',
+                  icon: Icons.error_outline,
+                  color: Colors.redAccent,
+                );
+                return;
+            }
+            
+            wallet.needsRatio = n;
+            wallet.wantsRatio = w;
+            wallet.savingsRatio = s;
+            wallet.initialIncome = inc;
+
+            final uid = FirebaseAuth.instance.currentUser?.uid;
+            if (uid != null) {
+                await FirebaseFirestore.instance.collection('users').doc(uid).collection('profiles').doc(wallet.id).set(wallet.toJson());
+            }
+            
+            if (!mounted) return;
+            Navigator.pop(context);
+          },
+          child: const Text('SAVE'),
+        ),
+      ],
     );
   }
 
@@ -327,66 +349,103 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     String selectedCategory = 'Need';
     final amountController = TextEditingController();
 
-    showDialog(
+    EliteDialog.show(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(builder: (context, setDialogState) {
-          return AlertDialog(
-            title: const Text('Add Expense'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  // ignore: deprecated_member_use
-                  value: selectedCategory,
-                  items: ['Need', 'Want', 'Saving'].map((String category) {
-                    return DropdownMenuItem(
-                        value: category, child: Text(category));
-                  }).toList(),
-                  onChanged: (val) {
-                    setDialogState(() {
-                      selectedCategory = val!;
-                    });
+      title: 'New Outflow',
+      glowColor: Theme.of(context).colorScheme.primary,
+      content: StatefulBuilder(builder: (context, setDialogState) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            InkWell(
+              onTap: () async {
+                final result = await EliteSelectionSheet.show<String>(
+                  context: context,
+                  title: 'Select Category',
+                  items: ['Need', 'Want', 'Saving'],
+                  labelBuilder: (cat) => cat,
+                  iconBuilder: (cat) {
+                    if (cat == 'Need') return Icons.shopping_bag_outlined;
+                    if (cat == 'Want') return Icons.favorite_border;
+                    return Icons.savings_outlined;
                   },
-                  decoration: const InputDecoration(labelText: 'Category'),
+                  selectedItem: selectedCategory,
+                );
+                if (result != null) {
+                  setDialogState(() {
+                    selectedCategory = result;
+                  });
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                TextField(
-                  controller: amountController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Amount (\$)'),
+                child: Row(
+                  children: [
+                    Icon(
+                      selectedCategory == 'Need'
+                          ? Icons.shopping_bag_outlined
+                          : selectedCategory == 'Want'
+                              ? Icons.favorite_border
+                              : Icons.savings_outlined,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      selectedCategory.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const Spacer(),
+                    const Icon(Icons.arrow_drop_down, color: Colors.white54),
+                  ],
                 ),
-              ],
+              ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: amountController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                labelText: 'AMOUNT (\$)',
+                labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900, color: Colors.grey),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                prefixIcon: const Icon(Icons.attach_money, size: 20, color: Colors.white54),
               ),
-              FilledButton(
-                onPressed: () {
-                  if (amountController.text.isNotEmpty) {
-                    final double? amount =
-                        double.tryParse(amountController.text);
-                    if (amount != null) {
-                      HapticFeedback.lightImpact();
-                      _addExpense(selectedCategory, amount);
-                      Navigator.pop(context);
-                      CustomToast.show(
-                        context: context,
-                        message: 'Expense added successfully',
-                        icon: Icons.check_circle_outline,
-                        color: Colors.greenAccent,
-                      );
-                    }
-                  }
-                },
-                child: const Text('Add'),
-              ),
-            ],
-          );
-        });
-      },
+            ),
+          ],
+        );
+      }),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('CANCEL'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (amountController.text.isNotEmpty) {
+              final double? amount = double.tryParse(amountController.text);
+              if (amount != null) {
+                HapticFeedback.lightImpact();
+                _addExpense(selectedCategory, amount);
+                Navigator.pop(context);
+              }
+            }
+          },
+          child: const Text('SAVE'),
+        ),
+      ],
     );
   }
 

@@ -1,10 +1,10 @@
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/elite_dialog.dart';
 import 'profile_screen.dart';
 
 class CalendarTask {
@@ -170,163 +170,174 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _showAddTaskDialog() {
     final controller = TextEditingController();
-    int? selectedColor = 0xFF1E88E5; // Default Blue
+    int? selectedColor = Theme.of(context).colorScheme.primary.toARGB32();
     TimeOfDay? selectedTime;
 
     final List<int> presetColors = [
-      0xFF1E88E5, // Blue
-      0xFFE53935, // Red
-      0xFF43A047, // Green
+      Theme.of(context).colorScheme.primary.toARGB32(), // Brand Gold/Primary
+      0xFFE53935, // Deep Red
+      0xFF43A047, // Emerald Green
     ];
 
-    showDialog(
+    EliteDialog.show(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(builder: (context, setState) {
-          return AlertDialog(
-            title: const Text('New Calendar Event'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                TextField(
-                  controller: controller,
-                  decoration: const InputDecoration(labelText: 'Task Title'),
-                  autofocus: true,
-                  textCapitalization: TextCapitalization.sentences,
+      title: 'Calendar Event',
+      glowColor: Color(selectedColor),
+      content: StatefulBuilder(builder: (context, setDialogState) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: 'EVENT TITLE',
+                labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900, color: Colors.grey),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+            ),
+            const SizedBox(height: 20),
+            InkWell(
+              onTap: () async {
+                final time = await showTimePicker(
+                  context: context,
+                  initialTime: selectedTime ?? TimeOfDay.now(),
+                );
+                if (time != null) {
+                  setDialogState(() => selectedTime = time);
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 16),
-                Row(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Time: '),
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () async {
-                          final time = await showTimePicker(
-                            context: context,
-                            initialTime: selectedTime ?? TimeOfDay.now(),
-                          );
-                          if (time != null) {
-                            setState(() => selectedTime = time);
-                          }
-                        },
-                        child: Text(selectedTime == null
-                            ? 'Select Time'
-                            : selectedTime!.format(context)),
-                      ),
+                    Icon(Icons.access_time, size: 16, color: Color(selectedColor!)),
+                    const SizedBox(width: 8),
+                    Text(
+                      selectedTime == null ? 'SELECT TIME' : selectedTime!.format(context),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                const Align(alignment: Alignment.centerLeft, child: Text('Color:')),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    ...presetColors.map((colorValue) {
-                      final isSelected = selectedColor == colorValue;
-                      return GestureDetector(
-                        onTap: () => setState(() => selectedColor = colorValue),
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: Color(colorValue),
-                            shape: BoxShape.circle,
-                            border: isSelected ? Border.all(color: Colors.white, width: 2) : null,
-                          ),
-                          child: isSelected ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
-                        ),
-                      );
-                    }),
-                    GestureDetector(
-                      onTap: () {
-                        Color pickerColor = Color(selectedColor ?? 0xFF1E88E5);
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext ctx) {
-                            return AlertDialog(
-                              title: const Text('Pick a color!'),
-                              content: SingleChildScrollView(
-                                child: ColorPicker(
-                                  pickerColor: pickerColor,
-                                  onColorChanged: (Color color) {
-                                    pickerColor = color;
-                                  },
-                                  pickerAreaHeightPercent: 0.8,
-                                ),
-                              ),
-                              actions: <Widget>[
-                                FilledButton(
-                                  child: const Text('Got it'),
-                                  onPressed: () {
-                                    // ignore: deprecated_member_use
-                                    setState(() => selectedColor = pickerColor.value);
-                                    Navigator.of(ctx).pop();
-                                  },
-                                ),
-                              ],
-                            );
-                          },
-                        );
-                      },
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: SweepGradient(
-                            colors: [
-                              Colors.red,
-                              Colors.yellow,
-                              Colors.green,
-                              Colors.blue,
-                              Colors.purple,
-                              Colors.red,
-                            ],
-                          ),
-                        ),
-                        child: const Icon(Icons.add, size: 16, color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
-                ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
+            const SizedBox(height: 24),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'COLOR PALETTE',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1),
               ),
-              FilledButton(
-                onPressed: () {
-                  DateTime? scheduledDateTime;
-                  if (selectedTime != null && _selectedDay != null) {
-                    scheduledDateTime = DateTime(
-                      _selectedDay!.year,
-                      _selectedDay!.month,
-                      _selectedDay!.day,
-                      selectedTime!.hour,
-                      selectedTime!.minute,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ...presetColors.map((colorValue) {
+                  final isSelected = selectedColor == colorValue;
+                  return GestureDetector(
+                    onTap: () => setDialogState(() => selectedColor = colorValue),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Color(colorValue),
+                        shape: BoxShape.circle,
+                        border: isSelected ? Border.all(color: Colors.white, width: 2) : Border.all(color: Colors.white10),
+                        boxShadow: [
+                            if (isSelected) BoxShadow(color: Color(colorValue).withValues(alpha: 0.5), blurRadius: 10)
+                        ],
+                      ),
+                      child: isSelected ? const Icon(Icons.check, size: 18, color: Colors.white) : null,
+                    ),
+                  );
+                }),
+                GestureDetector(
+                  onTap: () {
+                    Color pickerColor = Color(selectedColor ?? Theme.of(context).colorScheme.primary.toARGB32());
+                    EliteDialog.show(
+                      context: context,
+                      title: 'Custom Spectrum',
+                      glowColor: pickerColor,
+                      content: SingleChildScrollView(
+                        child: ColorPicker(
+                          pickerColor: pickerColor,
+                          onColorChanged: (Color color) {
+                            pickerColor = color;
+                          },
+                          pickerAreaHeightPercent: 0.8,
+                          enableAlpha: false,
+                          displayThumbColor: true,
+                          paletteType: PaletteType.hsvWithHue,
+                          labelTypes: const [],
+                        ),
+                      ),
+                      actions: [
+                        FilledButton(
+                          child: const Text('SAVE'),
+                          onPressed: () {
+                            setDialogState(() => selectedColor = pickerColor.toARGB32());
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ],
                     );
-                  }
-                  _addTask(controller.text, selectedColor, scheduledDateTime);
-                  Navigator.pop(context);
-                },
-                child: const Text('Add'),
-              ),
-            ],
-          );
-        });
-      },
+                  },
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: SweepGradient(
+                        colors: [Colors.red, Colors.yellow, Colors.green, Colors.blue, Colors.purple, Colors.red],
+                      ),
+                    ),
+                    child: const Icon(Icons.add, size: 18, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      }),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('CANCEL'),
+        ),
+        FilledButton(
+          onPressed: () {
+            DateTime? scheduledDateTime;
+            if (selectedTime != null && _selectedDay != null) {
+              scheduledDateTime = DateTime(
+                _selectedDay!.year,
+                _selectedDay!.month,
+                _selectedDay!.day,
+                selectedTime!.hour,
+                selectedTime!.minute,
+              );
+            }
+            _addTask(controller.text, selectedColor, scheduledDateTime);
+            Navigator.pop(context);
+          },
+          child: const Text('SAVE'),
+        ),
+      ],
     );
   }
 
   Widget _buildTaskPill(CalendarTask task) {
     Color bgColor = task.isCompleted
         ? Colors.grey[800]!
-        : (task.colorCode != null ? Color(task.colorCode!) : const Color(0xFF1E88E5));
+        : (task.colorCode != null ? Color(task.colorCode!) : Theme.of(context).colorScheme.primary);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 2, left: 2, right: 2),

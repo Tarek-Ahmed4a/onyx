@@ -1,14 +1,17 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import '../widgets/premium_empty_state.dart';
 import '../widgets/custom_toast.dart';
 import '../widgets/elite_header.dart';
 import '../widgets/elite_card.dart';
+import '../widgets/elite_dialog.dart';
 import 'profile_screen.dart';
 import 'calendar_screen.dart';
 import '../models/note_model.dart';
@@ -85,6 +88,7 @@ class _TasksScreenState extends State<TasksScreen> {
   String? _activeCategoryId;
   bool _isLoading = true;
   String _searchQuery = '';
+  String _selectedNoteCategory = 'All';
   StreamSubscription? _categoriesSub;
   StreamSubscription? _notesSub;
 
@@ -349,30 +353,40 @@ class _TasksScreenState extends State<TasksScreen> {
 
   void _showAddCategoryDialog() {
     final controller = TextEditingController();
-    showDialog(
+    EliteDialog.show(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('New List'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: 'List Name'),
-          autofocus: true,
-          textCapitalization: TextCapitalization.sentences,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              _addCategory(controller.text);
-              Navigator.pop(context);
-            },
-            child: const Text('Done'),
+      title: 'Create New List',
+      glowColor: Theme.of(context).colorScheme.primary,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              labelText: 'LIST NAME',
+              labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.05),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            ),
+            autofocus: true,
+            textCapitalization: TextCapitalization.sentences,
           ),
         ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('CANCEL'),
+        ),
+        FilledButton(
+          onPressed: () {
+            _addCategory(controller.text);
+            Navigator.pop(context);
+          },
+          child: const Text('SAVE'),
+        ),
+      ],
     );
   }
 
@@ -381,139 +395,131 @@ class _TasksScreenState extends State<TasksScreen> {
     DateTime? selectedDate;
     TimeOfDay? selectedTime;
 
-    showDialog(
+    EliteDialog.show(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(builder: (context, setState) {
-          return AlertDialog(
-            title: const Text('New Task'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
+      title: 'New Mission',
+      glowColor: Theme.of(context).colorScheme.primary,
+      content: StatefulBuilder(builder: (context, setDialogState) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: 'TASK TITLE',
+                labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+            ),
+            const SizedBox(height: 20),
+            Row(
               children: [
-                TextField(
-                  controller: controller,
-                  decoration: const InputDecoration(labelText: 'Task Title'),
-                  autofocus: true,
-                  textCapitalization: TextCapitalization.sentences,
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate ?? DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (date != null) {
+                        setDialogState(() => selectedDate = date);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.calendar_today_outlined, size: 16, color: Theme.of(context).colorScheme.primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            selectedDate == null ? 'DATE' : DateFormat('MMM d').format(selectedDate!),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                        ),
-                        onPressed: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: selectedDate ?? DateTime.now(),
-                            firstDate: DateTime.now(),
-                            lastDate:
-                                DateTime.now().add(const Duration(days: 365)),
-                          );
-                          if (date != null) {
-                            setState(() => selectedDate = date);
-                          }
-                        },
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.calendar_today, size: 16),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  selectedDate == null
-                                      ? 'Date'
-                                      : '${selectedDate!.month}/${selectedDate!.day}',
-                                  maxLines: 1,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: selectedTime ?? TimeOfDay.now(),
+                      );
+                      if (time != null) {
+                        setDialogState(() => selectedTime = time);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.access_time, size: 16, color: Theme.of(context).colorScheme.primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            selectedTime == null ? 'TIME' : selectedTime!.format(context),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                        ),
-                        onPressed: () async {
-                          final time = await showTimePicker(
-                            context: context,
-                            initialTime: selectedTime ?? TimeOfDay.now(),
-                          );
-                          if (time != null) {
-                            setState(() => selectedTime = time);
-                          }
-                        },
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.access_time, size: 16),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  selectedTime == null
-                                      ? 'Time'
-                                      : selectedTime!.format(context),
-                                  maxLines: 1,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  DateTime? finalDateTime;
-                  if (selectedDate != null) {
-                    final time =
-                        selectedTime ?? const TimeOfDay(hour: 9, minute: 0);
-                    finalDateTime = DateTime(
-                      selectedDate!.year,
-                      selectedDate!.month,
-                      selectedDate!.day,
-                      time.hour,
-                      time.minute,
-                    );
-                  }
-                  _addTask(controller.text, finalDateTime);
+          ],
+        );
+      }),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('CANCEL'),
+        ),
+        FilledButton(
+          onPressed: () {
+            DateTime? finalDateTime;
+            if (selectedDate != null) {
+              final time = selectedTime ?? const TimeOfDay(hour: 9, minute: 0);
+              finalDateTime = DateTime(
+                selectedDate!.year,
+                selectedDate!.month,
+                selectedDate!.day,
+                time.hour,
+                time.minute,
+              );
+            }
+            _addTask(controller.text, finalDateTime);
 
-                  if (finalDateTime != null) {
-                    final timeString =
-                        TimeOfDay.fromDateTime(finalDateTime).format(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content:
-                              Text('Task saved. Alarm set for $timeString')),
-                    );
-                  }
+            if (finalDateTime != null) {
+              final timeString = TimeOfDay.fromDateTime(finalDateTime).format(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Task saved. Alarm set for $timeString')),
+              );
+            }
 
-                  Navigator.pop(context);
-                },
-                child: const Text('Save'),
-              ),
-            ],
-          );
-        });
-      },
+            Navigator.pop(context);
+          },
+          child: const Text('SAVE'),
+        ),
+      ],
     );
   }
 
@@ -771,11 +777,62 @@ class _TasksScreenState extends State<TasksScreen> {
       ],
     );
 
+
+    final uniqueCategories = ['All', ..._notes.map((n) => n.category).whereType<String>().toSet()];
+
+    final categoryFilterBar = Container(
+      height: 48,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: uniqueCategories.length + 1,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return const Padding(
+              padding: EdgeInsets.only(right: 12, top: 14),
+              child: Text(
+                'CATEGORIES:',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1),
+              ),
+            );
+          }
+          final cat = uniqueCategories[index - 1];
+          final isSelected = _selectedNoteCategory == cat;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(cat, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+              selected: isSelected,
+              onSelected: (val) {
+                if (val) setState(() => _selectedNoteCategory = cat);
+              },
+              backgroundColor: Colors.white.withValues(alpha: 0.05),
+              selectedColor: Theme.of(context).colorScheme.primary,
+              labelStyle: TextStyle(color: isSelected ? Colors.black : Colors.white),
+              side: BorderSide.none,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+          );
+        },
+      ),
+    );
+
     final filteredNotes = _notes
-        .where((n) =>
-            n.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            n.content.toLowerCase().contains(_searchQuery.toLowerCase()))
+        .where((n) {
+          final matchesSearch = n.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              n.content.toLowerCase().contains(_searchQuery.toLowerCase());
+          final matchesCategory = _selectedNoteCategory == 'All' || n.category == _selectedNoteCategory;
+          return matchesSearch && matchesCategory;
+        })
         .toList();
+
+    // Sort: Pinned first, then by date
+    filteredNotes.sort((a, b) {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return b.date.compareTo(a.date);
+    });
 
     final notesGrid = filteredNotes.isEmpty
         ? const PremiumEmptyState(
@@ -784,7 +841,7 @@ class _TasksScreenState extends State<TasksScreen> {
             subtitle: 'Start writing your thoughts and ideas. Tap + to create a note.',
           )
         : MasonryGridView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
             gridDelegate: const SliverSimpleGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
             ),
@@ -793,69 +850,111 @@ class _TasksScreenState extends State<TasksScreen> {
             itemCount: filteredNotes.length,
             itemBuilder: (context, index) {
               final note = filteredNotes[index];
-              return Dismissible(
-                key: Key(note.id),
-                direction: DismissDirection.endToStart,
-                background: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade400,
-                    borderRadius: BorderRadius.circular(12),
+              return TweenAnimationBuilder<double>(
+                key: ValueKey(note.id),
+                duration: Duration(milliseconds: 300 + (index * 50)),
+                tween: Tween(begin: 0.0, end: 1.0),
+                builder: (context, value, child) {
+                  return Opacity(
+                    opacity: value,
+                    child: Transform.translate(
+                      offset: Offset(0, 20 * (1 - value)),
+                      child: child,
+                    ),
+                  );
+                },
+                child: Dismissible(
+                  key: Key(note.id),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade400,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: const Icon(Icons.delete, color: Colors.white),
                   ),
-                  alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: const Icon(Icons.delete, color: Colors.white),
-                ),
-                onDismissed: (_) => _deleteNote(note),
-                child: EliteCard(
-                  margin: EdgeInsets.zero,
-                  padding: const EdgeInsets.all(12),
-                  child: InkWell(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => NoteDetailScreen(
-                          note: note,
-                          onSave: _saveNoteFromDetail,
+                  onDismissed: (_) => _deleteNote(note),
+                  child: EliteCard(
+                    margin: EdgeInsets.zero,
+                    padding: const EdgeInsets.all(12),
+                    glowColor: note.colorValue != null ? Color(note.colorValue!) : null,
+                    child: InkWell(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => NoteDetailScreen(
+                            note: note,
+                            onSave: _saveNoteFromDetail,
+                          ),
                         ),
                       ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (note.title.isNotEmpty)
-                          Text(
-                            note.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                      child: Column(
+                        crossAxisAlignment: note.textAlign == 'right' ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        children: [
+                          if (note.isPinned)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8.0),
+                              child: Icon(Icons.push_pin, size: 14, color: Theme.of(context).colorScheme.primary),
                             ),
-                          ),
-                        if (note.title.isNotEmpty && note.content.isNotEmpty)
-                          const SizedBox(height: 8),
-                        if (note.content.isNotEmpty)
-                          Text(
-                            note.content,
-                            maxLines: 4,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade400,
+                          if (note.title.isNotEmpty)
+                            Text(
+                              note.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: note.textAlign == 'right' ? TextAlign.right : TextAlign.left,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: Alignment.bottomRight,
-                          child: Text(
-                            '${note.date.month}/${note.date.day}/${note.date.year}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey.shade500,
+                          if (note.title.isNotEmpty && note.content.isNotEmpty)
+                            const SizedBox(height: 8),
+                          if (note.content.isNotEmpty)
+                            Text(
+                              note.content,
+                              maxLines: 4,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: note.textAlign == 'right' ? TextAlign.right : TextAlign.left,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade400,
+                              ),
                             ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              if (note.category != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    note.category!.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w900,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                )
+                              else
+                                const SizedBox(),
+                              Text(
+                                '${note.date.month}/${note.date.day}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -885,6 +984,7 @@ class _TasksScreenState extends State<TasksScreen> {
             },
           ),
         ),
+        categoryFilterBar,
         Expanded(child: notesGrid),
       ],
     );

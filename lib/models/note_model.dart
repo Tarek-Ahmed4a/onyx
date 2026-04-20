@@ -4,6 +4,9 @@ class Note {
   String content;
   DateTime date;
   String? category;
+  bool isPinned;
+  int? colorValue;
+  String textAlign;
 
   Note({
     required this.id,
@@ -11,6 +14,9 @@ class Note {
     required this.content,
     required this.date,
     this.category,
+    this.isPinned = false,
+    this.colorValue,
+    this.textAlign = 'left',
   });
 
   Map<String, dynamic> toJson() => {
@@ -19,6 +25,9 @@ class Note {
         'content': content,
         'date': date.toIso8601String(),
         if (category != null) 'category': category,
+        'isPinned': isPinned,
+        if (colorValue != null) 'colorValue': colorValue,
+        'textAlign': textAlign,
       };
 
   factory Note.fromJson(Map<String, dynamic> json) => Note(
@@ -27,5 +36,8 @@ class Note {
         content: json['content'] ?? '',
         date: DateTime.parse(json['date']),
         category: json['category'],
+        isPinned: json['isPinned'] ?? false,
+        colorValue: json['colorValue'],
+        textAlign: json['textAlign'] ?? 'left',
       );
 }
