@@ -368,7 +368,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
           .collection('investments')
           .doc(newPortfolio.id)
           .set(newPortfolio.toJson());
-      
+
       if (mounted) {
         setState(() {
           _activePortfolioId = newPortfolio.id;
@@ -387,10 +387,13 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
         controller: controller,
         decoration: InputDecoration(
           labelText: 'PORTFOLIO NAME',
-          labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+          labelStyle: const TextStyle(
+              fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
           filled: true,
           fillColor: Colors.white.withValues(alpha: 0.05),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none),
         ),
         autofocus: true,
         textCapitalization: TextCapitalization.words,
@@ -577,15 +580,20 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                     title: 'Select Asset Ticker',
                     items: marketData.keys.toList(),
                     labelBuilder: (ticker) => ticker,
-                    subtitleBuilder: (ticker) => marketData[ticker]?['name'] ?? '',
+                    subtitleBuilder: (ticker) =>
+                        marketData[ticker]?['name'] ?? '',
                     allowCustomEntry: true,
-                    selectedItem: nameController.text.isNotEmpty ? nameController.text : null,
+                    selectedItem: nameController.text.isNotEmpty
+                        ? nameController.text
+                        : null,
                   );
                   if (result != null) {
                     setDialogState(() {
                       nameController.text = result;
                       final price = marketData[result]?['price'];
-                      if (price != null) currentPriceController.text = price.toString();
+                      if (price != null) {
+                        currentPriceController.text = price.toString();
+                      }
                     });
                   }
                 },
@@ -600,10 +608,16 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                       const Icon(Icons.search, size: 20, color: Colors.white54),
                       const SizedBox(width: 12),
                       Text(
-                        nameController.text.isEmpty ? 'SELECT ASSET TICKER' : nameController.text,
+                        nameController.text.isEmpty
+                            ? 'SELECT ASSET TICKER'
+                            : nameController.text,
                         style: TextStyle(
-                          color: nameController.text.isEmpty ? Colors.white54 : Colors.white,
-                          fontWeight: nameController.text.isEmpty ? FontWeight.normal : FontWeight.bold,
+                          color: nameController.text.isEmpty
+                              ? Colors.white54
+                              : Colors.white,
+                          fontWeight: nameController.text.isEmpty
+                              ? FontWeight.normal
+                              : FontWeight.bold,
                           fontSize: 12,
                           letterSpacing: 1,
                         ),
@@ -622,13 +636,20 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                       controller: buyPriceController,
                       decoration: InputDecoration(
                         labelText: 'BUY PRICE',
-                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        labelStyle: const TextStyle(
+                            fontSize: 10,
+                            letterSpacing: 1,
+                            fontWeight: FontWeight.w900),
                         filled: true,
                         fillColor: Colors.white.withValues(alpha: 0.05),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) =>
+                          value == null || value.isEmpty ? 'Required' : null,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -637,13 +658,20 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                       controller: quantityController,
                       decoration: InputDecoration(
                         labelText: 'QUANTITY',
-                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        labelStyle: const TextStyle(
+                            fontSize: 10,
+                            letterSpacing: 1,
+                            fontWeight: FontWeight.w900),
                         filled: true,
                         fillColor: Colors.white.withValues(alpha: 0.05),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) =>
+                          value == null || value.isEmpty ? 'Required' : null,
                     ),
                   ),
                 ],
@@ -653,13 +681,20 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                 controller: currentPriceController,
                 decoration: InputDecoration(
                   labelText: 'CURRENT MARKET PRICE',
-                  labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                  labelStyle: const TextStyle(
+                      fontSize: 10,
+                      letterSpacing: 1,
+                      fontWeight: FontWeight.w900),
                   filled: true,
                   fillColor: Colors.white.withValues(alpha: 0.05),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) =>
+                    value == null || value.isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               Row(
@@ -669,12 +704,18 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                       controller: takeProfitController,
                       decoration: InputDecoration(
                         labelText: 'TARGET PRICE',
-                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        labelStyle: const TextStyle(
+                            fontSize: 10,
+                            letterSpacing: 1,
+                            fontWeight: FontWeight.w900),
                         filled: true,
                         fillColor: Colors.white.withValues(alpha: 0.05),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -683,12 +724,18 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                       controller: stopLossController,
                       decoration: InputDecoration(
                         labelText: 'STOP LOSS',
-                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        labelStyle: const TextStyle(
+                            fontSize: 10,
+                            letterSpacing: 1,
+                            fontWeight: FontWeight.w900),
                         filled: true,
                         fillColor: Colors.white.withValues(alpha: 0.05),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                     ),
                   ),
                 ],
@@ -698,7 +745,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
         );
       }),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL')),
         FilledButton(
           onPressed: () {
             if (formKey.currentState!.validate()) {
@@ -785,11 +834,16 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
 
   void _showEditAssetDialog(Asset asset) {
     final nameController = TextEditingController(text: asset.name);
-    final buyPriceController = TextEditingController(text: asset.buyPrice.toString());
-    final currentPriceController = TextEditingController(text: asset.currentPrice.toString());
-    final quantityController = TextEditingController(text: asset.quantity.toString());
-    final takeProfitController = TextEditingController(text: asset.takeProfit?.toString() ?? '');
-    final stopLossController = TextEditingController(text: asset.stopLoss?.toString() ?? '');
+    final buyPriceController =
+        TextEditingController(text: asset.buyPrice.toString());
+    final currentPriceController =
+        TextEditingController(text: asset.currentPrice.toString());
+    final quantityController =
+        TextEditingController(text: asset.quantity.toString());
+    final takeProfitController =
+        TextEditingController(text: asset.takeProfit?.toString() ?? '');
+    final stopLossController =
+        TextEditingController(text: asset.stopLoss?.toString() ?? '');
     final formKey = GlobalKey<FormState>();
 
     final marketData = context.read<MarketDataService>().stocksData;
@@ -811,15 +865,20 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                     title: 'Select Asset Ticker',
                     items: marketData.keys.toList(),
                     labelBuilder: (ticker) => ticker,
-                    subtitleBuilder: (ticker) => marketData[ticker]?['name'] ?? '',
+                    subtitleBuilder: (ticker) =>
+                        marketData[ticker]?['name'] ?? '',
                     allowCustomEntry: true,
-                    selectedItem: nameController.text.isNotEmpty ? nameController.text : null,
+                    selectedItem: nameController.text.isNotEmpty
+                        ? nameController.text
+                        : null,
                   );
                   if (result != null) {
                     setDialogState(() {
                       nameController.text = result;
                       final price = marketData[result]?['price'];
-                      if (price != null) currentPriceController.text = price.toString();
+                      if (price != null) {
+                        currentPriceController.text = price.toString();
+                      }
                     });
                   }
                 },
@@ -834,10 +893,16 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                       const Icon(Icons.search, size: 20, color: Colors.white54),
                       const SizedBox(width: 12),
                       Text(
-                        nameController.text.isEmpty ? 'SELECT ASSET TICKER' : nameController.text,
+                        nameController.text.isEmpty
+                            ? 'SELECT ASSET TICKER'
+                            : nameController.text,
                         style: TextStyle(
-                          color: nameController.text.isEmpty ? Colors.white54 : Colors.white,
-                          fontWeight: nameController.text.isEmpty ? FontWeight.normal : FontWeight.bold,
+                          color: nameController.text.isEmpty
+                              ? Colors.white54
+                              : Colors.white,
+                          fontWeight: nameController.text.isEmpty
+                              ? FontWeight.normal
+                              : FontWeight.bold,
                           fontSize: 12,
                           letterSpacing: 1,
                         ),
@@ -856,13 +921,20 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                       controller: buyPriceController,
                       decoration: InputDecoration(
                         labelText: 'BUY PRICE',
-                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        labelStyle: const TextStyle(
+                            fontSize: 10,
+                            letterSpacing: 1,
+                            fontWeight: FontWeight.w900),
                         filled: true,
                         fillColor: Colors.white.withValues(alpha: 0.05),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) =>
+                          value == null || value.isEmpty ? 'Required' : null,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -871,13 +943,20 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                       controller: quantityController,
                       decoration: InputDecoration(
                         labelText: 'QUANTITY',
-                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        labelStyle: const TextStyle(
+                            fontSize: 10,
+                            letterSpacing: 1,
+                            fontWeight: FontWeight.w900),
                         filled: true,
                         fillColor: Colors.white.withValues(alpha: 0.05),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) =>
+                          value == null || value.isEmpty ? 'Required' : null,
                     ),
                   ),
                 ],
@@ -887,13 +966,20 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                 controller: currentPriceController,
                 decoration: InputDecoration(
                   labelText: 'CURRENT MARKET PRICE',
-                  labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                  labelStyle: const TextStyle(
+                      fontSize: 10,
+                      letterSpacing: 1,
+                      fontWeight: FontWeight.w900),
                   filled: true,
                   fillColor: Colors.white.withValues(alpha: 0.05),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) =>
+                    value == null || value.isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               Row(
@@ -903,12 +989,18 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                       controller: takeProfitController,
                       decoration: InputDecoration(
                         labelText: 'TARGET PRICE',
-                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        labelStyle: const TextStyle(
+                            fontSize: 10,
+                            letterSpacing: 1,
+                            fontWeight: FontWeight.w900),
                         filled: true,
                         fillColor: Colors.white.withValues(alpha: 0.05),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -917,12 +1009,18 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                       controller: stopLossController,
                       decoration: InputDecoration(
                         labelText: 'STOP LOSS',
-                        labelStyle: const TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w900),
+                        labelStyle: const TextStyle(
+                            fontSize: 10,
+                            letterSpacing: 1,
+                            fontWeight: FontWeight.w900),
                         filled: true,
                         fillColor: Colors.white.withValues(alpha: 0.05),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                     ),
                   ),
                 ],
@@ -932,7 +1030,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
         );
       }),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL')),
         FilledButton(
           onPressed: () {
             if (formKey.currentState!.validate()) {
@@ -1110,8 +1210,6 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
     );
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -1161,7 +1259,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
             baseColor: Colors.white.withValues(alpha: 0.05),
             highlightColor: Colors.white.withValues(alpha: 0.05),
             child: Container(
-              height: index == 0 ? 220 : 120, // First card is bigger (dashboard)
+              height:
+                  index == 0 ? 220 : 120, // First card is bigger (dashboard)
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
                 color: Colors.black,
@@ -1193,7 +1292,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
             (priceVal is num) ? priceVal.toDouble() : asset.currentPrice;
         portfolioValue += livePrice * asset.quantity;
       }
-      
+
       final currentTotalValue = activePortfolio.balance + portfolioValue;
       totalPnlEgp = currentTotalValue - activePortfolio.initialBudget;
       if (activePortfolio.initialBudget > 0) {
@@ -1270,7 +1369,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
               if (activePortfolio != null) ...[
                 // Redesigned Premium Glass/Gradient Summary Card
                 EliteCard(
-                  glowColor: totalPnlEgp >= 0 ? Colors.greenAccent : Colors.redAccent,
+                  glowColor:
+                      totalPnlEgp >= 0 ? Colors.greenAccent : Colors.redAccent,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -1278,7 +1378,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           GestureDetector(
-                            onTap: () => _showUpdateBudgetDialog(activePortfolio),
+                            onTap: () =>
+                                _showUpdateBudgetDialog(activePortfolio),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -1288,7 +1389,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                     fontSize: 10,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 1.2,
-                                    color: Colors.blueAccent.withValues(alpha: 0.05),
+                                    color: Colors.grey.shade600,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -1382,112 +1483,115 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                           builder: (context, snapshot) {
                             if (snapshot.connectionState ==
                                 ConnectionState.waiting) {
-                                return Shimmer.fromColors(
-                                  baseColor: Colors.white.withValues(alpha: 0.05),
-                                  highlightColor: Colors.white.withValues(alpha: 0.05),
-                                  child: Container(
-                                    height: 100,
-                                    decoration: BoxDecoration(
-                                      color: Colors.black,
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                );
-                              }
-
-                              if (!snapshot.hasData ||
-                                  snapshot.data!.docs.isEmpty) {
-                                return Center(
-                                  child: Text(
-                                    'No performance data yet.',
-                                    style: TextStyle(
-                                        color: Colors.grey.shade700,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                );
-                              }
-
-                              // Reverse snapshots to get chronological order [Oldest -> Newest]
-                              final docs = snapshot.data!.docs.reversed.toList();
-                              final List<FlSpot> spots = [];
-                              
-                              for (int i = 0; i < docs.length; i++) {
-                                final data = docs[i].data() as Map<String, dynamic>;
-                                final val = data['total_value'];
-                                if (val is num) {
-                                  spots.add(FlSpot(i.toDouble(), val.toDouble()));
-                                }
-                              }
-
-                              if (spots.length < 2) {
-                                return Center(
-                                  child: Text(
-                                    'Not enough data for chart.',
-                                    style: TextStyle(
-                                        color: Colors.grey.shade700,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                );
-                              }
-
-                              final lineColor = totalPnlEgp >= 0
-                                  ? Colors.greenAccent
-                                  : Colors.redAccent;
-
-                              return LineChart(
-                                LineChartData(
-                                  gridData: const FlGridData(show: false),
-                                  titlesData: const FlTitlesData(show: false),
-                                  borderData: FlBorderData(show: false),
-                                  lineBarsData: [
-                                    LineChartBarData(
-                                      spots: spots,
-                                      isCurved: true,
-                                      color: lineColor,
-                                      barWidth: 3,
-                                      isStrokeCapRound: true,
-                                      dotData: const FlDotData(show: false),
-                                      belowBarData: BarAreaData(
-                                        show: true,
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          colors: [
-                                            lineColor.withValues(alpha: 0.05),
-                                            lineColor.withValues(alpha: 0.05),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                  lineTouchData: LineTouchData(
-                                    touchTooltipData: LineTouchTooltipData(
-                                      getTooltipColor: (_) => Colors.black.withValues(alpha: 0.05),
-                                      getTooltipItems: (touchedSpots) {
-                                        return touchedSpots.map((spot) {
-                                          return LineTooltipItem(
-                                            'EGP ${spot.y.toStringAsFixed(2)}',
-                                            const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          );
-                                        }).toList();
-                                      },
-                                    ),
+                              return Shimmer.fromColors(
+                                baseColor: Colors.white.withValues(alpha: 0.05),
+                                highlightColor:
+                                    Colors.white.withValues(alpha: 0.05),
+                                child: Container(
+                                  height: 100,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black,
+                                    borderRadius: BorderRadius.circular(16),
                                   ),
                                 ),
                               );
-                            },
-                          ),
+                            }
+
+                            if (!snapshot.hasData ||
+                                snapshot.data!.docs.isEmpty) {
+                              return Center(
+                                child: Text(
+                                  'No performance data yet.',
+                                  style: TextStyle(
+                                      color: Colors.grey.shade700,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              );
+                            }
+
+                            // Reverse snapshots to get chronological order [Oldest -> Newest]
+                            final docs = snapshot.data!.docs.reversed.toList();
+                            final List<FlSpot> spots = [];
+
+                            for (int i = 0; i < docs.length; i++) {
+                              final data =
+                                  docs[i].data() as Map<String, dynamic>;
+                              final val = data['total_value'];
+                              if (val is num) {
+                                spots.add(FlSpot(i.toDouble(), val.toDouble()));
+                              }
+                            }
+
+                            if (spots.length < 2) {
+                              return Center(
+                                child: Text(
+                                  'Not enough data for chart.',
+                                  style: TextStyle(
+                                      color: Colors.grey.shade700,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              );
+                            }
+
+                            final lineColor = totalPnlEgp >= 0
+                                ? Colors.greenAccent
+                                : Colors.redAccent;
+
+                            return LineChart(
+                              LineChartData(
+                                gridData: const FlGridData(show: false),
+                                titlesData: const FlTitlesData(show: false),
+                                borderData: FlBorderData(show: false),
+                                lineBarsData: [
+                                  LineChartBarData(
+                                    spots: spots,
+                                    isCurved: true,
+                                    color: lineColor,
+                                    barWidth: 3,
+                                    isStrokeCapRound: true,
+                                    dotData: const FlDotData(show: false),
+                                    belowBarData: BarAreaData(
+                                      show: true,
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          lineColor.withValues(alpha: 0.05),
+                                          lineColor.withValues(alpha: 0.05),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                lineTouchData: LineTouchData(
+                                  touchTooltipData: LineTouchTooltipData(
+                                    getTooltipColor: (_) =>
+                                        Colors.black.withValues(alpha: 0.05),
+                                    getTooltipItems: (touchedSpots) {
+                                      return touchedSpots.map((spot) {
+                                        return LineTooltipItem(
+                                          'EGP ${spot.y.toStringAsFixed(2)}',
+                                          const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        );
+                                      }).toList();
+                                    },
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ] else ...[
+                ),
+              ] else ...[
                 const SizedBox(height: 64),
                 const Center(
                   child: Text(
@@ -1527,24 +1631,28 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                           asset.currentPrice;
                   final assetRoi =
                       ((livePrice - asset.buyPrice) / asset.buyPrice) * 100;
-                  final assetProfitEgp = (livePrice - asset.buyPrice) * asset.quantity;
+                  final assetProfitEgp =
+                      (livePrice - asset.buyPrice) * asset.quantity;
 
                   return Dismissible(
                     key: Key(asset.id),
                     direction: DismissDirection.endToStart,
                     background: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
                       decoration: BoxDecoration(
                         color: Colors.redAccent.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: const Icon(Icons.delete_outline, color: Colors.white),
+                      child:
+                          const Icon(Icons.delete_outline, color: Colors.white),
                     ),
                     onDismissed: (_) => _deleteAsset(asset),
                     child: EliteCard(
-                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
                       padding: const EdgeInsets.all(20),
                       child: Column(
                         children: [
@@ -1555,7 +1663,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      knownFunds[asset.name] ?? knownStocks[asset.name] ?? asset.name,
+                                      knownFunds[asset.name] ??
+                                          knownStocks[asset.name] ??
+                                          asset.name,
                                       style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w900,
@@ -1566,7 +1676,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                     ),
                                     const SizedBox(height: 4),
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
                                         Row(
                                           children: [
@@ -1593,22 +1704,36 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             TextButton(
-                                              onPressed: () => _showSellActionDialog(asset, livePrice),
+                                              onPressed: () =>
+                                                  _showSellActionDialog(
+                                                      asset, livePrice),
                                               style: TextButton.styleFrom(
-                                                foregroundColor: Colors.redAccent,
+                                                foregroundColor:
+                                                    Colors.redAccent,
                                                 padding: EdgeInsets.zero,
                                                 minimumSize: Size.zero,
-                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                                visualDensity: VisualDensity.compact,
+                                                tapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
+                                                visualDensity:
+                                                    VisualDensity.compact,
                                               ),
-                                              child: const Text('SELL', style: TextStyle(fontWeight: FontWeight.bold)),
+                                              child: const Text('SELL',
+                                                  style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold)),
                                             ),
                                             const SizedBox(width: 6),
                                             IconButton(
-                                              icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blueAccent),
-                                              onPressed: () => _showEditAssetDialog(asset),
+                                              icon: const Icon(
+                                                  Icons.edit_outlined,
+                                                  size: 20,
+                                                  color: Colors.blueAccent),
+                                              onPressed: () =>
+                                                  _showEditAssetDialog(asset),
                                               padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(),
+                                              constraints:
+                                                  const BoxConstraints(),
                                             ),
                                           ],
                                         ),
@@ -1627,17 +1752,22 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Expanded(
-                                child: _buildAssetDetail('BUY AVG', 'EGP ${asset.buyPrice.toStringAsFixed(2)}'),
+                                child: _buildAssetDetail('BUY AVG',
+                                    'EGP ${asset.buyPrice.toStringAsFixed(2)}'),
                               ),
                               Expanded(
-                                child: _buildAssetDetail('LIVE PRICE', 'EGP ${livePrice.toStringAsFixed(2)}',
-                                    color: assetRoi >= 0 ? Colors.greenAccent : Colors.redAccent),
+                                child: _buildAssetDetail('LIVE PRICE',
+                                    'EGP ${livePrice.toStringAsFixed(2)}',
+                                    color: assetRoi >= 0
+                                        ? Colors.greenAccent
+                                        : Colors.redAccent),
                               ),
                               Expanded(
-                                child: _buildAssetDetail(
-                                    'ROI',
+                                child: _buildAssetDetail('ROI',
                                     'EGP ${assetProfitEgp >= 0 ? '+' : ''}${assetProfitEgp.toStringAsFixed(1)} (${assetRoi >= 0 ? '+' : ''}${assetRoi.toStringAsFixed(1)}%)',
-                                    color: assetRoi >= 0 ? Colors.greenAccent : Colors.redAccent),
+                                    color: assetRoi >= 0
+                                        ? Colors.greenAccent
+                                        : Colors.redAccent),
                               ),
                             ],
                           ),
@@ -1648,17 +1778,22 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                               Expanded(
                                 child: _buildAssetDetail(
                                     'TARGET (TP)',
-                                    asset.takeProfit != null ? 'EGP ${asset.takeProfit!.toStringAsFixed(2)}' : 'N/A',
+                                    asset.takeProfit != null
+                                        ? 'EGP ${asset.takeProfit!.toStringAsFixed(2)}'
+                                        : 'N/A',
                                     color: Colors.greenAccent),
                               ),
                               Expanded(
-                                child: _buildAssetDetail('TOTAL', 'EGP ${(asset.buyPrice * asset.quantity).toStringAsFixed(2)}',
+                                child: _buildAssetDetail('TOTAL',
+                                    'EGP ${(asset.buyPrice * asset.quantity).toStringAsFixed(2)}',
                                     color: Colors.white70),
                               ),
                               Expanded(
                                 child: _buildAssetDetail(
                                     'STOP LOSS',
-                                    asset.stopLoss != null ? 'EGP ${asset.stopLoss!.toStringAsFixed(2)}' : 'N/A',
+                                    asset.stopLoss != null
+                                        ? 'EGP ${asset.stopLoss!.toStringAsFixed(2)}'
+                                        : 'N/A',
                                     color: Colors.redAccent),
                               ),
                             ],
@@ -1674,7 +1809,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                   child: PremiumEmptyState(
                     icon: Icons.pie_chart_outline_rounded,
                     title: 'Empty Portfolio',
-                    subtitle: 'Your investment journey is just a click away. Add your first asset to track its performance!',
+                    subtitle:
+                        'Your investment journey is just a click away. Add your first asset to track its performance!',
                   ),
                 ),
               const SizedBox(height: 40),
@@ -1881,12 +2017,14 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       // Title & Ticker
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               fullName,
@@ -1942,10 +2080,13 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                     child: Row(
                                       children: [
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 6),
                                           decoration: BoxDecoration(
-                                            color: sentimentColor.withValues(alpha: 0.05),
-                                            borderRadius: BorderRadius.circular(4),
+                                            color: sentimentColor.withValues(
+                                                alpha: 0.05),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
                                           ),
                                           child: Text(
                                             sentimentLabel,
@@ -1961,12 +2102,16 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                         ),
                                         const SizedBox(width: 8),
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 6),
                                           decoration: BoxDecoration(
-                                            color: Colors.black.withValues(alpha: 0.05),
-                                            borderRadius: BorderRadius.circular(4),
+                                            color: Colors.black
+                                                .withValues(alpha: 0.05),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
                                             border: Border.all(
-                                              color: Colors.white.withValues(alpha: 0.05),
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.05),
                                             ),
                                           ),
                                           child: Row(
@@ -2019,66 +2164,67 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
         ),
       ),
       child: Scaffold(
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          SliverAppBar(
-            title: const Text('Investments', style: TextStyle(fontWeight: FontWeight.bold)),
-            backgroundColor: Colors.black,
-            floating: true,
-            pinned: true,
-            elevation: 0,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.calendar_today_outlined,
-                    color: Colors.white),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const CalendarScreen()),
-                  );
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.account_circle_outlined,
-                    color: Colors.white),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const ProfileScreen()),
-                  );
-                },
-              ),
-            ],
-            bottom: TabBar(
-              controller: _tabController,
-              indicatorColor: const Color(0xFFFFFFFF),
-              labelColor: const Color(0xFFFFFFFF),
-              unselectedLabelColor: const Color(0xFF888888),
-              tabs: const [
-                Tab(text: 'My Wallet'),
-                Tab(text: 'Market Status'),
+        body: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+            SliverAppBar(
+              title: const Text('Investments',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.black,
+              floating: true,
+              pinned: true,
+              elevation: 0,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.calendar_today_outlined,
+                      color: Colors.white),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const CalendarScreen()),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.account_circle_outlined,
+                      color: Colors.white),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const ProfileScreen()),
+                    );
+                  },
+                ),
               ],
+              bottom: TabBar(
+                controller: _tabController,
+                indicatorColor: const Color(0xFFFFFFFF),
+                labelColor: const Color(0xFFFFFFFF),
+                unselectedLabelColor: const Color(0xFF888888),
+                tabs: const [
+                  Tab(text: 'My Wallet'),
+                  Tab(text: 'Market Status'),
+                ],
+              ),
             ),
-          ),
-          const SliverToBoxAdapter(
-            child: EliteHeader(title: 'Portfolio & Assets'),
-          ),
-        ],
-        body: Stack(
-          children: [
-            TabBarView(
-              controller: _tabController,
-              children: [
-                myPortfolioView,
-                marketStatusView,
-              ],
+            const SliverToBoxAdapter(
+              child: EliteHeader(title: 'Portfolio & Assets'),
             ),
-            const ConnectivityIndicator(),
           ],
+          body: Stack(
+            children: [
+              TabBarView(
+                controller: _tabController,
+                children: [
+                  myPortfolioView,
+                  marketStatusView,
+                ],
+              ),
+              const ConnectivityIndicator(),
+            ],
+          ),
         ),
-      ),
         floatingActionButton:
             (_tabController.index == 0 && _activePortfolioId != null)
                 ? Padding(
@@ -2122,7 +2268,6 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
       ],
     );
   }
-
 
   Widget _buildAssetDetail(String label, String value, {Color? color}) {
     return Column(
