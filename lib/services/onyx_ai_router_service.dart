@@ -1,8 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import '../config/api_keys.dart';
 import 'market_data_service.dart';
 
 // ─────────────────────────────────────────────────────────────
@@ -127,24 +126,17 @@ NO Markdown tables. Answer precisely:
   bool get hasValidKeys =>
       _apiKeys.isNotEmpty && _apiKeys.first.isNotEmpty;
 
-  /// Loads all non-empty GEMINI_API_KEY_* values from the .env file.
+  /// Loads all Gemini API keys from the hardcoded config.
   void _loadApiKeys() {
-    _apiKeys = [
-      dotenv.env['GEMINI_API_KEY_1'] ?? '',
-      dotenv.env['GEMINI_API_KEY_2'] ?? '',
-      dotenv.env['GEMINI_API_KEY_3'] ?? '',
-      dotenv.env['GEMINI_API_KEY_4'] ?? '',
-      dotenv.env['GEMINI_API_KEY_5'] ?? '',
-    ]
-        .map((k) => k.trim())
-        .where((k) => k.isNotEmpty && !k.contains('YOUR_'))
+    _apiKeys = ApiKeys.geminiKeys
+        .where((k) => k.trim().isNotEmpty)
         .toList();
 
     debugPrint(
-        '🤖 OnyxAiRouter: Loaded ${_apiKeys.length} valid API keys.');
+        '🤖 OnyxAiRouter: Loaded ${_apiKeys.length} valid Gemini keys.');
 
     if (_apiKeys.isEmpty) {
-      debugPrint('⚠️ OnyxAiRouter: No API keys found in .env!');
+      debugPrint('⚠️ OnyxAiRouter: No API keys found!');
       _apiKeys = ['']; // Prevent index errors; calls will fail gracefully.
     }
   }
@@ -205,39 +197,7 @@ NO Markdown tables. Answer precisely:
   }
 
   Future<String> _callNemotronDeepAnalysis(String contextData, String userMessage) async {
-    String? apiKey = dotenv.env['OPENROUTER_API_KEY']?.trim();
-    
-    // Fallback: manually parse config files if dotenv missed the key
-    if (apiKey == null || apiKey.isEmpty) {
-      debugPrint('[WARN] dotenv miss - trying manual parse');
-      final paths = ['assets/onyx_config.txt', '.env'];
-      for (final path in paths) {
-        try {
-          final raw = await rootBundle.loadString(path);
-          debugPrint('[INFO] Loaded $path OK (${raw.length} chars)');
-          final lines = raw.split('\n');
-          for (final line in lines) {
-            final trimmed = line.trim();
-            if (trimmed.startsWith('OPENROUTER_API_KEY')) {
-              final eqIdx = trimmed.indexOf('=');
-              if (eqIdx != -1) {
-                apiKey = trimmed.substring(eqIdx + 1).replaceAll('"', '').replaceAll("'", "").trim();
-                debugPrint('[OK] Found OPENROUTER key from $path');
-                break;
-              }
-            }
-          }
-          if (apiKey != null && apiKey.isNotEmpty) break;
-        } catch (e) {
-          debugPrint('[ERR] Could not load $path: $e');
-        }
-      }
-    }
-
-    if (apiKey == null || apiKey.isEmpty) {
-      final loadedKeys = dotenv.env.keys.join(', ');
-      return "[V3.1] Key NOT found. Keys: $loadedKeys";
-    }
+    const apiKey = ApiKeys.openRouterApiKey;
 
     debugPrint('[AI] OpenRouter Nemotron call starting...');
 
@@ -570,8 +530,8 @@ NO Markdown tables. Answer precisely:
   // ─────────────────────────────────────────────────────────
 
   Future<String> _fetchMarketContext(String userQuery) async {
-    final apiKey = dotenv.env['TAVILY_API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) return '';
+    const apiKey = ApiKeys.tavilyApiKey;
+    if (apiKey.isEmpty) return '';
 
     try {
       final response = await http

@@ -60,7 +60,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     if (!_router.hasValidKeys) {
       _addMessage(Message(
         text:
-            'Hello! No valid Gemini API Keys were found. Please update the `.env` file with your keys (GEMINI_API_KEY_1 through GEMINI_API_KEY_5) to start chatting.',
+            'Hello! No valid Gemini API Keys were found. Please update the ApiKeys config to start chatting.',
         isUser: false,
       ));
     }

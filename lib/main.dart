@@ -5,7 +5,6 @@ import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:animations/animations.dart';
 import 'dart:ui';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:firebase_core/firebase_core.dart';
@@ -31,11 +30,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await dotenv.load(fileName: "assets/onyx_config.txt");
-  } catch (e) {
-    debugPrint("Failed to load .env file: $e");
-  }
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
