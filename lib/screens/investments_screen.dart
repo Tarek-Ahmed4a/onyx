@@ -1566,7 +1566,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                       style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w900,
-                                        letterSpacing: 0.5,
+                                        letterSpacing: 0,
                                       ),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
@@ -1597,17 +1597,20 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                 ),
                               ),
                               Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   TextButton(
                                     onPressed: () => _showSellActionDialog(asset, livePrice),
                                     style: TextButton.styleFrom(
                                       foregroundColor: Colors.redAccent,
-                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                      padding: EdgeInsets.zero,
+                                      minimumSize: Size.zero,
                                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      visualDensity: VisualDensity.compact,
                                     ),
                                     child: const Text('SELL', style: TextStyle(fontWeight: FontWeight.bold)),
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: 6),
                                   IconButton(
                                     icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blueAccent),
                                     onPressed: () => _showEditAssetDialog(asset),
