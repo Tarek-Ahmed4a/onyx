@@ -207,31 +207,40 @@ NO Markdown tables. Answer precisely:
   Future<String> _callNemotronDeepAnalysis(String contextData, String userMessage) async {
     String? apiKey = dotenv.env['OPENROUTER_API_KEY']?.trim();
     
-    // Fallback: manually parse config file if dotenv didn't load the key
+    // Fallback: manually parse config files if dotenv missed the key
     if (apiKey == null || apiKey.isEmpty) {
-      debugPrint('⚠️ dotenv miss — falling back to manual parse');
-      try {
-        final raw = await rootBundle.loadString('assets/onyx_config.txt');
-        for (final line in raw.split(RegExp(r'[\r\n]+'))) {
-          final trimmed = line.trim();
-          if (trimmed.startsWith('OPENROUTER_API_KEY=')) {
-            apiKey = trimmed.split('=').sublist(1).join('=').replaceAll('"', '').trim();
-            break;
+      debugPrint('[WARN] dotenv miss - trying manual parse');
+      final paths = ['assets/onyx_config.txt', '.env'];
+      for (final path in paths) {
+        try {
+          final raw = await rootBundle.loadString(path);
+          debugPrint('[INFO] Loaded $path OK (${raw.length} chars)');
+          final lines = raw.split('\n');
+          for (final line in lines) {
+            final trimmed = line.trim();
+            if (trimmed.startsWith('OPENROUTER_API_KEY')) {
+              final eqIdx = trimmed.indexOf('=');
+              if (eqIdx != -1) {
+                apiKey = trimmed.substring(eqIdx + 1).replaceAll('"', '').replaceAll("'", "").trim();
+                debugPrint('[OK] Found OPENROUTER key from $path');
+                break;
+              }
+            }
           }
+          if (apiKey != null && apiKey.isNotEmpty) break;
+        } catch (e) {
+          debugPrint('[ERR] Could not load $path: $e');
         }
-      } catch (e) {
-        debugPrint('❌ Manual config parse failed: $e');
       }
     }
 
     if (apiKey == null || apiKey.isEmpty) {
       final loadedKeys = dotenv.env.keys.join(', ');
-      debugPrint('❌ OPENROUTER_API_KEY not found anywhere. dotenv keys: $loadedKeys');
-      return "[V3] Key NOT found even after fallback. dotenv keys: $loadedKeys";
+      return "[V3.1] Key NOT found. Keys: $loadedKeys";
     }
 
-    final partialKey = apiKey.length > 10 ? '${apiKey.substring(0, 10)}...' : 'Short';
-    debugPrint('🧠 Calling OpenRouter Nemotron (Key: $partialKey)');
+    debugPrint('[AI] OpenRouter Nemotron call starting...');
+
 
     try {
       final response = await http.post(
