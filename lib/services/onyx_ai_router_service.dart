@@ -205,14 +205,20 @@ NO Markdown tables. Answer precisely:
 
   Future<String> _callNemotronDeepAnalysis(String contextData, String userMessage) async {
     final rawKey = dotenv.env['OPENROUTER_API_KEY'];
-    final apiKey = (rawKey ?? '').trim();
     
-    if (apiKey.isEmpty || apiKey.contains('sk-or-v1-YOUR')) {
-      debugPrint('❌ OnyxAiRouter: OPENROUTER_API_KEY is missing or invalid in assets/onyx_config.txt');
-      return "[V2] Missing or invalid OpenRouter API Key. Please verify assets/onyx_config.txt and do a cold restart.";
+    if (rawKey == null || rawKey.isEmpty) {
+      final loadedKeys = dotenv.env.keys.join(', ');
+      debugPrint('❌ OnyxAiRouter: OPENROUTER_API_KEY is missing. Found keys: $loadedKeys');
+      return "[V2.1] Key NOT found. Loaded keys: $loadedKeys. Please verify assets/onyx_config.txt";
     }
 
-    debugPrint('🧠 Calling OpenRouter Nemotron (Key Length: ${apiKey.length})');
+    final apiKey = rawKey.trim();
+    if (apiKey.contains('sk-or-v1-YOUR')) {
+      return "[V2.1] Invalid placeholder detected. Please update assets/onyx_config.txt with your real key.";
+    }
+
+    final partialKey = apiKey.length > 10 ? '${apiKey.substring(0, 10)}...' : 'Short Key';
+    debugPrint('🧠 Calling OpenRouter Nemotron (Partial Key: $partialKey)');
 
     try {
       final response = await http.post(
