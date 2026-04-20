@@ -295,7 +295,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     ),
                     const SliverToBoxAdapter(
                       child: EliteHeader(
-                        title: 'ONYX AI [v2.0]',
+                        title: 'ONYX AI',
                         showGreeting: false,
                         showBackButton: false,
                       ),
