@@ -200,6 +200,8 @@ def _load_market_state_from_firestore():
                             if MARKET_DATA_CACHE[ticker]["price"] == 0 and history:
                                 MARKET_DATA_CACHE[ticker]["price"] = float(history[-1])
                             count += 1
+                            # Recalculate indicators immediately after loading history
+                            _recalculate_technicals(ticker)
                     print(f"📂 Loaded market state from Firestore ({count} tickers). Freshness: {delta}")
                     return True
                 else:
@@ -554,16 +556,31 @@ def _fetch_single_ticker_aggressive(ticker):
         if live_price:
             history_dq.append(live_price)
             data["price"] = round(float(live_price), 2)
+        # 4. Technical Recalculation
+        _recalculate_technicals(ticker)
         
-        # 4. Technical Recalculation on the Deque
-        if len(history_dq) >= 14:
+        data["source"] = source
+        return data
+
+    except Exception as e:
+        print(f"Engine Error {ticker}: {e}")
+        return None
+
+def _recalculate_technicals(ticker):
+    """Calculates RSI, MACD, Support, and Resistance based on the current deque."""
+    data = MARKET_DATA_CACHE.get(ticker)
+    if not data: return
+    
+    history_dq = data["deque"]
+    if len(history_dq) >= 14:
+        try:
             history_series = pd.Series(list(history_dq))
             data["rsi"] = round(calculate_rsi(history_series), 2)
             data["macd"] = calculate_macd(history_series)
             
             recent_max = history_series.max()
             recent_min = history_series.min()
-            current = data["price"]
+            current = data.get("price", 0.0)
             
             res = recent_max if current < recent_max else current * 1.05
             sup = recent_min if current > recent_min else current * 0.95
@@ -573,13 +590,8 @@ def _fetch_single_ticker_aggressive(ticker):
             
             # Ensure RSI is finite
             if not math.isfinite(data["rsi"]): data["rsi"] = 50.0
-        
-        data["source"] = source
-        return data
-
-    except Exception as e:
-        print(f"Engine fail {ticker}: {e}")
-        return None
+        except Exception as e:
+            print(f"Technical calculation error for {ticker}: {e}")
 
 def refresh_market_data():
     """Iterates through all tickers, updates prices, and calculates indicators."""
