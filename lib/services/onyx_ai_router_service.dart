@@ -77,11 +77,11 @@ class OnyxAiRouterService {
   // Each constant maps to a specific Google AI model optimized
   // for a particular task type within the ONYX ecosystem.
 
-  /// Fast general-purpose chat — Gemini 2.5 Flash
-  static const String _chatModel = 'models/gemini-2.5-flash';
+  /// Fast general-purpose chat — Gemini 3 Flash
+  static const String _chatModel = 'models/gemini-3-flash-preview';
 
-  /// Deep stock / financial analysis — Gemini 3.1 Flash Preview
-  static const String _analysisModel = 'models/gemini-3.1-flash-preview';
+  /// Deep stock / financial analysis — Gemini 3.1 Pro Preview
+  static const String _analysisModel = 'models/gemini-3.1-pro-preview';
 
   /// Structured data extraction (JSON) — Gemma 4 31B Instruct
   static const String _dataModel = 'models/gemma-4-31b-it';
@@ -94,7 +94,7 @@ class OnyxAiRouterService {
 
   static const String _routerPrompt = '''You are the Router for the ONYX financial system. Your job is to classify the user's intent from their message (which is usually in Arabic). 
 Rules:
-1. If the user mentions a specific stock (e.g. Fawry, CIB, فوري, حديد عز) or asks for recommendations/market status -> Output: {"intent": "call_expert", "stock_symbol": "SYMBOL_OR_NULL"}
+1. If the user mentions a specific stock, asks for market analysis, OR asks to "analyze my portfolio" (حلل محفظتي, المحفظة) -> Output: {"intent": "call_expert", "stock_symbol": "SYMBOL_OR_NULL"}
 2. If it's just a greeting or general non-financial talk -> Output: {"intent": "general_chat", "reply": "Your friendly response in Arabic"}
 
 STRICT: Output ONLY the JSON. No conversational filler.''';
@@ -244,7 +244,7 @@ NO Markdown tables. Answer precisely:
             {'role': 'user', 'content': '$contextData\n\nUser Question: $userMessage'}
           ]
         }),
-      ).timeout(const Duration(seconds: 45));
+      ).timeout(const Duration(seconds: 120));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -255,7 +255,7 @@ NO Markdown tables. Answer precisely:
       }
     } catch (e) {
       debugPrint('Nemotron deep analysis error: $e');
-      throw AiException('فشل في الاتصال بمحلل السوق العميق: $e');
+      throw AiException('فشل في الاتصال بمحلل السوق العميق (Nemotron): $e');
     }
   }
 
@@ -263,7 +263,7 @@ NO Markdown tables. Answer precisely:
   Future<AiResponse> sendMessage(
       String userMessage, {
       required MarketDataService marketDataService,
-      required String portfolioData,
+      required Future<String> portfolioDataFuture, // Take a Future to allow parallel execution
   }) async {
     // ── Diagnostic Command ──────────────────────────────────
     final cmd = userMessage.trim().toLowerCase();
@@ -280,18 +280,38 @@ NO Markdown tables. Answer precisely:
     }
 
     try {
-      final intentJson = await _detectIntent(userMessage);
+      // ── FAST-PATH REGEX ───────────────────────────────────
+      // If the message is simple and contains a known stock, 
+      // we skip the expensive Gemini intent detection call.
+      Map<String, dynamic>? intentJson;
+      final fastMatch = _detectFastPathIntent(userMessage);
+      
+      if (fastMatch != null) {
+        debugPrint('🚀 OnyxAiRouter: Fast-path intent detected.');
+        intentJson = fastMatch;
+      } else {
+        // Run intent detection and portfolio fetching in PARALLEL
+        final results = await Future.wait([
+          _detectIntent(userMessage),
+          portfolioDataFuture,
+        ]);
+        intentJson = results[0] as Map<String, dynamic>;
+      }
+
       final intent = intentJson['intent'] ?? 'general_chat';
 
       if (intent == 'general_chat') {
         final reply = intentJson['reply'] ?? 'أهلاً بك!';
-        return AiResponse(text: reply, modelName: 'Gemini Router');
+        return AiResponse(text: reply, modelName: 'ONYX Router');
       } else if (intent == 'call_expert') {
         final stockSymbol = intentJson['stock_symbol'];
         
+        // Wait for portfolio data if we skipped it in the fast-path or if it's still pending
+        final portfolioData = await portfolioDataFuture;
+
         String marketData = '';
         if (stockSymbol != null && stockSymbol != 'SYMBOL_OR_NULL' && stockSymbol.toString().isNotEmpty) {
-          marketData = marketDataService.buildMarketDataContext(stockSymbol); // returns <MARKET_DATA_INTERNAL>
+          marketData = marketDataService.buildMarketDataContext(stockSymbol);
         }
         if (marketData.isEmpty) {
            marketData = '<MARKET_DATA>\n${marketDataService.generateOptimizedMarketScan()}\n</MARKET_DATA>';
@@ -299,13 +319,58 @@ NO Markdown tables. Answer precisely:
            marketData = marketData.replaceAll('MARKET_DATA_INTERNAL', 'MARKET_DATA');
         }
 
-        final marketNews = '<MARKET_NEWS>\n${marketDataService.news.join("\\n")}\n</MARKET_NEWS>';
+        final newsItems = marketDataService.news;
+        final truncatedNews = newsItems.length > 15 
+            ? newsItems.sublist(newsItems.length - 15) 
+            : newsItems;
+        final marketNews = '<MARKET_NEWS>\n${truncatedNews.join("\n")}\n</MARKET_NEWS>';
         final userPortContext = '<USER_PORTFOLIO>\n$portfolioData\n</USER_PORTFOLIO>';
 
         final contextData = '$marketData\n$marketNews\n$userPortContext';
 
-        final nemotronRes = await _callNemotronDeepAnalysis(contextData, userMessage);
-        return AiResponse(text: nemotronRes, modelName: 'Nvidia Nemotron');
+        // ── PARALLEL CONSENSUS TIERING ──────────────────
+        // We trigger all available tiers simultaneously to ensure we get the best 
+        // possible analysis and allow for a consensus "vote" between models.
+        final List<Future<AiResponse?>> tierFutures = [
+          // Tier 1: Gemini 3.1 Pro (The Specialist)
+          analyzeStock(
+            contextData,
+            conversationHistory: [{'role': 'user', 'parts': [{'text': userMessage}]}],
+          ).then<AiResponse?>((res) => res).catchError((e) {
+            debugPrint('⚠️ Tier 1 (Pro) parallel fail: $e');
+            return null;
+          }),
+          
+          // Tier 2: Gemini 3 Flash (The High-Speed Engine)
+          analyzeStock(
+            contextData,
+            model: _chatModel,
+            conversationHistory: [{'role': 'user', 'parts': [{'text': userMessage}]}],
+            systemInstruction: "You are a financial analyst. Analyze this data fast.",
+          ).then<AiResponse?>((res) => res).catchError((e) {
+            debugPrint('⚠️ Tier 2 (Flash) parallel fail: $e');
+            return null;
+          }),
+
+          // Tier 3: Nvidia Nemotron (The Deep Logic Analyst)
+          _callNemotronDeepAnalysis(contextData, userMessage).then<AiResponse?>((text) {
+             return AiResponse(text: text, modelName: 'Nvidia Nemotron (Tier 3)');
+          }).catchError((e) {
+            debugPrint('⚠️ Tier 3 (Nemotron) parallel fail: $e');
+            return null;
+          }),
+        ];
+
+        final rawResponses = await Future.wait(tierFutures);
+        final successfulResponses = rawResponses.whereType<AiResponse>().toList();
+
+        if (successfulResponses.isEmpty) {
+          debugPrint('❌ All Tiers failed in parallel.');
+          throw const AiException('جميع محركات التحليل حالياً تحت ضغط كبير. برجاء المحاولة لاحقاً.');
+        }
+
+        // If we have multiple successful responses, perform consensus synthesis
+        return await _performConsensusSynthesis(userMessage, successfulResponses);
       }
       
       return const AiResponse(text: 'عذراً لا استطيع الخدمة الان', modelName: 'System');
@@ -314,11 +379,54 @@ NO Markdown tables. Answer precisely:
         rethrow;
       }
       debugPrint('sendMessage Orchestrator Error: $e');
-      throw AiException('حدث خطأ أثناء المعالجة: $e');
+      throw AiException('حدث خطأ غير متوقع: $e');
     }
   }
 
-  /// **General Chat** — Uses [_chatModel] (Gemini 2.5 Flash).
+  /// **Fast-Path Intent Detection**
+  /// Uses simple regex to find common EGX symbols and avoid an API call.
+  Map<String, dynamic>? _detectFastPathIntent(String msg) {
+    final lower = msg.toLowerCase();
+    
+    // Common EGX tickers / names
+    final Map<String, String> commonStocks = {
+      'فوري': 'FWRY.CA',
+      'fawry': 'FWRY.CA',
+      'cib': 'COMI.CA',
+      'سي أي بي': 'COMI.CA',
+      'حديد عز': 'ESRS.CA',
+      'ezz': 'ESRS.CA',
+      'طلعت مصطفى': 'TMGH.CA',
+      'tmg': 'TMGH.CA',
+      'هيرميس': 'HRHO.CA',
+      'hermes': 'HRHO.CA',
+      'بلتون': 'BTFH.CA',
+      'beltone': 'BTFH.CA',
+    };
+
+    for (final entry in commonStocks.entries) {
+      if (lower.contains(entry.key)) {
+        return {
+          'intent': 'call_expert',
+          'stock_symbol': entry.value,
+        };
+      }
+    }
+
+    // Generic "invest", "buy", or "portfolio" keywords
+    if (lower.contains('أشتري') || 
+        lower.contains('بيع') || 
+        lower.contains('تحليل') || 
+        lower.contains('حلل') || 
+        lower.contains('محفظة') || 
+        lower.contains('محفظتي')) {
+       return {'intent': 'call_expert', 'stock_symbol': null};
+    }
+
+    return null;
+  }
+
+  /// **General Chat** — Uses [_chatModel] (Gemini 3 Flash).
   ///
   /// Designed for the main ChatScreen. Supports full conversation
   /// history and Google Search grounding for real-time data.
@@ -422,18 +530,23 @@ NO Markdown tables. Answer precisely:
   /// [conversationHistory] — Optional chat history for context.
   Future<AiResponse> analyzeStock(
     String stockData, {
+    String? model,
     String? systemInstruction,
     List<Map<String, dynamic>>? conversationHistory,
   }) async {
+    final targetModel = model ?? _analysisModel;
+
     final sysPrompt = systemInstruction ??
         "You are an elite financial analyst specializing in the Egyptian Exchange (EGX). "
-            "Analyze the provided stock data with extreme precision and depth.\n"
+            "Analyze the provided stock data AND user portfolio data with extreme precision.\n"
+            "CRITICAL: If the input contains a <USER_PORTFOLIO> tag, analyze the assets within it FIRST. "
+            "Do NOT ask the user to provide their portfolio if it is already present in the context.\n"
             "Focus on: Price action, RSI levels, MACD signals, support/resistance levels, "
-            "volume trends, and provide clear actionable recommendations (BUY / HOLD / SELL).\n"
+            "sector diversification, and actionable recommendations (BUY / HOLD / SELL).\n"
             "Use clean Markdown formatting with emojis 📊📈🎯💰 for readability.\n"
             "Be direct, confident, and speak like a senior Egyptian trader. Zero disclaimers.";
 
-    final contents = conversationHistory ??
+    var contents = conversationHistory ??
         [
           {
             'role': 'user',
@@ -442,6 +555,21 @@ NO Markdown tables. Answer precisely:
             ]
           }
         ];
+
+    // Ensure context (stockData) is injected into the prompt even if history is provided
+    if (conversationHistory != null && contents.isNotEmpty && contents.last['role'] == 'user') {
+      final newContents = List<Map<String, dynamic>>.from(contents);
+      final lastMsg = Map<String, dynamic>.from(newContents.last);
+      final parts = List<Map<String, dynamic>>.from(lastMsg['parts']);
+      final part = Map<String, dynamic>.from(parts[0]);
+
+      part['text'] = "$stockData\n\nUser Question: ${part['text']}";
+
+      parts[0] = part;
+      lastMsg['parts'] = parts;
+      newContents[newContents.length - 1] = lastMsg;
+      contents = newContents;
+    }
 
     final body = <String, dynamic>{
       'systemInstruction': {
@@ -456,7 +584,7 @@ NO Markdown tables. Answer precisely:
       },
     };
 
-    return _callModelWithRetry(_analysisModel, body);
+    return _callModelWithRetry(targetModel, body);
   }
 
   /// **JSON Data Extraction** — Uses [_dataModel] (Gemma 4 31B-IT).
@@ -586,7 +714,7 @@ NO Markdown tables. Answer precisely:
               'include_answer': true,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 120));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -671,7 +799,7 @@ NO Markdown tables. Answer precisely:
           headers: {'Content-Type': 'application/json'},
           body: json.encode(body),
         )
-        .timeout(const Duration(seconds: 60));
+        .timeout(const Duration(seconds: 90));
 
     if (response.statusCode == 200) {
       return _parseResponse(response.body, model);
@@ -681,11 +809,64 @@ NO Markdown tables. Answer precisely:
     }
   }
 
+  /// **Consensus Synthesis (Voting Logic)**
+  /// 
+  /// Takes multiple AI responses and synthesizes them into a single definitive answer.
+  /// If only one response is present, it is returned as-is.
+  Future<AiResponse> _performConsensusSynthesis(
+    String userQuery,
+    List<AiResponse> responses,
+  ) async {
+    if (responses.isEmpty) {
+      throw const AiException('No responses to synthesize.');
+    }
+    if (responses.length == 1) {
+      debugPrint('🤖 OnyxAiRouter: Single success (${responses.first.modelName}), skipping synthesis.');
+      return responses.first;
+    }
+
+    debugPrint('🤖 OnyxAiRouter: Consensus synthesis starting with ${responses.length} models...');
+
+    final synthesisPrompt = StringBuffer();
+    synthesisPrompt.writeln('You are the ONYX Consensus Judge. You have been given multiple versions of a financial analysis for the EGX.');
+    synthesisPrompt.writeln('User Query: "$userQuery"');
+    synthesisPrompt.writeln('\nHere are the drafts from different analysis models:');
+    
+    for (int i = 0; i < responses.length; i++) {
+      synthesisPrompt.writeln('\n--- DRAFT ${i + 1} (Model: ${responses[i].modelName ?? "Unknown"}) ---');
+      synthesisPrompt.writeln(responses[i].text);
+    }
+
+    synthesisPrompt.writeln('\n--- INSTRUCTIONS ---');
+    synthesisPrompt.writeln('1. Create a single, high-quality, professional final response in Arabic.');
+    synthesisPrompt.writeln('2. Combine the best insights from all drafts.');
+    synthesisPrompt.writeln('3. Resolve any data contradictions (favor the most precise or common data point).');
+    synthesisPrompt.writeln('4. Use the ONYX tone: elite, confident, senior trader style.');
+    synthesisPrompt.writeln('5. Ensure all formatting (emojis, markdown) is consistent and premium.');
+    synthesisPrompt.writeln('6. DO NOT mention that this is a synthesis or that you are a judge. Just output the final analysis.');
+
+    // Use Tier 1 (Pro) for synthesis if possible, fallback to Flash
+    try {
+      debugPrint('🤖 OnyxAiRouter: Synthesis using Pro model...');
+      return await analyzeStock(
+        synthesisPrompt.toString(),
+        systemInstruction: "You are the ONYX Master Analyst. Synthesize the final definitive report.",
+      );
+    } catch (e) {
+      debugPrint('⚠️ Synthesis with Pro failed, trying Flash: $e');
+      return await analyzeStock(
+        synthesisPrompt.toString(),
+        model: _chatModel,
+        systemInstruction: "You are the ONYX Master Analyst. Synthesize the final definitive report.",
+      );
+    }
+  }
+
   // ── Friendly Model Names ──────────────────────────────────
 
   static const Map<String, String> _modelDisplayNames = {
-    'models/gemini-2.5-flash': 'Gemini 2.5 Flash',
-    'models/gemini-3.1-flash-preview': 'Gemini 3.1 Flash',
+    'models/gemini-3-flash-preview': 'Gemini 3 Flash',
+    'models/gemini-3.1-pro-preview': 'Gemini 3.1 Pro',
     'models/gemma-4-31b-it': 'Gemma 4 31B',
     'models/gemini-2.5-flash-lite': 'Gemini 2.5 Flash Lite',
     'models/gemini-3.1-flash-lite-preview': 'Gemini 3.1 Flash Lite',

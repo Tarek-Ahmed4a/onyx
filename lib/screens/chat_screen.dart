@@ -92,30 +92,49 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return '';
 
+      // 1. Try to fetch fresh from Firestore
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
           .collection('investments')
           .get();
 
-      if (snapshot.docs.isEmpty) return 'No investments found.';
-
       final buffer = StringBuffer();
-      buffer.writeln('<PORTFOLIO_DATA>');
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
-        final portfolioName = data['name'] ?? 'Portfolio';
-        final assets = data['assets'] as List<dynamic>? ?? [];
+      
+      if (snapshot.docs.isNotEmpty) {
+        buffer.writeln('<PORTFOLIO_DATA>');
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          final portfolioName = data['name'] ?? 'Portfolio';
+          final assets = data['assets'] as List<dynamic>? ?? [];
 
-        buffer.writeln('Portfolio: $portfolioName');
-        for (final asset in assets) {
-          final name = asset['name'] ?? '?';
-          final qty = asset['quantity'] ?? 0;
-          buffer.writeln('  - $name: Qty=$qty');
+          buffer.writeln('Portfolio: $portfolioName');
+          for (final asset in assets) {
+            final name = asset['name'] ?? '?';
+            final qty = asset['quantity'] ?? 0;
+            buffer.writeln('  - $name: Qty=$qty');
+          }
+        }
+        buffer.writeln('</PORTFOLIO_DATA>');
+      }
+
+      // 2. If Firestore segment is empty, check MarketDataService cache
+      if (buffer.isEmpty && mounted) {
+        final service = Provider.of<MarketDataService>(context, listen: false);
+        if (service.cachedUserAssets.isNotEmpty) {
+           buffer.writeln('<PORTFOLIO_DATA>');
+           buffer.writeln('Source: Service Cache');
+           for (final asset in service.cachedUserAssets) {
+             final name = asset['name'] ?? '?';
+             final qty = asset['quantity'] ?? 0;
+             final ticker = asset['ticker'] ?? '';
+             buffer.writeln('  - ${ticker.isNotEmpty ? ticker : name}: Qty=$qty');
+           }
+           buffer.writeln('</PORTFOLIO_DATA>');
         }
       }
-      buffer.writeln('</PORTFOLIO_DATA>');
-      return buffer.toString();
+
+      return buffer.isEmpty ? 'No investments found.' : buffer.toString();
     } catch (e) {
       debugPrint('Error fetching portfolio context: $e');
       return 'Error loading portfolio.';
@@ -142,15 +161,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
     try {
       setState(() {
-        _statusMessage = '🧠 Analyzing intent...';
+        _statusMessage = '🧠 Analyzing & Scanning...';
       });
 
-      final portfolioData = await _getPortfolioContext();
+      final portfolioFuture = _getPortfolioContext();
 
       final AiResponse response = await _router.sendMessage(
         text,
         marketDataService: service,
-        portfolioData: portfolioData,
+        portfolioDataFuture: portfolioFuture,
       );
 
       // ── Handle success ───────────────────────────────────
@@ -199,6 +218,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       _scrollToBottom();
     } catch (e) {
       debugPrint('AI Chat Error: $e');
+      String errorText = 'عذراً يا هندسة، حصلت مشكلة تقنية. جرب تاني كمان شوية.';
+      
+      // If the error message contains Arabic from our specific AiException, use it.
+      final eStr = e.toString();
+      if (eStr.contains('محركات') || eStr.contains('فشل')) {
+        errorText = 'عذراً يا هندسة، $eStr';
+      }
+
       setState(() {
         if (_messages.isNotEmpty && _messages.last.isUser) {
           _messages.removeLast();
@@ -206,7 +233,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         }
         _textController.text = text;
         _addMessage(Message(
-          text: 'عذراً يا هندسة، حصلت مشكلة تقنية. جرب تاني كمان شوية.',
+          text: errorText,
           isUser: false,
         ));
         _isLoading = false;
@@ -263,9 +290,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           Column(
             children: [
               Expanded(
-                child: CustomScrollView(
+                child: Scrollbar(
                   controller: _scrollController,
-                  physics: const BouncingScrollPhysics(),
+                  child: CustomScrollView(
+                    controller: _scrollController,
+                    primary: false,
+                    physics: const BouncingScrollPhysics(),
                   slivers: [
                     SliverAppBar(
                       backgroundColor: Colors.transparent,
@@ -304,8 +334,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   ],
                 ),
               ),
-              _buildInputBar(),
-            ],
+            ),
+            _buildInputBar(),
+          ],
           ),
         ],
       ),

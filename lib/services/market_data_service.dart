@@ -108,6 +108,7 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Local cache of user assets for high-performance alert checking.
   List<dynamic> _cachedUserAssets = [];
+  List<dynamic> get cachedUserAssets => _cachedUserAssets;
 
   /// Fetches all assets from the user's portfolios and caches them.
   /// This should be called once on init and whenever the UI updates investments.

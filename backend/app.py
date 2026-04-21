@@ -151,6 +151,67 @@ MARKET_DATA_CACHE = {
     for ticker in WATCHLIST
 }
 
+# --- Firebase Global Client ---
+db = None
+
+# --- State Persistence Logic ---
+
+def _save_market_state_to_firestore():
+    """Saves the current deques (history) to Firestore to persist across restarts."""
+    try:
+        state_data = {}
+        for ticker, data in MARKET_DATA_CACHE.items():
+            dq = data.get("deque")
+            if dq and len(dq) > 0:
+                state_data[ticker] = list(dq)
+        
+        if state_data:
+            db.collection('system_metadata').document('market_state').set({
+                "tickers": state_data,
+                "last_updated": datetime.utcnow()
+            })
+            print(f"💾 Market state persisted to Firestore ({len(state_data)} tickers).")
+    except Exception as e:
+        print(f"❌ Failed to save market state: {e}")
+
+def _load_market_state_from_firestore():
+    """Loads persisted deques from Firestore if they are less than 24 hours old."""
+    global db
+    try:
+        if db is None:
+            print("⚠️ Firestore client (db) is not initialized yet.")
+            return False
+        doc = db.collection('system_metadata').document('market_state').get()
+        if doc.exists:
+            data = doc.to_dict()
+            last_updated = data.get("last_updated")
+            
+            if last_updated:
+                delta = datetime.utcnow() - last_updated.replace(tzinfo=None)
+                if delta < timedelta(hours=24):
+                    tickers_state = data.get("tickers", {})
+                    count = 0
+                    for ticker, history in tickers_state.items():
+                        if ticker in MARKET_DATA_CACHE:
+                            MARKET_DATA_CACHE[ticker]["deque"].clear()
+                            for p in history:
+                                MARKET_DATA_CACHE[ticker]["deque"].append(float(p))
+                            # Update current price to last known history point if still zero
+                            if MARKET_DATA_CACHE[ticker]["price"] == 0 and history:
+                                MARKET_DATA_CACHE[ticker]["price"] = float(history[-1])
+                            count += 1
+                    print(f"📂 Loaded market state from Firestore ({count} tickers). Freshness: {delta}")
+                    return True
+                else:
+                    print(f"⏳ Persisted market state is too old ({delta}). Skipping.")
+        else:
+            print("ℹ️ No market state found in Firestore.")
+    except Exception as e:
+        print(f"⚠️ Failed to load market state: {e}")
+    return False
+
+# --- Technical Indicators ---
+
 NEWS_CACHE = []
 MACRO_CACHE = {
     "egx100": 0.0,
@@ -181,9 +242,11 @@ def calculate_macd(series, fast=12, slow=26, signal=9):
 # --- Scrapers ---
 def _fetch_mubasher_price(ticker):
     try:
-        symbol = ticker.split('.')[0]
-        url = f"https://www.mubasher.info/markets/EGX/stocks/{symbol}"
-        resp = requests.get(url, headers=get_headers(), timeout=5)
+        url = f"https://www.mubasher.info/markets/EGX/stocks/{ticker.split('.')[0]}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        resp = requests.get(url, headers=headers, timeout=15)
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.text, 'lxml')
             price_tag = soup.select_one('.market-summary__last-price')
@@ -264,24 +327,67 @@ def get_macro_news_enterprise(limit=3):
         return []
 
 def _fetch_macro_indicators():
-    """Fetches USD/EGP, Gold, and EGX100 via yfinance."""
+    """Fetches USD/EGP, Gold, and EGX100 via yfinance with robust Scraper Fallbacks."""
     global MACRO_CACHE
     try:
-        # Tickers: EGX100 (CASE100.CA), USD/EGP (EGP=X), Gold (GC=F)
         tickers = ["CASE100.CA", "EGP=X", "GC=F"]
-        data = yf.download(tickers, period="1d", timeout=10)
+        data = yf.download(tickers, period="5d", interval="1d", progress=False, timeout=15)
         
         if not data.empty and 'Close' in data:
             closes = data['Close'].iloc[-1]
+            def get_val(ticker, default=0.0):
+                try:
+                    val = closes[ticker]
+                    return float(val) if math.isfinite(val) else default
+                except: return default
+
             MACRO_CACHE = {
-                "egx100": round(float(closes.get("CASE100.CA", 0.0)), 2),
-                "usd_egp": round(float(closes.get("EGP=X", 0.0)), 2),
-                "gold": round(float(closes.get("GC=F", 0.0)), 2),
+                "egx100": round(get_val("CASE100.CA"), 2),
+                "usd_egp": round(get_val("EGP=X"), 2),
+                "gold": round(get_val("GC=F"), 2),
                 "last_updated": datetime.utcnow().isoformat()
             }
-            print(f"🌍 Macro Indicators Updated: {MACRO_CACHE}")
-    except Exception as e:
-        print(f"Macro Fetch Error: {e}")
+        else:
+            raise ValueError("yfinance failed for Macro")
+            
+    except Exception:
+        # --- Fallback Scrapers for Macro ---
+        print("🕒 yfinance Macro failed. Attempting Scraper Fallbacks...")
+        try:
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+            # 1. USD/EGP Scraper
+            usd_price = 48.50 
+            resp = requests.get("https://www.mubasher.info/markets/currencies/USD/EGP", headers=headers, timeout=15)
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, 'lxml')
+                price_tag = soup.select_one('.market-summary__last-price')
+                if price_tag: usd_price = float(price_tag.text.strip().replace(',', ''))
+            
+            # 2. Gold Scraper
+            gold_price = 3200.0
+            resp = requests.get("https://www.mubasher.info/markets/commodities/GOLD", headers=headers, timeout=15)
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, 'lxml')
+                price_tag = soup.select_one('.market-summary__last-price')
+                if price_tag: gold_price = float(price_tag.text.strip().replace(',', ''))
+
+            # 3. EGX100 Scraper
+            egx_val = 10000.0
+            resp = requests.get("https://www.mubasher.info/markets/EGX/indices/CASE100", headers=headers, timeout=15)
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, 'lxml')
+                price_tag = soup.select_one('.market-summary__last-price')
+                if price_tag: egx_val = float(price_tag.text.strip().replace(',', ''))
+
+            MACRO_CACHE = {
+                "egx100": egx_val,
+                "usd_egp": usd_price,
+                "gold": gold_price,
+                "last_updated": datetime.utcnow().isoformat()
+            }
+            print(f"🌍 Macro Indicators (Scraped): {MACRO_CACHE}")
+        except Exception as e2:
+            print(f"Total Macro Failure: {e2}")
 
 def _calculate_market_breadth():
     """Calculates Gainers vs Losers for the AI to understand market tone."""
@@ -392,30 +498,57 @@ def _fetch_single_ticker_aggressive(ticker):
             except Exception as e:
                 print(f"Firestore fallback error {ticker}: {e}")
         
-        # 2. History Bootstrap (Only if deque is empty)
+        # 2. History Bootstrap (Warm-up)
         history_dq = data["deque"]
         source = "Fund Scraper" if is_fund else "Mubasher (Live Accumulation)"
         
         if len(history_dq) < 40:
             if not is_fund:
-                # Attempt one-time bootstrap from yfinance
+                # [Robust Bootstrap] Fetch real 1m historical data to warm up technicals
                 try:
-                    stock = yf.Ticker(ticker)
-                    df = stock.history(period="1mo", timeout=3)
+                    # Fetch last 5 days of 1-minute data
+                    df = yf.download(ticker, period="5d", interval="1m", progress=False, timeout=15)
+                    
                     if not df.empty:
-                        # Fill deque with historical points
-                        history_dq.clear()
-                        for p in df['Close'].tolist():
-                            history_dq.append(p)
-                        source = "Hybrid (yf Bootstrap + Live)"
-                except: pass
+                        # Robust column extraction (handles MultiIndex or Single Index)
+                        closes_series = None
+                        if isinstance(df.columns, pd.MultiIndex):
+                            # Case: MultiIndex (Ticker, Column) or (Column, Ticker)
+                            if 'Close' in df.columns.get_level_values(0):
+                                closes_series = df['Close']
+                            elif 'Close' in df.columns.get_level_values(1):
+                                closes_series = df.xs('Close', axis=1, level=1)
+                        else:
+                            # Case: Single Index
+                            if 'Close' in df.columns:
+                                closes_series = df['Close']
+
+                        if closes_series is not None:
+                            # If it's a DataFrame, try to get specific ticker or take first column
+                            if isinstance(closes_series, pd.DataFrame):
+                                if ticker in closes_series.columns:
+                                    closes_series = closes_series[ticker]
+                                else:
+                                    closes_series = closes_series.iloc[:, 0]
+                                
+                            history_dq.clear()
+                            closes_list = closes_series.dropna().tail(80).tolist()
+                            for p in closes_list:
+                                history_dq.append(float(p))
+                            source = f"Robust Bootstrap (yf {len(closes_list)}pts)"
+                            print(f"✅ {ticker} warmed up with {len(closes_list)} real points.")
+                        else:
+                            print(f"⚠️ Could not find Close column for {ticker}")
+                except Exception as e:
+                    print(f"⚠️ Bootstrap failed for {ticker}: {e}")
             
-            # If still empty or yf failed, seed with dummy history
+            # If still empty (Funds or yf failed), only then use a minimal seed to avoid crash
             if len(history_dq) < 40 and live_price:
-                history_dq.clear()
-                for _ in range(40):
-                    history_dq.append(live_price)
-                source = "Seed Scraper" if is_fund else "Mubasher (Dummy Seed)"
+                # Note: We keep this as a last-resort safety net, but yf should handle most stocks
+                if len(history_dq) == 0:
+                    for _ in range(40):
+                        history_dq.append(live_price)
+                    source = "Safety Seed (Static)"
 
         # 3. Append latest point
         if live_price:
@@ -449,28 +582,30 @@ def _fetch_single_ticker_aggressive(ticker):
         return None
 
 def refresh_market_data():
-    global NEWS_CACHE
+    """Iterates through all tickers, updates prices, and calculates indicators."""
     print(f"🕒 Refreshing {len(WATCHLIST)} tickers + News + Macro...")
     
-    # 1. Refresh News
-    new_news = _fetch_mubasher_news()
-    if new_news:
-        NEWS_CACHE = new_news
-        
-    # 2. Refresh Macro Indicators
+    # 1. Macro Indicators Fallback
     _fetch_macro_indicators()
-        
-    # 3. Refresh Stock Data
-    with ThreadPoolExecutor(max_workers=30) as executor:
-        futures = {executor.submit(_fetch_single_ticker_aggressive, t): t for t in WATCHLIST}
-        for f in as_completed(futures):
-            f.result() 
-    print(f"✅ Market state synchronized.")
+    
+    # 2. Sequential Stock Refresh with Rate Limiting
+    for ticker in WATCHLIST:
+        try:
+            _fetch_single_ticker_aggressive(ticker)
+            # Sleep 100ms to avoid hammering Mubasher/yfinance
+            time.sleep(0.1)
+        except Exception as e:
+            print(f"Error refreshing {ticker}: {e}")
+            
+    # 3. Persistence Save
+    _save_market_state_to_firestore()
+    print("✅ Market state synchronized.")
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=refresh_market_data, trigger="interval", seconds=60)
 
 def setup_firebase():
+    global db
     if not firebase_admin._apps:
         cred_json = os.environ.get('FIREBASE_CREDENTIALS')
         if cred_json:
@@ -478,21 +613,34 @@ def setup_firebase():
                 cred_dict = json.loads(cred_json)
                 cred = credentials.Certificate(cred_dict)
                 firebase_admin.initialize_app(cred)
-                print("Firebase Initialized.")
+                db = firestore.client()
+                print("Firebase Initialized and db client ready.")
             except Exception as e:
                 print(f"Error initializing Firebase: {e}")
         else:
             print("FIREBASE_CREDENTIALS not found in environment.")
+    else:
+        db = firestore.client()
 
 setup_firebase()
 
+def initialize_system():
+    print("🚀 Initializing ONYX System State...")
+    _load_market_state_from_firestore()
+    # Initial refresh to get current prices
+    refresh_market_data()
+    # Force an immediate save of the warmed up state to Firestore
+    _save_market_state_to_firestore()
+
+initialize_system()
+
 def cleanup_old_signals():
+    global db
     try:
-        if not firebase_admin._apps: return
-        db = firestore.client()
+        if db is None: return
         cutoff = datetime.utcnow() - timedelta(hours=24)
         signals_ref = db.collection('market_signals')
-        query = signals_ref.where('timestamp', '<', cutoff)
+        query = signals_ref.where(filter=firestore.FieldFilter('timestamp', '<', cutoff))
         docs = query.stream()
         count = 0
         for doc in docs:
@@ -506,6 +654,7 @@ cleanup_old_signals()
 
 def scan_market():
     try:
+        global db
         now_cairo = pd.Timestamp.now(tz='Africa/Cairo')
         if now_cairo.weekday() not in [0, 1, 2, 3, 6]:
             print("Outside EGX trading days (Fri-Sat).")
@@ -520,10 +669,8 @@ def scan_market():
         tickers_str = " ".join(EGX_100)
         data = yf.download(tickers_str, period="2mo", interval="1d", group_by="ticker", auto_adjust=False, prepost=False, threads=True)
         
-        if not firebase_admin._apps: 
+        if db is None: 
             return
-            
-        db = firestore.client()
         
         for ticker in WATCHLIST:
             stock_data = MARKET_DATA_CACHE.get(ticker)
@@ -555,7 +702,7 @@ def scan_market():
                     
                 msg = f"{ticker} is showing strong opportunities at {current_price} EGP."
                 
-                recent_signals = db.collection('market_signals').where('ticker', '==', ticker).where('type', '==', signal_type).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(1).stream()
+                recent_signals = db.collection('market_signals').where(filter=firestore.FieldFilter('ticker', '==', ticker)).where(filter=firestore.FieldFilter('type', '==', signal_type)).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(1).stream()
                 recent_list = list(recent_signals)
                 recently_alerted = False
                 if recent_list:
@@ -640,13 +787,16 @@ def scan_market():
                     
     except Exception as e:
         print(f"Scan Market Error: {e}")
+    finally:
+        # [Persistence] Save deques to Firestore after every scan
+        _save_market_state_to_firestore()
 
 def take_daily_snapshots():
     """Background job that calculates total portfolio value for all users and saves a snapshot."""
+    global db
     print("Initiating Daily Portfolio Snapshots...")
-    if not firebase_admin._apps: return
+    if db is None: return
     try:
-        db = firestore.client()
         users_ref = db.collection('users')
         user_docs = users_ref.stream()
         
@@ -748,5 +898,5 @@ def force():
     return jsonify({"status": "done", "count": len(MARKET_DATA_CACHE)})
 
 if __name__ == '__main__':
-    refresh_market_data()
+    # When running locally via 'python app.py'
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 7860)))
