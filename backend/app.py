@@ -16,6 +16,17 @@ import json
 import firebase_admin
 from firebase_admin import credentials, firestore, messaging
 import time
+try:
+    from tvDatafeed import TvDatafeed, Interval
+    HAS_TV = True
+except ImportError:
+    print("⚠️ tvDatafeed not installed. TradingView fallback will be disabled.")
+    HAS_TV = False
+    
+import logging
+
+# Mute noisy logs
+logging.getLogger('tvDatafeed').setLevel(logging.ERROR)
 
 
 # --- Configuration ---
@@ -138,6 +149,10 @@ MUTUAL_FUNDS = ['NMF', 'CMS', 'ASO', 'BWA', 'ADA', 'AZG', 'BFA', 'BSB', 'MTF']
 
 WATCHLIST = EGX_100 + MUTUAL_FUNDS
 
+# --- Global Cache Buffers ---
+MUBASHER_FUNDS_BUFFER = {}
+MUBASHER_FUNDS_LAST_FETCH = None
+
 # Initialize Storage with Deques for each ticker (maxlen 100 for 1-minute accumulation)
 MARKET_DATA_CACHE = {
     ticker: {
@@ -152,8 +167,19 @@ MARKET_DATA_CACHE = {
     for ticker in WATCHLIST
 }
 
-# --- Firebase Global Client ---
+# --- Global Clients ---
 db = None
+tv_client = None
+
+def get_tv_client():
+    global tv_client
+    if not HAS_TV: return None
+    if tv_client is None:
+        try:
+            tv_client = TvDatafeed()
+        except Exception as e:
+            print(f"⚠️ Failed to init TvDatafeed: {e}")
+    return tv_client
 
 # --- State Persistence Logic ---
 
@@ -240,7 +266,12 @@ def calculate_macd(series, fast=12, slow=26, signal=9):
     MACD_line = EMA_fast - EMA_slow
     Signal_line = MACD_line.ewm(span=signal, adjust=False).mean()
     m, s = MACD_line.iloc[-1], Signal_line.iloc[-1]
-    return "Bullish crossover" if m > s else "Bearish divergence"
+    if m > s + 0.0001:
+        return "Bullish crossover"
+    elif m < s - 0.0001:
+        return "Bearish divergence"
+    else:
+        return "Neutral"
 
 # --- Scrapers ---
 def _fetch_mubasher_price(ticker):
@@ -351,11 +382,32 @@ def _fetch_macro_indicators():
                 "last_updated": datetime.utcnow().isoformat()
             }
         else:
-            raise ValueError("yfinance failed for Macro")
+            raise ValueError("yfinance empty result")
             
-    except Exception:
-        # --- Fallback Scrapers for Macro ---
-        print("🕒 yfinance Macro failed. Attempting Scraper Fallbacks...")
+    except Exception as e:
+        # --- Fallback 1: TradingView (TvDatafeed) ---
+        print(f"🕒 yfinance Macro failed ({e}). Trying TradingView...")
+        try:
+            tv = get_tv_client()
+            if tv:
+                # TradingView symbols
+                egx = tv.get_hist(symbol='CASE100', exchange='EGX', interval=Interval.in_daily, n_bars=2)
+                gold = tv.get_hist(symbol='GOLD', exchange='TVC', interval=Interval.in_daily, n_bars=2)
+                usd = tv.get_hist(symbol='USDEGP', exchange='FX_IDC', interval=Interval.in_daily, n_bars=2)
+                
+                MACRO_CACHE = {
+                    "egx100": round(egx['close'].iloc[-1], 2) if egx is not None else MACRO_CACHE['egx100'],
+                    "usd_egp": round(usd['close'].iloc[-1], 2) if usd is not None else MACRO_CACHE['usd_egp'],
+                    "gold": round(gold['close'].iloc[-1], 2) if gold is not None else MACRO_CACHE['gold'],
+                    "last_updated": datetime.utcnow().isoformat()
+                }
+                print(f"🌍 Macro Indicators (TV): {MACRO_CACHE}")
+                return
+        except Exception as e2:
+            print(f"TradingView Macro error: {e2}")
+
+        # --- Fallback 2: Scrapers ---
+        print("🕒 Attempting Scraper Fallbacks...")
         try:
             headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
             # 1. USD/EGP Scraper
@@ -428,45 +480,67 @@ FUND_KEYWORDS = {
 }
 
 def _fetch_fund_price(ticker): 
-    """Offset-Paginated JSON API scraper for Egyptian Mutual Funds."""
+    """Offset-Paginated JSON API scraper with per-refresh caching."""
+    global MUBASHER_FUNDS_BUFFER, MUBASHER_FUNDS_LAST_FETCH
     try:
+        # If cache is fresh (less than 4 minutes old), use it
+        now = datetime.utcnow()
+        if MUBASHER_FUNDS_LAST_FETCH and (now - MUBASHER_FUNDS_LAST_FETCH).total_seconds() < 240:
+            val = MUBASHER_FUNDS_BUFFER.get(ticker)
+            if val is not None:
+                return val
+
+        # Otherwise, refresh the entire fund buffer
         keyword = FUND_KEYWORDS.get(ticker)
-        if not keyword:
-            return None
+        if not keyword: return None
             
-        # Offset pagination by 20 up to 200
-        for start_offset in range(0, 220, 20):
+        print(f"🔄 Refreshing Global Fund Buffer for {ticker}...")
+        temp_buffer = {}
+        
+        # Paginate to find all keywords
+        for start_offset in range(0, 200, 20):
             url = f"https://www.mubasher.info/api/1/funds?country=eg&size=20&start={start_offset}"
-            print(f"Fetching API: {url} for {ticker}")
-            
-            resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-            print(f"Mubasher API Status: {resp.status_code} (Offset {start_offset})")
+            resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
             
             if resp.status_code == 200:
                 data = resp.json()
                 rows = data.get('rows', [])
+                if not rows: break
                 
                 for row in rows:
-                    if keyword in row.get('name', ''):
-                        price_val = row.get('price')
-                        if price_val is not None:
-                            price = float(price_val)
-                            print(f"✅ API Success: {ticker} -> {price}")
-                            return price
-                
-                if not rows:
-                    break
+                    r_name = row.get('name', '')
+                    if r_name and any(k in r_name for k in FUND_KEYWORDS.values()):
+                        # Find which ticker this belongs to
+                        for t, k in FUND_KEYWORDS.items():
+                            if k in r_name:
+                                price_val = row.get('price')
+                                if price_val and float(price_val) > 0:
+                                    temp_buffer[t] = float(price_val)
+                                    print(f"✅ Buffered Fund: {t} -> {price_val}")
             else:
-                print(f"Failed HTTP Status {resp.status_code} at offset {start_offset}")
                 break
-                
-        print(f"Failed to find match for keyword '{keyword}' across all API offsets for {ticker}")
         
+        if temp_buffer:
+            MUBASHER_FUNDS_BUFFER.update(temp_buffer)
+            MUBASHER_FUNDS_LAST_FETCH = now
+            return MUBASHER_FUNDS_BUFFER.get(ticker)
+            
     except Exception as e:
-        print(f"Exception for {ticker}: {str(e)}")
-        print(f"API Scraping failed for {ticker}, falling back to DB")
+        print(f"Fund Scraping Exception: {e}")
         
     return None
+
+def is_market_open():
+    try:
+        now_cairo = pd.Timestamp.now(tz='Africa/Cairo')
+        if now_cairo.weekday() not in [0, 1, 2, 3, 6]:
+            return False
+        current_time_float = now_cairo.hour + now_cairo.minute / 60.0
+        if not (10.0 <= current_time_float <= 14.5):
+            return False
+        return True
+    except Exception:
+        return True
 
 # --- Data Engine ---
 def _fetch_single_ticker_aggressive(ticker):
@@ -527,7 +601,6 @@ def _fetch_single_ticker_aggressive(ticker):
                                 closes_series = df['Close']
 
                         if closes_series is not None:
-                            # If it's a DataFrame, try to get specific ticker or take first column
                             if isinstance(closes_series, pd.DataFrame):
                                 if ticker in closes_series.columns:
                                     closes_series = closes_series[ticker]
@@ -538,10 +611,25 @@ def _fetch_single_ticker_aggressive(ticker):
                             closes_list = closes_series.dropna().tail(80).tolist()
                             for p in closes_list:
                                 history_dq.append(float(p))
-                            source = f"Robust Bootstrap (yf {len(closes_list)}pts)"
-                            print(f"✅ {ticker} warmed up with {len(closes_list)} real points.")
-                        else:
-                            print(f"⚠️ Could not find Close column for {ticker}")
+
+                    if len(history_dq) >= 20:
+                        source = f"Robust Bootstrap (yf {len(history_dq)}pts)"
+                        print(f"✅ {ticker} warmed up with {len(history_dq)} yf points.")
+                    else:
+                        # [Fallback] Try TvDatafeed for warm-up
+                        try:
+                            tv = get_tv_client()
+                            if tv:
+                                tv_ticker = ticker.replace('.CA', '')
+                                hist = tv.get_hist(symbol=tv_ticker, exchange='EGX', interval=Interval.in_1_minute, n_bars=80)
+                                if hist is not None and not hist.empty:
+                                    history_dq.clear()
+                                    for p in hist['close'].tail(80).tolist():
+                                        history_dq.append(float(p))
+                                    source = f"TradingView Bootstrap ({len(history_dq)}pts)"
+                                    print(f"✅ {ticker} warmed up via TV.")
+                        except Exception as tv_e:
+                            print(f"⚠️ TV Bootstrap failed for {ticker}: {tv_e}")
                 except Exception as e:
                     print(f"⚠️ Bootstrap failed for {ticker}: {e}")
             
@@ -555,8 +643,19 @@ def _fetch_single_ticker_aggressive(ticker):
 
         # 3. Append latest point
         if live_price:
-            history_dq.append(live_price)
             data["price"] = round(float(live_price), 2)
+            
+            should_append = False
+            if is_market_open():
+                should_append = True
+            elif len(history_dq) == 0:
+                should_append = True
+            elif len(history_dq) > 0 and history_dq[-1] != float(live_price):
+                should_append = True
+                
+            if should_append:
+                history_dq.append(float(live_price))
+                
         # 4. Technical Recalculation
         _recalculate_technicals(ticker)
         
@@ -615,7 +714,8 @@ def refresh_market_data():
     print("✅ Market state synchronized.")
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=refresh_market_data, trigger="interval", seconds=60)
+# Increased interval to 5 minutes to avoid job overlap and yfinance rate limits
+scheduler.add_job(func=refresh_market_data, trigger="interval", seconds=300)
 
 def setup_firebase():
     global db
@@ -668,19 +768,17 @@ cleanup_old_signals()
 def scan_market():
     try:
         global db
-        now_cairo = pd.Timestamp.now(tz='Africa/Cairo')
-        if now_cairo.weekday() not in [0, 1, 2, 3, 6]:
-            print("Outside EGX trading days (Fri-Sat).")
-            return
-            
-        current_time_float = now_cairo.hour + now_cairo.minute / 60.0
-        if not (10.0 <= current_time_float <= 14.5):
-            print(f"Outside EGX hours ({now_cairo.strftime('%H:%M')}).")
+        if not is_market_open():
+            print("Outside EGX trading hours. Skipping scan.")
             return
             
         print("Starting Market Scan...")
         tickers_str = " ".join(EGX_100)
-        data = yf.download(tickers_str, period="2mo", interval="1d", group_by="ticker", auto_adjust=False, prepost=False, threads=True)
+        data = None
+        try:
+            data = yf.download(tickers_str, period="2mo", interval="1d", group_by="ticker", auto_adjust=False, prepost=False, threads=True, timeout=20)
+        except Exception as yfe:
+            print(f"⚠️ Bulk yfinance download failed: {yfe}")
         
         if db is None: 
             return
@@ -695,16 +793,29 @@ def scan_market():
             
             volume_spike = False
             try:
-                if ticker in EGX_100:
-                    if len(EGX_100) == 1:
-                        df = data
-                    else:
-                        df = data[ticker]
-                    if not df.empty and len(df) > 1:
-                        avg_vol = df['Volume'].iloc[-30:-1].mean()
-                        current_vol = df['Volume'].iloc[-1]
-                        if avg_vol > 0 and current_vol > (3 * avg_vol):
-                            volume_spike = True
+                # Get historical data for volume analysis
+                df = None
+                if data is not None and not data.empty:
+                    if ticker in EGX_100:
+                        if len(EGX_100) == 1: df = data
+                        else: df = data.get(ticker)
+                
+                # Fallback to TvDatafeed for volume if yfinance failed
+                if (df is None or df.empty) and ticker in EGX_100:
+                    try:
+                        tv = get_tv_client()
+                        if tv:
+                            tv_ticker = ticker.replace('.CA', '')
+                            df = tv.get_hist(symbol=tv_ticker, exchange='EGX', interval=Interval.in_daily, n_bars=30)
+                            if df is not None:
+                                df.rename(columns={'volume': 'Volume'}, inplace=True)
+                    except: pass
+
+                if df is not None and not df.empty and len(df) > 1:
+                    avg_vol = df['Volume'].iloc[-30:-1].mean()
+                    current_vol = df['Volume'].iloc[-1]
+                    if avg_vol > 0 and current_vol > (3 * avg_vol):
+                        volume_spike = True
             except Exception as e:
                 pass
                 
@@ -715,21 +826,29 @@ def scan_market():
                     
                 msg = f"{ticker} is showing strong opportunities at {current_price} EGP."
                 
-                recent_signals = db.collection('market_signals').where(filter=firestore.FieldFilter('ticker', '==', ticker)).where(filter=firestore.FieldFilter('type', '==', signal_type)).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(1).stream()
-                recent_list = list(recent_signals)
                 recently_alerted = False
-                if recent_list:
-                    last_alert_time = recent_list[0].to_dict().get('timestamp')
-                    if last_alert_time:
-                        try:
-                            # Handling Datetime With Timezone
+                try:
+                    recent_signals = db.collection('market_signals') \
+                        .where(filter=firestore.FieldFilter('ticker', '==', ticker)) \
+                        .where(filter=firestore.FieldFilter('type', '==', signal_type)) \
+                        .order_by('timestamp', direction=firestore.Query.DESCENDING) \
+                        .limit(1).stream()
+                    
+                    recent_list = list(recent_signals)
+                    if recent_list:
+                        last_alert_time = recent_list[0].to_dict().get('timestamp')
+                        if last_alert_time:
                             import pytz
                             if last_alert_time.tzinfo is None:
                                 last_alert_time = last_alert_time.replace(tzinfo=pytz.UTC)
                             if (datetime.now(pytz.UTC) - last_alert_time).total_seconds() < 3600 * 4:
                                 recently_alerted = True
-                        except Exception as e:
-                            pass
+                except Exception as e:
+                    # Likely missing index error, log it but don't stop the scan
+                    if "index" in str(e).lower():
+                        print(f"⚠️ Index required for signal check ({ticker}). Please create it in Firebase Console.")
+                    else:
+                        print(f"Signal check error: {e}")
 
                 if not recently_alerted:
                     db.collection('market_signals').add({
@@ -859,6 +978,10 @@ scheduler.add_job(
 )
 scheduler.start()
 
+# Trigger an initial refresh in the background immediately on startup
+import threading
+threading.Thread(target=refresh_market_data).start()
+
 @app.route('/api/egx/all')
 def get_all():
     ticker_symbol = request.args.get('ticker_symbol') or request.args.get('ticker')
@@ -871,9 +994,11 @@ def get_all():
         combined_news = macro_news + stock_news
         market_news_str = "\n".join(combined_news)
         
-    # If the app just started and cache is empty of prices, force one refresh
+    # If cache is empty, trigger a background refresh (non-blocking)
     all_zero = all(v['price'] == 0.0 for v in MARKET_DATA_CACHE.values())
-    if all_zero: refresh_market_data()
+    if all_zero:
+        import threading
+        threading.Thread(target=refresh_market_data).start()
     
     # Safe JSON sanitization: prevent NaN or Infinity from breaking JSON spec
     safe_stocks = {}

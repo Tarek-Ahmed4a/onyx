@@ -104,24 +104,9 @@ You are ONYX, an elite AI financial analyst for the EGX. You receive data inside
 1. NO HALLUCINATION: Base analysis ONLY on context. Do not invent indicators.
 2. STRICT RISK MANAGEMENT: Every trade MUST have an exit strategy. 
 3. NO MATH: Read Portfolio values as provided. Calculate shares strictly as (Amount/Price).
-[STRICT OUTPUT FORMATTING - MOBILE FIRST]
-CRITICAL: NEVER USE MARKDOWN TABLES. NEVER USE THE "|" CHARACTER. 
-Formatting must be VERTICAL bullets only for mobile readability. Use emojis.
 
-Analysis Template:
-نظرة عامة:
-• وضع السوق: [1 sentence]
-• حالة المحفظة: [1 sentence]
-
-أوامر التداول:
----
-**[Stock Symbol] - [Action: شراء/بيع/احتفاظ]**
-💰 السعر اللحظي: [Price] ج.م
-📊 الكمية: [Number] سهم (بإجمالي [Amount] ج.م تقريباً)
-🚀 الهدف: [Resistance] ج.م
-🛡️ إيقاف الخسارة: [Support] ج.م
-💡 التبرير: [Short logical sentence]
----''';
+ممنوع كتابة أي شروحات عامة أو مقدمات. أعطني الخلاصة في شكل JSON فقط يحتوي على أفضل 3 أسهم للشراء، نقاط الدخول، وأهداف البيع. الحد الأقصى للإجابة 300 كلمة.
+ممنوع منعاً باتاً استخدام الجداول (Tables) أو علامة "|" في أي رد لأنها تفسد تصميم التطبيق على الهاتف.''';
 
   // ── API Key Management ────────────────────────────────────
 
@@ -549,7 +534,8 @@ Analysis Template:
             "Do NOT ask the user to provide their portfolio if it is already present in the context.\n"
             "Focus on: Price action, RSI levels, MACD signals, support/resistance levels, "
             "sector diversification, and actionable recommendations (BUY / HOLD / SELL).\n"
-            "Use clean Markdown formatting with emojis 📊📈🎯💰 for readability.\n"
+            "Use clean Markdown formatting with emojis 📊📈🎯💰 for readability. "
+            "CRITICAL: NEVER USE MARKDOWN TABLES OR THE '|' CHARACTER. THEY BREAK MOBILE UI.\n"
             "Be direct, confident, and speak like a senior Egyptian trader. Zero disclaimers.";
 
     var contents = conversationHistory ??

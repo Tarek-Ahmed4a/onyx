@@ -296,12 +296,11 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
             (info['rsi'] is num) ? (info['rsi'] as num).toDouble() : 50.0;
         final String macd = (info['macd'] as String? ?? '').toLowerCase();
 
-        final bool isOversold = rsi <= 35;
-        final bool isOverbought = rsi >= 70;
-        final bool isMacdSignal =
-            macd.contains('bullish') || macd.contains('bearish');
+        final bool isOversold = rsi < 40;
+        final double volVal = (info['volume'] is num) ? (info['volume'] as num).toDouble() : 0.0;
+        final bool hasHighVolume = volVal > 500000; // Filter for high volume stocks
 
-        if (isOversold || isOverbought || isMacdSignal) {
+        if (isOversold || hasHighVolume) {
           final change = info['change'] ?? '0';
           final vol = info['volume'] ?? '0';
           final support = info['support'] ?? '0';
