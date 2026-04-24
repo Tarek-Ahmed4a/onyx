@@ -976,6 +976,13 @@ scheduler.add_job(
     minute=45,
     timezone='Africa/Cairo'
 )
+scheduler.add_job(
+    func=cleanup_old_signals,
+    trigger="cron",
+    hour=2,
+    minute=0,
+    timezone='Africa/Cairo'
+)
 scheduler.start()
 
 # Trigger an initial refresh in the background immediately on startup

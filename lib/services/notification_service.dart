@@ -49,6 +49,19 @@ class NotificationService {
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await androidImplementation?.requestNotificationsPermission();
     await androidImplementation?.requestExactAlarmsPermission();
+
+    // Foreground Firebase Messaging listener
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      final notification = message.notification;
+      if (notification != null) {
+        showNotification(
+          id: notification.hashCode,
+          title: notification.title ?? 'New Alert',
+          body: notification.body ?? '',
+          payload: message.data.toString(),
+        );
+      }
+    });
   }
 
   // ==========================================
