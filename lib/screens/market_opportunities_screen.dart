@@ -7,8 +7,25 @@ import '../widgets/elite_card.dart';
 import 'calendar_screen.dart';
 import 'profile_screen.dart';
 
-class MarketOpportunitiesScreen extends StatelessWidget {
+class MarketOpportunitiesScreen extends StatefulWidget {
   const MarketOpportunitiesScreen({super.key});
+
+  @override
+  State<MarketOpportunitiesScreen> createState() => _MarketOpportunitiesScreenState();
+}
+
+class _MarketOpportunitiesScreenState extends State<MarketOpportunitiesScreen> {
+  late final Stream<QuerySnapshot> _signalsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _signalsStream = FirebaseFirestore.instance
+        .collection('market_signals')
+        .orderBy('timestamp', descending: true)
+        .limit(50)
+        .snapshots();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,11 +34,7 @@ class MarketOpportunitiesScreen extends StatelessWidget {
       body: Stack(
         children: [
           StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('market_signals')
-                .orderBy('timestamp', descending: true)
-                .limit(50)
-                .snapshots(),
+            stream: _signalsStream,
             builder: (context, snapshot) {
               return CustomScrollView(
                 slivers: [

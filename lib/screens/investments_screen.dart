@@ -233,6 +233,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
   String _marketSearchQuery = '';
   String _marketFilter = 'Stocks';
   final Map<String, TextEditingController> _qtyControllers = {};
+  final Map<String, Future<QuerySnapshot>> _historyFutures = {};
 
   @override
   void dispose() {
@@ -1470,16 +1471,19 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                       const SizedBox(height: 16),
                       SizedBox(
                         height: 100,
-                        child: StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(FirebaseAuth.instance.currentUser?.uid)
-                              .collection('investments')
-                              .doc(activePortfolio.id)
-                              .collection('portfolio_snapshots')
-                              .orderBy('timestamp', descending: true)
-                              .limit(14) // Fetch last 2 weeks for trend
-                              .snapshots(),
+                        child: FutureBuilder<QuerySnapshot>(
+                          future: _historyFutures.putIfAbsent(
+                            activePortfolio.id,
+                            () => FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(FirebaseAuth.instance.currentUser?.uid)
+                                .collection('investments')
+                                .doc(activePortfolio.id)
+                                .collection('portfolio_snapshots')
+                                .orderBy('timestamp', descending: true)
+                                .limit(14) // Fetch last 2 weeks for trend
+                                .get(const GetOptions(source: Source.serverAndCache)),
+                          ),
                           builder: (context, snapshot) {
                             if (snapshot.connectionState ==
                                 ConnectionState.waiting) {
