@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:animations/animations.dart';
-import 'dart:ui';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:firebase_core/firebase_core.dart';
@@ -12,16 +11,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'screens/market_opportunities_screen.dart';
 import 'firebase_options.dart';
 import 'services/market_data_service.dart';
 import 'services/notification_service.dart';
-import 'screens/tasks_screen.dart';
 import 'screens/investments_screen.dart';
-import 'screens/expenses_screen.dart';
-import 'screens/login_screen.dart';
 import 'screens/chat_screen.dart';
 import 'config/api_keys.dart';
+import 'screens/market_screen.dart';
+import 'models/mock_market_data.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -102,43 +99,43 @@ class FinanceApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Onyx',
         themeMode:
-            ThemeMode.dark, // Force dark mode for global OLED minimalist theme
-        darkTheme: ThemeData(
-          brightness: Brightness.dark,
-          scaffoldBackgroundColor: const Color(0xFF000000), // OLED Black
-          cardColor: const Color(0xFF121212), // Slightly lighter for cards
+            ThemeMode.light, // Force light mode for the new White Theme
+        theme: ThemeData(
+          brightness: Brightness.light,
+          scaffoldBackgroundColor: const Color(0xFFF2F2F7), // Neutral Gray
+          cardColor: const Color(0xFFFFFFFF), // White
           cardTheme: CardThemeData(
-            color: const Color(0xFF121212),
-            elevation: 8,
-            shadowColor: Colors.black.withValues(alpha: 0.6),
+            color: const Color(0xFFFFFFFF),
+            elevation: 2,
+            shadowColor: Colors.black.withValues(alpha: 0.05),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(24),
             ),
           ),
           colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFFFFFFFF),
-            brightness: Brightness.dark,
-            primary: const Color(0xFFFFFFFF), // Primary accent color (White)
-            onPrimary: const Color(0xFF000000), // Text on primary
-            surface: const Color(0xFF121212),
+            seedColor: const Color(0xFF000000),
+            brightness: Brightness.light,
+            primary: const Color(0xFF000000), // Primary accent color (Black)
+            onPrimary: const Color(0xFFFFFFFF), // Text on primary
+            surface: const Color(0xFFFFFFFF),
           ),
-          textTheme: GoogleFonts.outfitTextTheme(
-            const TextTheme(
-              bodyLarge: TextStyle(color: Color(0xFFE0E0E0)),
-              bodyMedium: TextStyle(color: Color(0xFFE0E0E0)),
-              bodySmall: TextStyle(color: Color(0xFFA0A0A0)),
-              titleLarge: TextStyle(
-                  color: Color(0xFFFFFFFF), fontWeight: FontWeight.w600),
-              titleMedium: TextStyle(
-                  color: Color(0xFFFFFFFF), fontWeight: FontWeight.w600),
-              titleSmall: TextStyle(
-                  color: Color(0xFFFFFFFF), fontWeight: FontWeight.w600),
-              headlineLarge: TextStyle(
-                  color: Color(0xFFFFFFFF), fontWeight: FontWeight.w700),
-              headlineMedium: TextStyle(
-                  color: Color(0xFFFFFFFF), fontWeight: FontWeight.w700),
-              headlineSmall: TextStyle(
-                  color: Color(0xFFFFFFFF), fontWeight: FontWeight.w700),
+          textTheme: GoogleFonts.interTextTheme(
+            TextTheme(
+              bodyLarge: const TextStyle(color: Color(0xFF000000)),
+              bodyMedium: const TextStyle(color: Color(0xFF000000)),
+              bodySmall: const TextStyle(color: Color(0xFF666666)),
+              titleLarge: GoogleFonts.manrope(
+                  color: const Color(0xFF000000), fontWeight: FontWeight.w600),
+              titleMedium: GoogleFonts.manrope(
+                  color: const Color(0xFF000000), fontWeight: FontWeight.w600),
+              titleSmall: GoogleFonts.manrope(
+                  color: const Color(0xFF000000), fontWeight: FontWeight.w600),
+              headlineLarge: GoogleFonts.manrope(
+                  color: const Color(0xFF000000), fontWeight: FontWeight.w700),
+              headlineMedium: GoogleFonts.manrope(
+                  color: const Color(0xFF000000), fontWeight: FontWeight.w700),
+              headlineSmall: GoogleFonts.manrope(
+                  color: const Color(0xFF000000), fontWeight: FontWeight.w700),
             ),
           ),
           appBarTheme: const AppBarTheme(
@@ -149,17 +146,20 @@ class FinanceApp extends StatelessWidget {
               fontSize: 20,
               fontWeight: FontWeight.w900,
               letterSpacing: -0.5,
-              color: Colors.white,
+              color: Colors.black,
             ),
+            iconTheme: IconThemeData(color: Colors.black),
           ),
           bottomNavigationBarTheme: const BottomNavigationBarThemeData(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            selectedItemColor: Colors.white,
-            unselectedItemColor: Color(0xFF757575),
+            selectedItemColor: Color(0xFF000000),
+            unselectedItemColor: Color(0xFF999999),
             type: BottomNavigationBarType.fixed,
-            showSelectedLabels: false,
-            showUnselectedLabels: false,
+            showSelectedLabels: true,
+            showUnselectedLabels: true,
+            selectedLabelStyle: TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+            unselectedLabelStyle: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
           ),
           useMaterial3: true,
           pageTransitionsTheme: const PageTransitionsTheme(
@@ -186,56 +186,14 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(color: Colors.white),
-            ),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Authentication Error:\n${snapshot.error}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => setState(() {}), // Trigger rebuild/retry
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        if (snapshot.hasData && snapshot.data != null) {
-          // Trigger a single market data fetch on login
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            final service =
-                Provider.of<MarketDataService>(context, listen: false);
-            if (!service.hasData && !service.isLoading) {
-              service.fetchAllMarketData();
-            }
-          });
-          return const MainScaffold();
-        }
-
-        return const LoginScreen();
-      },
-    );
+    // Authentication disabled, go directly to MainScaffold
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final service = Provider.of<MarketDataService>(context, listen: false);
+      if (!service.hasData && !service.isLoading) {
+        service.fetchAllMarketData();
+      }
+    });
+    return const MainScaffold();
   }
 }
 
@@ -321,10 +279,11 @@ class _MainScaffoldState extends State<MainScaffold> {
   }
 
   final List<Widget> _screens = const [
-    TasksScreen(),
     InvestmentsScreen(),
-    MarketOpportunitiesScreen(),
-    ExpensesScreen(),
+    MarketScreen(marketName: 'Egyptian Market', stocks: MockMarketData.egyptStocks, funds: MockMarketData.egyptFunds),
+    ChatScreen(),
+    MarketScreen(marketName: 'Tadawul', stocks: MockMarketData.saudiStocks),
+    MarketScreen(marketName: 'DFM & ADX', stocks: MockMarketData.uaeStocks),
   ];
 
   void _onTabTapped(int index) {
@@ -388,88 +347,64 @@ class _MainScaffoldState extends State<MainScaffold> {
         physics: const BouncingScrollPhysics(),
         children: _screens,
       ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.only(bottom: 24.0, left: 24.0, right: 24.0),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(30),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-            child: Container(
-              color: Colors.white.withValues(alpha: 0.05),
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  Theme(
-                    data: Theme.of(context).copyWith(
-                      splashColor: Colors.transparent,
-                      highlightColor: Colors.transparent,
-                    ),
-                    child: BottomNavigationBar(
-                      backgroundColor: Colors.transparent,
-                      elevation: 0,
-                      type: BottomNavigationBarType.fixed,
-                      showSelectedLabels: false,
-                      showUnselectedLabels: false,
-                      currentIndex:
-                          _currentIndex < 2 ? _currentIndex : _currentIndex + 1,
-                      onTap: (index) {
-                        HapticFeedback.lightImpact(); // Premium Haptic Feedback
-                        if (index == 2) return;
-                        final pageIndex = index > 2 ? index - 1 : index;
-                        _onTabTapped(pageIndex);
-                      },
-                      items: const [
-                        BottomNavigationBarItem(
-                          icon: Icon(Icons
-                              .assignment_turned_in), // Market Analysis (Tasks)
-                          label: '',
-                        ),
-                        BottomNavigationBarItem(
-                          icon: Icon(
-                              Icons.trending_up), // My Portfolio (Investments)
-                          label: '',
-                        ),
-                        BottomNavigationBarItem(
-                          icon: SizedBox(
-                              width: 24, height: 24), // Center placeholder
-                          label: '',
-                        ),
-                        BottomNavigationBarItem(
-                          icon: Icon(Icons.track_changes), // Opportunity Radar
-                          label: '',
-                        ),
-                        BottomNavigationBarItem(
-                          icon: Icon(Icons.account_balance_wallet), // Expenses
-                          label: '',
-                        ),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    child: FloatingActionButton(
-                      heroTag: null,
-                      onPressed: () {
-                        HapticFeedback.mediumImpact();
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const ChatScreen()),
-                        );
-                      },
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      shape: const CircleBorder(),
-                      elevation: 4,
-                      child: Icon(
-                        Icons.auto_awesome,
-                        color: Theme.of(context).colorScheme.onPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFFFF),
+          border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildNavItem(0, 'WALLET', Icons.account_balance_wallet_outlined),
+                _buildNavItem(1, 'EGX', Icons.flag_outlined),
+                _buildNavItem(2, 'AI CHAT', Icons.smart_toy_outlined),
+                _buildNavItem(3, 'TADAWUL', Icons.mosque_outlined),
+                _buildNavItem(4, 'DFM', Icons.public_outlined),
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, String label, IconData icon) {
+    final isSelected = _currentIndex == index;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _onTabTapped(index);
+      },
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+        decoration: isSelected
+            ? BoxDecoration(
+                color: const Color(0xFFF2F2F7),
+                borderRadius: BorderRadius.circular(12),
+              )
+            : null,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? const Color(0xFF000000) : const Color(0xFF8E8E93),
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                color: isSelected ? const Color(0xFF000000) : const Color(0xFF8E8E93),
+              ),
+            ),
+          ],
         ),
       ),
     );

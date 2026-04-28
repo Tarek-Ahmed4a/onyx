@@ -51,11 +51,11 @@ class EliteHeader extends StatelessWidget {
                   icon: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                      border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
                     ),
-                    child: const Icon(Icons.arrow_back, size: 20, color: Colors.white),
+                    child: const Icon(Icons.arrow_back, size: 20, color: Colors.black),
                   ),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -89,8 +89,8 @@ class EliteHeader extends StatelessWidget {
             ),
             const SizedBox(height: 1),
             Shimmer.fromColors(
-              baseColor: Colors.white,
-              highlightColor: Colors.white.withValues(alpha: 0.5),
+              baseColor: Colors.black,
+              highlightColor: Colors.black.withValues(alpha: 0.5),
               child: Text(
                 displayName,
                 style: const TextStyle(

@@ -8,22 +8,23 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/market_data_service.dart';
 import '../services/onyx_ai_router_service.dart';
 import '../widgets/elite_header.dart';
+import 'profile_screen.dart';
 
 // ─────────────────────────────────────────────────────────────
 // CONSTANTS & THEME TOKENS
 // ─────────────────────────────────────────────────────────────
 
 class _ChatColors {
-  static const Color background = Color(0xFF000000);
-  static const Color surfaceLight = Color(0xFF151515);
-  static const Color userBubble = Color(0xFF1E1E1E);
-  static const Color aiBubble = Color(0xFF0A0A0A);
-  static const Color aiBorder = Color(0xFF222222);
-  static const Color accentGlow = Colors.blueAccent;
-  static const Color textPrimary = Color(0xFFEEEEEE);
-  static const Color textSecondary = Color(0xFF888888);
-  static const Color inputBg = Color(0xFF0D0D0D);
-  static const Color inputBorder = Color(0xFF222222);
+  static const Color background = Color(0xFFF2F2F7);
+  static const Color surfaceLight = Color(0xFFFFFFFF);
+  static const Color userBubble = Color(0xFFFFFFFF);
+  static const Color aiBubble = Color(0xFFFFFFFF);
+  static const Color aiBorder = Color(0xFFE5E5EA);
+  static const Color accentGlow = Color(0xFF000000);
+  static const Color textPrimary = Color(0xFF000000);
+  static const Color textSecondary = Color(0xFF666666);
+  static const Color inputBg = Color(0xFFFFFFFF);
+  static const Color inputBorder = Color(0xFFE5E5EA);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -303,7 +304,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                       floating: true,
                       pinned: false,
                       leading: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        icon: const Icon(Icons.arrow_back, color: Colors.black),
                         onPressed: () => Navigator.pop(context),
                       ),
                       actions: [
@@ -312,13 +313,19 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                           icon: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                              border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
                             ),
                             child: const Icon(Icons.delete_sweep_rounded, size: 18, color: Colors.redAccent),
                           ),
                           tooltip: 'Clear Chat',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.account_circle_outlined, color: Colors.black),
+                          onPressed: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen()));
+                          },
                         ),
                         const SizedBox(width: 8),
                       ],
@@ -470,7 +477,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           const Text(
             'ONYX AI',
             style: TextStyle(
-              color: Colors.white,
+              color: Colors.black,
               fontSize: 24,
               fontWeight: FontWeight.w900,
               letterSpacing: -0.5,
@@ -688,8 +695,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                             ? null
                             : const LinearGradient(
                                 colors: [
-                                  _ChatColors.userBubble,
-                                  _ChatColors.accentGlow,
+                                  Colors.black87,
+                                  Colors.black,
                                 ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
@@ -700,8 +707,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                             ? []
                             : [
                                 BoxShadow(
-                                  color: _ChatColors.accentGlow
-                                      .withValues(alpha: 0.3),
+                                  color: Colors.black.withValues(alpha: 0.2),
                                   blurRadius: 12,
                                   offset: const Offset(0, 2),
                                 ),
@@ -796,17 +802,7 @@ class _MessageBubble extends StatelessWidget {
               ),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                gradient: isUser
-                    ? LinearGradient(
-                        colors: [
-                          _ChatColors.userBubble,
-                          _ChatColors.userBubble.withValues(alpha: 0.7)
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: isUser ? null : _ChatColors.aiBubble,
+                color: isUser ? _ChatColors.userBubble : _ChatColors.aiBubble,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(20),
                   topRight: const Radius.circular(20),
@@ -817,9 +813,7 @@ class _MessageBubble extends StatelessWidget {
                       ? const Radius.circular(4)
                       : const Radius.circular(20),
                 ),
-                border: isUser
-                    ? null
-                    : Border.all(
+                border: Border.all(
                         color: _ChatColors.aiBorder.withValues(alpha: 0.5),
                         width: 1,
                       ),
@@ -842,7 +836,7 @@ class _MessageBubble extends StatelessWidget {
                       ? Text(
                           message.text,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: Colors.black,
                             fontSize: 15,
                             height: 1.5,
                           ),
@@ -1064,27 +1058,17 @@ class _MessageBubble extends StatelessWidget {
       width: 32,
       height: 32,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            _ChatColors.userBubble,
-            _ChatColors.userBubble.withValues(alpha: 0.7)
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: _ChatColors.aiBubble,
         borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: _ChatColors.userBubble.withValues(alpha: 0.2),
-            blurRadius: 6,
-          ),
-        ],
+        border: Border.all(
+          color: _ChatColors.aiBorder.withValues(alpha: 0.5),
+        ),
       ),
       child: Center(
         child: Text(
           initial,
           style: const TextStyle(
-            color: Colors.white,
+            color: Colors.black,
             fontSize: 14,
             fontWeight: FontWeight.w700,
           ),

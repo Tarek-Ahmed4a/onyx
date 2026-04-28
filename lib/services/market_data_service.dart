@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+// import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,7 +11,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// Fetches data ONCE from /api/egx/all and exposes it to
 /// both Dashboard and AI Chat via Provider.
 class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
-  static const String _baseUrl = 'https://tarekahmed-onyx.hf.space/api';
+  // static const String _baseUrl = 'https://tarekahmed-onyx.hf.space/api';
 
   MarketDataService() {
     WidgetsBinding.instance.addObserver(this);
@@ -83,7 +83,18 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   /// Cached market data: { "COMI.CA": { "price": 85.5, "rsi": 62.3, "macd": "Bullish..." }, ... }
-  Map<String, dynamic> _stocksData = {};
+  Map<String, dynamic> _stocksData = {
+    'COMI.CA': {"price": 75.50, "rsi": 62.3, "macd": "Bullish", "support": 70.0, "resistance": 80.0, "change": 1.2, "volume": 1200500},
+    'HRHO.CA': {"price": 18.20, "rsi": 45.1, "macd": "Bearish", "support": 17.5, "resistance": 19.0, "change": -0.5, "volume": 850000},
+    'FWRY.CA': {"price": 5.40, "rsi": 71.2, "macd": "Bullish", "support": 5.0, "resistance": 6.0, "change": 2.1, "volume": 3200000},
+    'TMGH.CA': {"price": 26.80, "rsi": 55.4, "macd": "Neutral", "support": 25.0, "resistance": 28.0, "change": 0.8, "volume": 1500000},
+    'ESRS.CA': {"price": 65.30, "rsi": 38.2, "macd": "Bearish", "support": 60.0, "resistance": 70.0, "change": -1.5, "volume": 420000},
+    'ORAS.CA': {"price": 195.00, "rsi": 50.0, "macd": "Neutral", "support": 190.0, "resistance": 200.0, "change": 0.0, "volume": 120000},
+    'SWDY.CA': {"price": 32.10, "rsi": 68.5, "macd": "Bullish", "support": 30.0, "resistance": 35.0, "change": 3.4, "volume": 2100000},
+    'ABUK.CA': {"price": 85.00, "rsi": 48.9, "macd": "Neutral", "support": 80.0, "resistance": 90.0, "change": -0.2, "volume": 650000},
+    'AMOC.CA': {"price": 9.75, "rsi": 42.1, "macd": "Bearish", "support": 9.0, "resistance": 10.5, "change": -1.1, "volume": 1800000},
+    'EAST.CA': {"price": 24.50, "rsi": 58.6, "macd": "Bullish", "support": 23.0, "resistance": 26.0, "change": 1.5, "volume": 950000},
+  };
   Map<String, dynamic> get stocksData => _stocksData;
 
   bool _isLoading = false;
@@ -113,18 +124,14 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
   /// Fetches all assets from the user's portfolios and caches them.
   /// This should be called once on init and whenever the UI updates investments.
   Future<void> fetchUserAssets() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      _cachedUserAssets = [];
-      return;
-    }
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'guest_user';
 
     try {
       // Prioritize Cache with source: Source.cache
       // If we are offline, this will return the cached data immediately.
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
-          .doc(user.uid)
+          .doc(uid)
           .collection('investments')
           .get(const GetOptions(source: Source.serverAndCache));
 
@@ -170,61 +177,19 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     try {
-      final response = await http
-          .get(Uri.parse('$_baseUrl/egx/all'))
-          .timeout(const Duration(seconds: 45)); // Extended timeout
-
-      if (response.statusCode == 200) {
-        // Wrap everything else in its own try-catch for granular failure handling
-        try {
-          final Map<String, dynamic> body = json.decode(response.body);
-          final dynamic stocksRaw = body['stocks'];
-
-          final Map<String, dynamic> newMap = {};
-
-          if (stocksRaw is Map) {
-            stocksRaw.forEach((ticker, data) {
-              try {
-                if (data is Map) {
-                  newMap[ticker] = {
-                    "price": _parseNum(data["price"]),
-                    "rsi": _parseNum(data["rsi"], defaultVal: 50.0),
-                    "macd": data["macd"] ?? "Neutral",
-                    "support": _parseNum(data["support"]),
-                    "resistance": _parseNum(data["resistance"]),
-                    "change": _parseNum(data["change"]),
-                    "volume": _parseNum(data["volume"]),
-                    "source": data["source"] ?? "Unknown",
-                  };
-                }
-              } catch (e) {
-                debugPrint('⚠️ MarketDataService skipping ticker $ticker: $e');
-              }
-            });
-          }
-
-          _stocksData = newMap;
-          _news = (body['news'] as List?)?.map((e) => e.toString()).toList() ?? [];
-          _macro = (body['macro'] as Map?)?.cast<String, dynamic>() ?? {};
-          _breadth = body['breadth']?.toString() ?? 'Unknown';
-          _lastUpdated = body['last_updated'] as String?;
-          _error = null;
-
-          // Save for offline/instant-on
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('cached_market_data', response.body);
-
-          debugPrint(
-              '✅ MarketDataService: Loaded ${_stocksData.length} tickers');
-        } catch (je) {
-          _error = 'JSON Parsing Error: $je';
-          debugPrint('❌ MarketDataService JSON Error: $je');
-          // Don't clear _stocksData here to keep stale data visible
-        }
-      } else {
-        _error = 'Server returned ${response.statusCode}';
-        debugPrint('❌ MarketDataService: $_error');
-      }
+      // Replace with your actual API when ready
+      // final response = await http.get(Uri.parse('$_baseUrl/egx/all')).timeout(const Duration(seconds: 45));
+      // if (response.statusCode == 200) {
+      //   final Map<String, dynamic> body = json.decode(response.body);
+      //   ...
+      // }
+      
+      // Simulate network delay for API readiness
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // We already populated _stocksData with 10 mock stocks.
+      _error = null;
+      debugPrint('✅ MarketDataService: Mock data loaded successfully');
     } catch (e) {
       _error = 'Connection error: $e';
       debugPrint('❌ MarketDataService fetch error: $e');

@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/notification_service.dart';
-import '../widgets/elite_header.dart';
-import '../widgets/elite_card.dart';
 import '../widgets/custom_toast.dart';
-import 'calendar_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,14 +14,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _backgroundAlertsEnabled = true;
   bool _appLockEnabled = false;
   bool _isLoadingPrefs = true;
-  final TextEditingController _nameController = TextEditingController();
-  bool _isUpdatingName = false;
+  final TextEditingController _nameController = TextEditingController(text: 'Onyx User');
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
-    _nameController.text = FirebaseAuth.instance.currentUser?.displayName ?? '';
   }
 
   @override
@@ -34,48 +28,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  Future<void> _updateName() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final newName = _nameController.text.trim();
-    if (newName.isEmpty) return;
-
-    setState(() => _isUpdatingName = true);
-
+  Future<void> _loadSettings() async {
     try {
-      await user.updateDisplayName(newName);
-      await user.reload();
-      
+      final prefs = await SharedPreferences.getInstance();
       if (mounted) {
-        CustomToast.show(
-          context: context,
-          message: 'Name updated successfully | GOOD LUCK',
-          icon: Icons.check_circle_outline,
-          color: Colors.greenAccent,
-        );
+        setState(() {
+          _backgroundAlertsEnabled = prefs.getBool('background_alerts_enabled') ?? true;
+          _appLockEnabled = prefs.getBool('app_lock_enabled') ?? false;
+          _nameController.text = prefs.getString('display_name') ?? 'Onyx User';
+          _isLoadingPrefs = false;
+        });
       }
     } catch (e) {
-      if (mounted) {
-        CustomToast.show(
-          context: context,
-          message: 'Failed to update name',
-          icon: Icons.error_outline,
-          color: Colors.redAccent,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isUpdatingName = false);
+      if (mounted) setState(() => _isLoadingPrefs = false);
     }
   }
 
-  Future<void> _loadSettings() async {
+  Future<void> _updateName() async {
+    final newName = _nameController.text.trim();
+    if (newName.isEmpty) return;
+
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _backgroundAlertsEnabled = prefs.getBool('background_alerts_enabled') ?? true;
-      _appLockEnabled = prefs.getBool('app_lock_enabled') ?? false;
-      _isLoadingPrefs = false;
-    });
+    await prefs.setString('display_name', newName);
+
+    if (mounted) {
+      CustomToast.show(
+        context: context,
+        message: 'Name updated successfully',
+        icon: Icons.check_circle_outline,
+        color: const Color(0xFF34C759),
+      );
+    }
   }
 
   Future<void> _toggleBackgroundAlerts(bool value) async {
@@ -87,9 +70,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (value) {
       await NotificationService().subscribeToMarketOpportunities();
-    } else {
-      // Unsubscribe logic could be added here
-      debugPrint("FCM Topic Unsubscription not implemented in this UI demo.");
     }
   }
 
@@ -103,219 +83,215 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            title: const Text('Settings', style: TextStyle(fontWeight: FontWeight.bold)),
-            backgroundColor: Colors.black,
-            floating: true,
-            pinned: true,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.calendar_today_outlined, color: Colors.white),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const CalendarScreen()),
-                  );
-                },
-              ),
-            ],
+      backgroundColor: const Color(0xFFF2F2F7),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF2F2F7),
+        elevation: 0,
+        title: const Text(
+          'Settings',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
+            fontSize: 22,
           ),
-          const SliverToBoxAdapter(
-            child: EliteHeader(
-              title: 'Preferences & Profile',
-              showBackButton: false,
-              showGreeting: false,
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            sliver: uid == null
-                ? SliverToBoxAdapter(child: _buildAccessRestricted())
-                : _buildProfileSliverContent(),
-          ),
-        ],
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
-    );
-  }
-
-  Widget _buildAccessRestricted() {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.6,
-      alignment: Alignment.center,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      body: ListView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         children: [
-          const Icon(Icons.lock_outline, size: 64, color: Colors.grey),
-          const SizedBox(height: 16),
-          const Text(
-            'Access Restricted',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+          const SizedBox(height: 10),
+          // Avatar
+          Center(
+            child: Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.grey.shade300),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.person, size: 40, color: Colors.black54),
+            ),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Please sign in to view your profile.',
-            style: TextStyle(color: Colors.grey),
+          const SizedBox(height: 12),
+          Center(
+            child: Text(
+              _nameController.text,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
+              ),
+            ),
           ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () => FirebaseAuth.instance.signOut(),
-            child: const Text('Sign In'),
+          const SizedBox(height: 32),
+
+          // Personal Information Section
+          Text(
+            'PERSONAL INFORMATION',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade600,
+              letterSpacing: 1.2,
+            ),
           ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: _nameController,
+                  style: const TextStyle(color: Colors.black),
+                  decoration: InputDecoration(
+                    labelText: 'Display Name',
+                    labelStyle: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    hintText: 'Enter your name',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    prefixIcon: const Icon(Icons.person_outline, size: 20, color: Colors.black54),
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _updateName,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Update Name', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // Settings Section
+          Text(
+            'SETTINGS',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade600,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              children: [
+                _buildSettingRow(
+                  icon: Icons.radar_rounded,
+                  color: Colors.blueAccent,
+                  title: 'Alpha Signals & Radar',
+                  subtitle: 'Push alerts for Volume Spikes & Breakouts',
+                  value: _backgroundAlertsEnabled,
+                  onChanged: _isLoadingPrefs ? null : _toggleBackgroundAlerts,
+                ),
+                Divider(color: Colors.grey.shade200, height: 16),
+                _buildSettingRow(
+                  icon: Icons.fingerprint_rounded,
+                  color: const Color(0xFF34C759),
+                  title: 'App Lock',
+                  subtitle: 'Secure access with Biometrics / FaceID',
+                  value: _appLockEnabled,
+                  onChanged: _isLoadingPrefs ? null : _toggleAppLock,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // App Info
+          Text(
+            'APP INFO',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade600,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.info_outline, color: Colors.black54, size: 20),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Onyx',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                      Text(
+                        'Version 1.0.0 • Guest Mode',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 40),
         ],
       ),
-    );
-  }
-
-  Widget _buildProfileSliverContent() {
-    return SliverList(
-      delegate: SliverChildListDelegate([
-        const SizedBox(height: 10),
-        const Center(
-          child: CircleAvatar(
-            radius: 40,
-            backgroundColor: Color(0xFF1E1E1E),
-            child: Icon(Icons.person, size: 40, color: Colors.white),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Center(
-          child: Text(
-            FirebaseAuth.instance.currentUser?.displayName ?? 'Onyx User',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              letterSpacing: -0.5,
-            ),
-          ),
-        ),
-        const SizedBox(height: 32),
-        
-        // Personal Information Section
-        const Text(
-          'PERSONAL INFORMATION',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(height: 12),
-        EliteCard(
-          glowColor: Colors.purpleAccent,
-          margin: EdgeInsets.zero,
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Display Name',
-                  labelStyle: const TextStyle(fontSize: 12),
-                  hintText: 'Enter your name',
-                  prefixIcon: const Icon(Icons.person_outline, size: 20),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _isUpdatingName ? null : _updateName,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.05),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-                  ),
-                ),
-                child: _isUpdatingName 
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Update Name', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 32),
-        
-        // Settings Section
-        const Text(
-          'SETTINGS',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(height: 12),
-        EliteCard(
-          glowColor: Colors.blueAccent,
-          margin: EdgeInsets.zero,
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            children: [
-              _buildSettingRow(
-                icon: Icons.radar_rounded,
-                color: Colors.blueAccent,
-                title: 'Alpha Signals & Radar',
-                subtitle: 'Push alerts for Volume Spikes & Breakouts',
-                value: _backgroundAlertsEnabled,
-                onChanged: _isLoadingPrefs ? null : _toggleBackgroundAlerts,
-              ),
-              const Divider(color: Colors.white10, height: 16),
-              _buildSettingRow(
-                icon: Icons.fingerprint_rounded,
-                color: Colors.greenAccent,
-                title: 'App Lock',
-                subtitle: 'Secure access with Biometrics / FaceID',
-                value: _appLockEnabled,
-                onChanged: _isLoadingPrefs ? null : _toggleAppLock,
-              ),
-            ],
-          ),
-        ),
-        
-        const SizedBox(height: 48),
-        
-        // Sign Out Button
-        ElevatedButton(
-          onPressed: () => _confirmSignOut(),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            foregroundColor: Colors.redAccent,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.5)),
-            ),
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.logout_rounded),
-              SizedBox(width: 12),
-              Text('Sign Out', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-      ]),
     );
   }
 
@@ -347,7 +323,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black),
                 ),
                 Text(
                   subtitle,
@@ -364,29 +340,5 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _confirmSignOut() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Sign Out'),
-        content: const Text('Are you sure you want to sign out?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sign Out', style: TextStyle(color: Colors.redAccent)),
-          ),
-        ],
-      ),
-    );
-    
-    if (confirm == true) {
-      await FirebaseAuth.instance.signOut();
-    }
   }
 }

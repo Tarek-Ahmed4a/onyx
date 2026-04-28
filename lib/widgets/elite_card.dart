@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 
 class EliteCard extends StatelessWidget {
@@ -26,46 +25,30 @@ class EliteCard extends StatelessWidget {
         boxShadow: [
           if (glowColor != null)
             BoxShadow(
-              color: glowColor!.withValues(alpha: 0.3),
-              blurRadius: 25,
+              color: glowColor!.withValues(alpha: 0.1),
+              blurRadius: 15,
               spreadRadius: -2,
             ),
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: blur ?? 10, sigmaY: blur ?? 10),
-          child: Container(
-            padding: padding ?? const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: glowColor != null 
-                  ? glowColor!.withValues(alpha: 0.15) 
-                  : const Color(0xFF1E1E1E).withValues(alpha: 0.7),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: glowColor != null 
-                    ? glowColor!.withValues(alpha: 0.3) 
-                    : Colors.white.withValues(alpha: 0.05),
-                width: 1.5,
-              ),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withValues(alpha: 0.08),
-                  Colors.white.withValues(alpha: 0.02),
-                ],
-              ),
-            ),
-            child: child,
+      child: Container(
+        padding: padding ?? const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: glowColor != null 
+                ? glowColor!.withValues(alpha: 0.3) 
+                : Colors.grey.shade200,
+            width: 1.5,
           ),
         ),
+        child: child,
       ),
     );
   }
