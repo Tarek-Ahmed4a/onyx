@@ -1036,24 +1036,30 @@ def get_all():
     # Safe JSON sanitization: prevent NaN or Infinity from breaking JSON spec
     safe_stocks = {}
     for k, v in MARKET_DATA_CACHE.items():
-        # Mask out the deque object from JSON response
+        # Clean up name: pandas might have put float('nan')
+        name_val = v.get("name", k)
+        if isinstance(name_val, float) and math.isnan(name_val):
+            name_val = None
+            
         stock_data = {
-            "price": v["price"],
-            "rsi": v["rsi"],
-            "macd": v["macd"],
+            "price": v.get("price", 0.0),
+            "rsi": v.get("rsi", 50.0),
+            "macd": v.get("macd", "Neutral"),
             "support": v.get("support", 0.0),
             "resistance": v.get("resistance", 0.0),
             "change": v.get("change", 0.0),
             "volume": v.get("volume", 0),
-            "source": v.get("source", "Unknown"),
-            "name": v.get("name", k),
-            "is_fund": v.get("is_fund", False)
+            "source": str(v.get("source", "Unknown")),
+            "name": str(name_val) if name_val is not None else None,
+            "is_fund": bool(v.get("is_fund", False))
         }
-        # Final pass: check for any accidental NaN values
-        if not math.isfinite(stock_data['rsi']): stock_data['rsi'] = 50.0
-        if not math.isfinite(stock_data['price']): stock_data['price'] = 0.0
-        safe_stocks[k] = stock_data
-        
+        # Final pass: check for any accidental NaN values in floats
+        for field in ['price', 'rsi', 'support', 'resistance', 'change']:
+            val = stock_data[field]
+            if isinstance(val, float) and not math.isfinite(val):
+                stock_data[field] = 50.0 if field == 'rsi' else 0.0
+                
+        safe_stocks[k] = stock_data        
     return jsonify({
         "stocks": safe_stocks,
         "news": NEWS_CACHE,
