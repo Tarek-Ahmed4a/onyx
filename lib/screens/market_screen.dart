@@ -114,10 +114,22 @@ class _MarketScreenState extends State<MarketScreen> {
           
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
           
-          Consumer<MarketDataService>(
-            builder: (context, service, _) {
-              final items = _getDisplayedItems(context);
-              if (items.isEmpty) {
+          Selector<MarketDataService, List<String>>(
+            selector: (context, service) {
+              // We only care about the LIST of symbols here, not their prices.
+              // This selector will only trigger a rebuild of the ListView structure
+              // if the filtered list of symbols changes.
+              return _getDisplayedItems(context, service).map((s) => s['symbol'] as String).toList();
+            },
+            shouldRebuild: (prev, next) {
+              if (prev.length != next.length) return true;
+              for (int i = 0; i < prev.length; i++) {
+                if (prev[i] != next[i]) return true;
+              }
+              return false;
+            },
+            builder: (context, symbolList, _) {
+              if (symbolList.isEmpty) {
                 return const SliverFillRemaining(child: Center(child: CircularProgressIndicator()));
               }
               return SliverPadding(
@@ -127,9 +139,10 @@ class _MarketScreenState extends State<MarketScreen> {
                     (context, index) {
                       if (index.isOdd) return const Divider(height: 1, color: Color(0xFFF2F2F7));
                       final itemIndex = index ~/ 2;
-                      return StockListItem(stock: items[itemIndex], marketSuffix: widget.marketSuffix);
+                      final symbol = symbolList[itemIndex];
+                      return StockListItem(symbol: symbol, marketSuffix: widget.marketSuffix);
                     },
-                    childCount: items.length * 2 - 1,
+                    childCount: symbolList.length * 2 - 1,
                   ),
                 ),
               );
@@ -140,31 +153,69 @@ class _MarketScreenState extends State<MarketScreen> {
       ),
     );
   }
+
+  List<Map<String, dynamic>> _getDisplayedItems(BuildContext context, MarketDataService service) {
+    // Note: service is passed from Selector, or fetched with listen: false if called elsewhere.
+    List<Map<String, dynamic>> items = service.getStocksByMarket(
+      widget.marketSuffix, 
+      isFund: _selectedFilter == 'Mutual Funds'
+    );
+    
+    if (_searchQuery.isNotEmpty) {
+      items = items.where((s) => 
+        (s['symbol'] as String).toLowerCase().contains(_searchQuery.toLowerCase()) || 
+        (s['name'] as String? ?? '').toLowerCase().contains(_searchQuery.toLowerCase())
+      ).toList();
+    }
+    return items;
+  }
+
+  Widget _buildFilterChip(String label) {
+    final isSelected = _selectedFilter == label;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedFilter = label;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.black : const Color(0xFFE5E5EA),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.black,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class StockListItem extends StatelessWidget {
-  final Map<String, dynamic> stock;
+  final String symbol;
   final String marketSuffix;
 
-  const StockListItem({super.key, required this.stock, required this.marketSuffix});
+  const StockListItem({super.key, required this.symbol, required this.marketSuffix});
 
   @override
   Widget build(BuildContext context) {
-    final symbol = stock['symbol'] ?? '';
-    final name = stock['name'] ?? symbol;
-    final marketData = Provider.of<MarketDataService>(context, listen: false);
-
-    return StreamBuilder<String>(
-      stream: marketData.priceUpdates.where((s) => s == symbol),
-      builder: (context, snapshot) {
-        final currentData = marketData.stocksData[symbol] ?? stock;
-        // Use the name from the passed 'stock' map (which has the correct name from DB)
-        final displayName = stock['name']?.toString().isNotEmpty == true ? stock['name'] : (currentData['name'] ?? symbol);
+    return Selector<MarketDataService, Map<String, dynamic>?>(
+      selector: (context, service) => service.stocksData[symbol],
+      builder: (context, currentData, child) {
+        if (currentData == null) return const SizedBox.shrink();
+        
+        final displayName = currentData['name'] ?? symbol;
         final price = (currentData['price'] as num?)?.toDouble() ?? 0.0;
         final changePercent = (currentData['change'] as num?)?.toDouble() ?? 0.0;
         final rsi = (currentData['rsi'] as num?)?.toDouble() ?? 50.0;
         final isPositive = changePercent >= 0;
-        final indicatorStatus = rsi < 35 ? 'positive' : (rsi > 65 ? 'negative' : 'neutral');
+        final indicatorStatus = rsi < 40 ? 'positive' : (rsi > 70 ? 'negative' : 'neutral');
 
         return InkWell(
           onTap: () {
@@ -215,49 +266,6 @@ class StockListItem extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-
-
-  List<Map<String, dynamic>> _getDisplayedItems(BuildContext context) {
-    final service = Provider.of<MarketDataService>(context);
-    List<Map<String, dynamic>> items = service.getStocksByMarket(
-      widget.marketSuffix, 
-      isFund: _selectedFilter == 'Mutual Funds'
-    );
-    
-    if (_searchQuery.isNotEmpty) {
-      items = items.where((s) => 
-        (s['symbol'] as String).toLowerCase().contains(_searchQuery.toLowerCase()) || 
-        (s['name'] as String? ?? '').toLowerCase().contains(_searchQuery.toLowerCase())
-      ).toList();
-    }
-    return items;
-  }
-
-  Widget _buildFilterChip(String label) {
-    final isSelected = _selectedFilter == label;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedFilter = label;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.black : const Color(0xFFE5E5EA),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
     );
   }
 }

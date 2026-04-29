@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -160,13 +159,13 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Timer? _refreshTimer;
-  IO.Socket? _socket;
+  io.Socket? _socket;
 
   void initSocket() {
     final String socketUrl = _baseUrl.replaceAll('/api', '');
     debugPrint('🔌 MarketDataService: Connecting to WebSocket at $socketUrl');
     
-    _socket = IO.io(socketUrl, <String, dynamic>{
+    _socket = io.io(socketUrl, <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': true,
     });
@@ -179,13 +178,12 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
       if (data is Map) {
         final String symbol = data['s'] ?? '';
         if (symbol.isNotEmpty && _stocksData.containsKey(symbol)) {
-          _stocksData[symbol]['price'] = _parseNum(data['p']);
-          _stocksData[symbol]['change'] = _parseNum(data['c']);
+          // Immutable update: create a new map reference so Selector can detect changes
+          _stocksData[symbol] = Map<String, dynamic>.from(_stocksData[symbol])
+            ..['price'] = _parseNum(data['p'])
+            ..['change'] = _parseNum(data['c']);
           
-          // 1. Granular Update: Push to a specialized stream for this symbol
-          _priceUpdateController.add(symbol);
-          
-          // 2. Throttled UI Refresh: Notify listeners at most once every 500ms
+          // Throttled UI Refresh: Notify listeners at most once every 300ms (as suggested)
           _throttleUpdate();
         }
       }
@@ -194,14 +192,10 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
     _socket!.onDisconnect((_) => debugPrint('❌ MarketDataService: WebSocket Disconnected'));
   }
 
-  // Throttling logic to prevent UI jank
-  final StreamController<String> _priceUpdateController = StreamController<String>.broadcast();
-  Stream<String> get priceUpdates => _priceUpdateController.stream;
-  
   Timer? _throttleTimer;
   void _throttleUpdate() {
     if (_throttleTimer?.isActive ?? false) return;
-    _throttleTimer = Timer(const Duration(milliseconds: 500), () {
+    _throttleTimer = Timer(const Duration(milliseconds: 300), () {
       notifyListeners();
     });
   }
