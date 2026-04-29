@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../models/mock_market_data.dart';
 
 class StockDetailsScreen extends StatefulWidget {
-  final MockStock stock;
+  final Map<String, dynamic> stock;
 
   const StockDetailsScreen({super.key, required this.stock});
 
@@ -17,10 +16,14 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isPositive = widget.stock.changePercent >= 0;
+    final price = widget.stock['price'] ?? 0.0;
+    final changePercent = widget.stock['change'] ?? 0.0;
+    final symbol = widget.stock['symbol'] ?? '';
+    final name = widget.stock['name'] ?? symbol;
+    
+    final isPositive = changePercent >= 0;
     final primaryColor = isPositive ? const Color(0xFF34C759) : const Color(0xFFFF3B30);
-    // In the mock image, the price is big, change is next to it.
-    final changeAmount = (widget.stock.price * widget.stock.changePercent / 100).abs();
+    final changeAmount = (price * changePercent / 100).abs();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F2F7),
@@ -61,7 +64,7 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
             // Tags
             Row(
               children: [
-                _buildTag(widget.stock.symbol),
+                _buildTag(symbol),
                 const SizedBox(width: 8),
                 _buildTag('EQUITIES'),
               ],
@@ -70,7 +73,7 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
             
             // Name
             Text(
-              widget.stock.name,
+              name,
               style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w500,
@@ -81,7 +84,7 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
 
             // Price & Change
             Text(
-              '\$${widget.stock.price.toStringAsFixed(2)}',
+              '${price.toStringAsFixed(2)}',
               style: const TextStyle(
                 fontSize: 40,
                 fontWeight: FontWeight.w800,
@@ -99,7 +102,7 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '${isPositive ? '+' : '-'}\$${changeAmount.toStringAsFixed(2)} (${widget.stock.changePercent.abs()}%)',
+                  '${isPositive ? '+' : '-'}${changeAmount.toStringAsFixed(2)} (${changePercent.abs().toStringAsFixed(2)}%)',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,

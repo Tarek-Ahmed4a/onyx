@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
-// import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:http/http.dart' as http;
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,7 +13,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// Fetches data ONCE from /api/egx/all and exposes it to
 /// both Dashboard and AI Chat via Provider.
 class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
-  // static const String _baseUrl = 'https://tarekahmed-onyx.hf.space/api';
+  static String get _baseUrl {
+    // Production URL for Hugging Face
+    return 'https://tarekahmed-onyx.hf.space/api';
+  }
 
   MarketDataService() {
     WidgetsBinding.instance.addObserver(this);
@@ -19,8 +24,10 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
     _loadCachedData().then((_) {
       // 2. Load from Firestore cache (Offline Persistence)
       fetchUserAssets();
-      // 3. Finally, trigger a silent network update
+      // 3. Trigger initial data fetch
       fetchAllMarketData(isSilent: true);
+      // 4. Initialize WebSocket for live updates
+      initSocket();
     });
   }
 
@@ -28,6 +35,7 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
+    _socket?.disconnect();
     super.dispose();
   }
 
@@ -69,6 +77,8 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
             "change": _parseNum(data["change"]),
             "volume": _parseNum(data["volume"]),
             "source": data["source"] ?? "Unknown",
+            "is_fund": data["is_fund"] ?? false,
+            "name": data["name"] ?? ticker,
           };
         }
       });
@@ -150,6 +160,51 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Timer? _refreshTimer;
+  IO.Socket? _socket;
+
+  void initSocket() {
+    final String socketUrl = _baseUrl.replaceAll('/api', '');
+    debugPrint('🔌 MarketDataService: Connecting to WebSocket at $socketUrl');
+    
+    _socket = IO.io(socketUrl, <String, dynamic>{
+      'transports': ['websocket'],
+      'autoConnect': true,
+    });
+
+    _socket!.onConnect((_) {
+      debugPrint('✅ MarketDataService: WebSocket Connected');
+    });
+
+    _socket!.on('price_update', (data) {
+      if (data is Map) {
+        final String symbol = data['s'] ?? '';
+        if (symbol.isNotEmpty && _stocksData.containsKey(symbol)) {
+          _stocksData[symbol]['price'] = _parseNum(data['p']);
+          _stocksData[symbol]['change'] = _parseNum(data['c']);
+          
+          // 1. Granular Update: Push to a specialized stream for this symbol
+          _priceUpdateController.add(symbol);
+          
+          // 2. Throttled UI Refresh: Notify listeners at most once every 500ms
+          _throttleUpdate();
+        }
+      }
+    });
+
+    _socket!.onDisconnect((_) => debugPrint('❌ MarketDataService: WebSocket Disconnected'));
+  }
+
+  // Throttling logic to prevent UI jank
+  final StreamController<String> _priceUpdateController = StreamController<String>.broadcast();
+  Stream<String> get priceUpdates => _priceUpdateController.stream;
+  
+  Timer? _throttleTimer;
+  void _throttleUpdate() {
+    if (_throttleTimer?.isActive ?? false) return;
+    _throttleTimer = Timer(const Duration(milliseconds: 500), () {
+      notifyListeners();
+    });
+  }
 
   /// Start a periodic refresh of market data.
   void startPeriodicRefresh({int seconds = 60}) {
@@ -177,19 +232,20 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     try {
-      // Replace with your actual API when ready
-      // final response = await http.get(Uri.parse('$_baseUrl/egx/all')).timeout(const Duration(seconds: 45));
-      // if (response.statusCode == 200) {
-      //   final Map<String, dynamic> body = json.decode(response.body);
-      //   ...
-      // }
-      
-      // Simulate network delay for API readiness
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      // We already populated _stocksData with 10 mock stocks.
-      _error = null;
-      debugPrint('✅ MarketDataService: Mock data loaded successfully');
+      final response = await http.get(Uri.parse('$_baseUrl/egx/all')).timeout(const Duration(seconds: 45));
+      if (response.statusCode == 200) {
+        final String bodyStr = response.body;
+        _parseAndSetData(bodyStr);
+        
+        // Save to cache
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cached_market_data', bodyStr);
+        
+        _error = null;
+        debugPrint('✅ MarketDataService: Data fetched from backend.');
+      } else {
+        throw Exception('Failed to load data: ${response.statusCode}');
+      }
     } catch (e) {
       _error = 'Connection error: $e';
       debugPrint('❌ MarketDataService fetch error: $e');
@@ -320,5 +376,28 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     return result;
+  }
+
+  /// Get stocks for a specific market
+  List<Map<String, dynamic>> getStocksByMarket(String suffix, {bool isFund = false}) {
+    List<Map<String, dynamic>> results = [];
+    
+    // Special case for UAE which has both .DU and .AD
+    List<String> suffixes = [suffix];
+    if (suffix == '.DU') suffixes.add('.AD');
+
+    _stocksData.forEach((symbol, data) {
+      bool matchesMarket = suffixes.any((s) => symbol.endsWith(s));
+      bool isMutualFund = data['is_fund'] == true;
+      
+      if (matchesMarket) {
+        if (isFund == isMutualFund) {
+          var item = Map<String, dynamic>.from(data);
+          item['symbol'] = symbol;
+          results.add(item);
+        }
+      }
+    });
+    return results;
   }
 }

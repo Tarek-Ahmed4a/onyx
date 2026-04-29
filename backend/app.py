@@ -1,6 +1,7 @@
 import os
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import yfinance as yf
@@ -40,114 +41,62 @@ def get_headers():
 
 app = Flask(__name__)
 CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-EGX_100 = [
-'AMER.CA' ,
-'ATLC.CA' ,
-'TALM.CA' ,
-'ISPH.CA' ,
-'ABUK.CA' ,
-'AIHC.CA' ,
-'AIDC.CA' ,
-'ASPI.CA' ,
-'SCEM.CA' ,
-'ASCM.CA' ,
-'EMFD.CA' ,
-'ACTF.CA' ,
-'ALCN.CA' ,
-'AMOC.CA' ,
-'IDRE.CA' ,
-'ISMA.CA' ,
-'AFDI.CA' ,
-'COMI.CA' ,
-'EXPA.CA' ,
-'DAPH.CA' ,
-'ISMQ.CA' ,
-'ICFC.CA' ,
-'IFAP.CA' ,
-'ZEOT.CA' ,
-'OCDI.CA' ,
-'SWDY.CA' ,
-'EAST.CA' ,
-'ELSH.CA' ,
-'UEGC.CA' ,
-'EGCH.CA' ,
-'ENGC.CA' ,
-'RMDA.CA' ,
-'PRCL.CA' ,
-'MEPA.CA' ,
-'OBRI.CA' ,
-'ARCC.CA' ,
-'ECAP.CA' ,
-'POUL.CA' ,
-'COSG.CA' ,
-'CCAP.CA' ,
-'CSAG.CA' ,
-'IEEC.CA' ,
-'PHAR.CA' ,
-'ETRS.CA' ,
-'ETEL.CA' ,
-'EGTS.CA' ,
-'MOED.CA' ,
-'MPRC.CA' ,
-'EHDR.CA' ,
-'ARAB.CA' ,
-'AMIA.CA' ,
-'MPCO.CA' ,
-'ORWE.CA' ,
-'KABO.CA' ,
-'NIPH.CA' ,
-'MTIE.CA' ,
-'OFH.CA' ,
-'ORAS.CA' ,
-'OIH.CA' ,
-'ORHD.CA' ,
-'EFIH.CA' ,
-'EFID.CA' ,
-'PHDC.CA' ,
-'BTFH.CA' ,
-'HDBK.CA' ,
-'CIEB.CA' ,
-'TANM.CA' ,
-'BIOC.CA' ,
-'SVCE.CA' ,
-'JUFO.CA' ,
-'GPIM.CA' ,
-'GBCO.CA' ,
-'DSCW.CA' ,
-'RAYA.CA' ,
-'RACC.CA' ,
-'ZMID.CA' ,
-'SIPC.CA' ,
-'SKPC.CA' ,
-'SDTI.CA' ,
-'NCCW.CA' ,
-'TAQA.CA' ,
-'VLMR.CA' ,
-'VLMRA.CA' ,
-'FWRY.CA' ,
-'CNFN.CA' ,
-'LCSW.CA' ,
-'MCRO.CA' ,
-'HRHO.CA' ,
-'TMGH.CA' ,
-'MASR.CA' ,
-'HELI.CA' ,
-'ATQA.CA' ,
-'MFPC.CA' ,
-'MCQE.CA' ,
-'EGAL.CA' ,
-'ADIB.CA' ,
-'AFMC.CA' ,
-'MPCI.CA' ,
-'KRDI.CA' ,
-'VALU.CA' ,
-'UNIP.CA' ,
-]
+import sqlite3
 
-MUTUAL_FUNDS = ['NMF', 'CMS', 'ASO', 'BWA', 'ADA', 'AZG', 'BFA', 'BSB', 'MTF']
+def load_all_symbols():
+    # Try multiple possible locations for the DB
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), "tickers.db"),
+        os.path.join(os.path.dirname(__file__), "..", "tickers.db"),
+        os.path.join(os.path.dirname(__file__), "ticker_data", "tickers.db"),
+        os.path.join(os.path.dirname(__file__), "..", "ticker_data", "tickers.db"),
+        "tickers.db"
+    ]
+    
+    db_path = None
+    for p in possible_paths:
+        if os.path.exists(p):
+            db_path = p
+            break
 
-WATCHLIST = EGX_100 + MUTUAL_FUNDS
+    tickers = []
+    funds = []
+    
+    if not db_path:
+        print(f"⚠️ Warning: tickers.db not found in any of {possible_paths}. Using default empty watchlist.")
+        return [], []
+        
+    print(f"📂 Using database at: {db_path}")
+    ticker_names = {}
+    try:
+        conn = sqlite3.connect(db_path)
+        # Load all tickers with names
+        df_tickers = pd.read_sql("SELECT symbol, name FROM all_tickers", conn)
+        for _, row in df_tickers.iterrows():
+            ticker_names[row['symbol']] = row['name']
+        
+        # Load all funds with names
+        df_funds = pd.read_sql("SELECT symbol, name FROM all_funds", conn)
+        for _, row in df_funds.iterrows():
+            ticker_names[row['symbol']] = row['name']
+        
+        tickers = df_tickers['symbol'].tolist()
+        funds = df_funds['symbol'].tolist()
+        
+        conn.close()
+        print(f"✅ [SUCCESS] Loaded {len(tickers)} tickers and {len(funds)} funds with names.")
+    except Exception as e:
+        print(f"❌ [ERROR] Database loading failed: {e}")
+        tickers, funds = [], []
+        
+    return tickers, funds, ticker_names
+
+ALL_TICKERS, ALL_FUNDS, TICKER_NAMES_MAP = load_all_symbols()
+
+WATCHLIST = list(set(ALL_TICKERS + ALL_FUNDS))
+MUTUAL_FUNDS = ALL_FUNDS
 
 # --- Global Cache Buffers ---
 MUBASHER_FUNDS_BUFFER = {}
@@ -162,6 +111,7 @@ MARKET_DATA_CACHE = {
         "support": 0.0,
         "resistance": 0.0,
         "source": "Initializing",
+        "name": TICKER_NAMES_MAP.get(ticker, ticker),
         "deque": deque(maxlen=100)
     }
     for ticker in WATCHLIST
@@ -477,6 +427,38 @@ FUND_KEYWORDS = {
     'MTF': 'صندوق استثمار شركة مصر للتأمين التكافلي النقدى الإسلامي',
     'AZG': 'صندوق أزيموت للمعادن النفيسة الإسلامي - الإصدار الأول - جولد - AZ', 
     'ASO': 'صندوق أزيموت لفرص الأسهم - فرص الشريعة  AZ', 
+    'AZO': 'ازيموت فرص',
+    'AZN': 'ازيموت ناصر',
+    'AZS': 'ادخار',
+    'B35': 'بلتون بي-35',
+    'B70': 'بلتون EGX70',
+    'BAL': 'بلتون للاستثمار',
+    'BCO': 'بلتون القطاع الاسته',
+    'BFF': 'بنك القاهره الاول',
+    'BFI': 'بلتون القطاع المالي',
+    'BIN': 'بلتون القطاع الصناعي',
+    'BMM': 'بلتون مية مية',
+    'BRE': 'بلتون القطاع العقاري',
+    'BSC': 'بي سكيور',
+    'C20': 'سي آي 20HD',
+    'CCB': 'سي آي استهلاكي',
+    'CCM': 'كايرو كابيتال مومنتم',
+    'CCS': 'كايرو كابيتال ستريم',
+    'CEX': 'سي آي تصدير',
+    'CFF': 'سي آي مال ومدفوعا',
+    'CI30': 'مؤشر CI EGX30',
+    'CIP': 'سي آي للاكتتابات',
+    'CRE': 'سي آي عقارات وبناء',
+    'CTI': 'سي آي تكنولوجيا',
+    'CTQ': 'ذا كوانت',
+    'GRA': 'جرانيت',
+    'MSI': 'مباشر فضة',
+    'NAM': 'بنك الكويت الوطني',
+    'NCS': '70 ان أي كابيتال',
+    'PCM': 'كاشي PFI',
+    'T70': 'ثاندر T70',
+    'ZEM': 'زالدي المصري',
+    'ZST': 'زالدي ستار'
 }
 
 def _fetch_fund_price(ticker): 
@@ -550,11 +532,43 @@ def _fetch_single_ticker_aggressive(ticker):
         if not data: return None
         
         is_fund = ticker in MUTUAL_FUNDS
+        clean_ticker = ticker.split('.')[0]
         
         # 1. Primary Live Price
-        live_price = _fetch_fund_price(ticker) if is_fund else _fetch_mubasher_price(ticker)
+        live_price = None
+        source = "Initializing"
         
-        # Fallback to Firestore DB if live scraping failed (especially for Funds)
+        # Try yfinance first for everything (as requested by user)
+        try:
+            yf_ticker = ticker
+            # Ensure suffixes are correct for yfinance
+            # EGX -> .CA (already there)
+            # KSA -> .SR (already there)
+            # DFM -> .DU (already there)
+            # ADX -> .AD (already there)
+            
+            ticker_obj = yf.Ticker(yf_ticker)
+            # Use fast_info or info (fast_info is better for just price)
+            live_price = ticker_obj.fast_info.get('last_price')
+            if live_price is not None and math.isfinite(live_price) and live_price > 0:
+                source = f"yfinance (Live)"
+            else:
+                live_price = None
+        except Exception as e:
+            # If yfinance is blocked (common on HF), print and continue to scrapers
+            print(f"⚠️ yfinance blocked/failed for {ticker}: {e}")
+            pass 
+
+        # Fallback to Scrapers if yfinance failed or returned nothing
+        if live_price is None:
+            if is_fund:
+                live_price = _fetch_fund_price(clean_ticker)
+                source = "Fund Scraper (Mubasher)"
+            else:
+                live_price = _fetch_mubasher_price(ticker)
+                source = "Mubasher Scraper (Live)"
+        
+        # Final Fallback to Firestore DB
         if live_price is None:
             try:
                 if firebase_admin._apps:
@@ -580,11 +594,12 @@ def _fetch_single_ticker_aggressive(ticker):
         source = "Fund Scraper" if is_fund else "Mubasher (Live Accumulation)"
         
         if len(history_dq) < 40:
-            if not is_fund:
-                # [Robust Bootstrap] Fetch real 1m historical data to warm up technicals
+            # ONLY bootstrap if it's a priority or has no data
+            # To avoid slowing down, we skip bootstrapping for the bulk list on startup
+            if not is_fund and len(history_dq) == 0:
                 try:
-                    # Fetch last 5 days of 1-minute data
-                    df = yf.download(ticker, period="5d", interval="1m", progress=False, timeout=15)
+                    # Only fetch if we really have 0 data
+                    df = yf.download(ticker, period="2d", interval="5m", progress=False, timeout=5)
                     
                     if not df.empty:
                         # Robust column extraction (handles MultiIndex or Single Index)
@@ -660,6 +675,15 @@ def _fetch_single_ticker_aggressive(ticker):
         _recalculate_technicals(ticker)
         
         data["source"] = source
+        
+        # 5. Broadcast via WebSocket
+        # 5. Broadcast via WebSocket (Minimal Payload for Speed)
+        socketio.emit('price_update', {
+            's': ticker,
+            'p': data['price'],
+            'c': data.get('change', 0.0)
+        })
+        
         return data
 
     except Exception as e:
@@ -701,13 +725,15 @@ def refresh_market_data():
     _fetch_macro_indicators()
     
     # 2. Sequential Stock Refresh with Rate Limiting
-    for ticker in WATCHLIST:
-        try:
-            _fetch_single_ticker_aggressive(ticker)
-            # Sleep 100ms to avoid hammering Mubasher/yfinance
-            time.sleep(0.1)
-        except Exception as e:
-            print(f"Error refreshing {ticker}: {e}")
+    # 2. Parallel Ticker Refresh with ThreadPool
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(_fetch_single_ticker_aggressive, ticker): ticker for ticker in WATCHLIST}
+        for future in as_completed(futures):
+            ticker = futures[future]
+            try:
+                future.result()
+            except Exception as e:
+                print(f"Error refreshing {ticker}: {e}")
             
     # 3. Persistence Save
     _save_market_state_to_firestore()
@@ -773,7 +799,7 @@ def scan_market():
             return
             
         print("Starting Market Scan...")
-        tickers_str = " ".join(EGX_100)
+        tickers_str = " ".join(WATCHLIST)
         data = None
         try:
             data = yf.download(tickers_str, period="2mo", interval="1d", group_by="ticker", auto_adjust=False, prepost=False, threads=True, timeout=20)
@@ -796,12 +822,12 @@ def scan_market():
                 # Get historical data for volume analysis
                 df = None
                 if data is not None and not data.empty:
-                    if ticker in EGX_100:
-                        if len(EGX_100) == 1: df = data
+                    if ticker in WATCHLIST:
+                        if len(WATCHLIST) == 1: df = data
                         else: df = data.get(ticker)
                 
                 # Fallback to TvDatafeed for volume if yfinance failed
-                if (df is None or df.empty) and ticker in EGX_100:
+                if (df is None or df.empty) and ticker in WATCHLIST:
                     try:
                         tv = get_tv_client()
                         if tv:
@@ -1017,7 +1043,11 @@ def get_all():
             "macd": v["macd"],
             "support": v.get("support", 0.0),
             "resistance": v.get("resistance", 0.0),
-            "source": v["source"]
+            "change": v.get("change", 0.0),
+            "volume": v.get("volume", 0),
+            "source": v.get("source", "Unknown"),
+            "name": v.get("name", k),
+            "is_fund": v.get("is_fund", False)
         }
         # Final pass: check for any accidental NaN values
         if not math.isfinite(stock_data['rsi']): stock_data['rsi'] = 50.0
@@ -1037,10 +1067,15 @@ def get_all():
 def health_check():
     return jsonify({"status": "ONYX Radar is awake and running"}), 200
 
-@app.route('/force_sync')
-def force():
-    refresh_market_data()
-    return jsonify({"status": "done", "count": len(MARKET_DATA_CACHE)})
+@app.route('/api/debug')
+def debug_stats():
+    return jsonify({
+        "total_tickers_in_memory": len(WATCHLIST),
+        "total_funds_in_memory": len(MUTUAL_FUNDS),
+        "cache_size": len(MARKET_DATA_CACHE),
+        "db_path_resolved": os.path.join(os.path.dirname(__file__), "..", "ticker_data", "tickers.db"),
+        "db_exists": os.path.exists(os.path.join(os.path.dirname(__file__), "..", "ticker_data", "tickers.db"))
+    })
 
 if __name__ == '__main__':
     # When running locally via 'python app.py'

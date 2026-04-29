@@ -1,0 +1,117 @@
+symbol,name,exchange,type,specs
+AAF.CA,صندوق افاق,EGX,fund,mutual_fund
+ABR.CA,صندوق بريق,EGX,fund,mutual_fund
+ADA.CA,صندوق الاهلي دهب,EGX,fund,mutual_fund
+ADM.CA,صندوق دياموند,EGX,fund,mutual_fund
+AEF.CA,صندوق الفنار,EGX,fund,mutual_fund
+AGO.CA,صندوق جسور,EGX,fund,mutual_fund
+AIS.CA,صندوق استثمار وأمان,EGX,fund,mutual_fund
+ALV.CA,صندوق AZ LV,EGX,fund,mutual_fund
+ASO.CA,صندوق أزيموت فرص الشريعة,EGX,fund,mutual_fund
+ATD.CA,صندوق الاهلي تميز ذو التوزيع ا...,EGX,fund,mutual_fund
+AZG.CA,صندوق Azimut جولد,EGX,fund,mutual_fund
+AZN.CA,صندوق ازيموت ناصر,EGX,fund,mutual_fund
+AZO.CA,صندوق ازيموت فرص,EGX,fund,mutual_fund
+AZS.CA,صندوق AZ ادخار,EGX,fund,mutual_fund
+B35.CA,صندوق بلتون بي-35,EGX,fund,mutual_fund
+B70.CA,صندوق بلتون EGX70,EGX,fund,mutual_fund
+BAL.CA,صندوق بلتون للاستثمار في ...,EGX,fund,mutual_fund
+BCO.CA,صندوق بلتون القطاع الاسته...,EGX,fund,mutual_fund
+BFA.CA,صندوق بلتون فضة,EGX,fund,mutual_fund
+BFF.CA,صندوق بنك القاهره الاول,EGX,fund,mutual_fund
+BFI.CA,صندوق بلتون القطاع المالي,EGX,fund,mutual_fund
+BIN.CA,صندوق بلتون القطاع الصناعي,EGX,fund,mutual_fund
+BMM.CA,صندوق بلتون مية مية,EGX,fund,mutual_fund
+BRE.CA,صندوق بلتون القطاع العقاري,EGX,fund,mutual_fund
+BSB.CA,صندوق بلتون سبائك,EGX,fund,mutual_fund
+BSC.CA,صندوق بي سكيور,EGX,fund,mutual_fund
+BWA.CA,صندوق بلتون وفرة,EGX,fund,mutual_fund
+C20.CA,صندوق سي آي 20HD,EGX,fund,mutual_fund
+CCB.CA,صندوق سي آي استهلاكي,EGX,fund,mutual_fund
+CCM.CA,صندوق كايرو كابيتال مومنتم,EGX,fund,mutual_fund
+CCS.CA,صندوق كايرو كابيتال ستريم,EGX,fund,mutual_fund
+CEX.CA,صندوق سي آي تصدير,EGX,fund,mutual_fund
+CFF.CA,صندوق سي آي مال ومدفوعا...,EGX,fund,mutual_fund
+CI30.CA,صندوق مؤشر CI EGX30,EGX,fund,mutual_fund
+CIP.CA,صندوق سي آي للاكتتابات الأو...,EGX,fund,mutual_fund
+CMS.CA,صندوق مؤشر CI EGX33 الشري...,EGX,fund,mutual_fund
+CRE.CA,صندوق سي آي عقارات وبناء,EGX,fund,mutual_fund
+CTI.CA,صندوق سي آي تكنولوجيا وات...,EGX,fund,mutual_fund
+CTQ.CA,صندوق سي إي ذا كوانت,EGX,fund,mutual_fund
+GRA.CA,صندوق جرانيت,EGX,fund,mutual_fund
+MSI.CA,صندوق مباشر فضة,EGX,fund,mutual_fund
+MTF.CA,صندوق مصر للتأمين التكافلي,EGX,fund,mutual_fund
+NAM.CA,صندوق بنك الكويت الوطني ال...,EGX,fund,mutual_fund
+NCS.CA,صندوق سهمي 70 ان أي كابيتال,EGX,fund,mutual_fund
+NMF.CA,صندوق NM أسهم شريعة,EGX,fund,mutual_fund
+PCM.CA,صندوق كاشي PFI,EGX,fund,mutual_fund
+PGM.CA,جي اي جي للتأمين النقدي للسي...,EGX,fund,mutual_fund
+T70.CA,صندوق ثاندر T70,EGX,fund,mutual_fund
+ZEM.CA,صندوق زالدي المصري,EGX,fund,mutual_fund
+ZST.CA,صندوق زالدي ستار,EGX,fund,mutual_fund
+4330.SR,Riyad REIT,TADAWUL,fund,reit
+4331.SR,AlJazira REIT Fund,TADAWUL,fund,reit
+4332.SR,Jadwa REIT Al-Haramain Fund,TADAWUL,fund,reit
+4333.SR,Taleem REIT Fund,TADAWUL,fund,reit
+4334.SR,AL Maather REIT Fund,TADAWUL,fund,reit
+4335.SR,Musharaka REIT Fund,TADAWUL,fund,reit
+4336.SR,Mulkia Gulf Real Estate REIT Fund,TADAWUL,fund,reit
+4337.SR,Al Aziziah REIT Fund,TADAWUL,fund,reit
+4338.SR,AlAhli REIT Fund 1,TADAWUL,fund,reit
+4339.SR,Derayah REIT Fund,TADAWUL,fund,reit
+4340.SR,Al Rajhi REIT Fund,TADAWUL,fund,reit
+4342.SR,Jadwa REIT Saudi Fund,TADAWUL,fund,reit
+4344.SR,SEDCO Capital REIT Fund,TADAWUL,fund,reit
+4345.SR,Alinma Retail REIT Fund,TADAWUL,fund,reit
+4346.SR,MEFIC REIT Fund,TADAWUL,fund,reit
+4347.SR,Bonyan REIT Fund,TADAWUL,fund,reit
+4348.SR,Alkhabeer REIT Fund,TADAWUL,fund,reit
+4349.SR,Alinma Hospitality REIT Fund,TADAWUL,fund,reit
+4350.SR,Alistithmar AREIC Diversified REIT Fund,TADAWUL,fund,reit
+4700.SR,Al Khabeer Diversified Income Traded Fund Units,TADAWUL,fund,etf
+4701.SR,Alkhabeer Growth & Income Traded Fund Units,TADAWUL,fund,closedend
+4702.SR,Alkhabeer Diversified Income Traded Fund 2030,TADAWUL,fund,closedend
+4703.SR,SEDCO Capital Multi Asset Traded Fund Units,TADAWUL,fund,closedend
+9300.SR,Al Waha REIT Fund,TADAWUL,fund,closedend
+9400.SR,FALCOM Saudi Equity ETF,TADAWUL,fund,etf
+9401.SR,Yaqeen Petrochemical ETF,TADAWUL,fund,etf
+9402.SR,SAB Invest MSCI Tadawul 30 Saudi ETF,TADAWUL,fund,etf
+9403.SR,Albilad Saudi Sovereign Sukuk ETF,TADAWUL,fund,etf
+9404.SR,Alinma Saudi Government Sukuk ETF Fund Units,TADAWUL,fund,etf
+9405.SR,Albilad Gold ETF,TADAWUL,fund,etf
+9406.SR,Albilad MSCI Equity Traded Fund Units,TADAWUL,fund,etf
+9407.SR,Albilad MSCI US Tech ETF Units,TADAWUL,fund,etf
+9408.SR,Albilad MSCI Saudi Growth ETF Units,TADAWUL,fund,etf
+9409.SR,Yaqeen S&P ESG Mena ETF Fund,TADAWUL,fund,etf
+9410.SR,Albilad CSOP MSCI Hong Kong China Equity ETF,TADAWUL,fund,etf
+9411.SR,Hang Seng Hong Kong ETF Units,TADAWUL,fund,etf
+9412.SR,Albilad MSCI Saudi Equity ETF,TADAWUL,fund,etf
+ABTC.DU,21Shares Bitcoin ETP,NASDAQDUBAI,fund,etf
+AGIX.DU,KraneShares Artificial Intelligence & Technology ETF,ADX,fund,etf
+AIPOWR.DU,"Boreas S&P AI Data, Power & Infrastructure UCITS ETF - AED (Dist) AED",ADX,fund,etf
+AMCREIT.DU,Al Mal Capital REIT,DFM,fund,trust
+BONDAE.DU,Chimera JP Morgan UAE Bond UCITS ETF-Share Class-D Income,ADX,fund,etf
+CHADX15.DU,Chimera FTSE ADX 15 ETF Class B Income,ADX,fund,etf
+CHAE.DU,Chimera UCITS ICAV -Chimera S&P UAE UCITS ETF,DFM,fund,etf
+CHAESHIN.DU,Chimera Umbrella Fund Chimera S&P UAE Shariah ETF Units B,DFM,fund,etf
+CHHK.DU,Chimera S&P China HK Shariah ETF - Share Class B -  Income,ADX,fund,etf
+DUBAIRESI.DU,Dubai Residential REIT,DFM,fund,trust
+ENBDREIT.DU,ENBD REIT (CEIC) PLC,NASDAQDUBAI,fund,reit
+GRMNY.DU,Chimera S&P Germany UCITS ETF - Share Class D - In     ,ADX,fund,etf
+INDI.DU,CHIMERA S&P INDIA SHARIAH ETF-SHARE CLASS B INCOME,ADX,fund,etf
+JPANI.DU,Chimera S&P Japan UCITS ETF - Share Class D-Income,ADX,fund,etf
+KRBN.DU,KraneShares Global Carbon Strategy ETF,ADX,fund,etf
+KWEB.DU,KraneShares CSI China Internet ETF,ADX,fund,etf
+KWTI.DU,CHIMERA S&P KUWAIT SHARIAH ETF-Share Class B-Income,ADX,fund,etf
+LUXURY.DU,Boreas S&P Absolute Luxury UCITS ETF - AED,ADX,fund,etf
+PKSTN.DU,Chimera S&P Pakistan UCITS ETF- Share D - Income,ADX,fund,etf
+QUANTM.DU,Chimera UCITS ICAV - Boreas Solactive Quantum Computing UCITS ETF Unhedged AED,ADX,fund,etf
+REIT.DU,Emirates REIT (CEIC) PLC,NASDAQDUBAI,fund,trust
+SAUDIA.DU,CHIMERA S&P KSA SHARIAH ETF-SHARE CLASS B-INCOME,ADX,fund,etf
+SUKUK.DU,Chimera Umbrella Fund - Chimera JP Morgan Global   Sukuk,ADX,fund,etf
+TURKI.DU,CHIMERA S&P TURKEY SHARIAH ETF SHARE CLASS B - Income,ADX,fund,etf
+UAEA.DU,Chimera S&P UAE Shariah ETF- Share class A- Accumulating,ADX,fund,etf
+UAED.DU,CHIMERA S&P UAE UCITS ETF - SHARE CLASS D INCOME,ADX,fund,etf
+USGRWTH.DU,Chimera S&P US Shariah Growth ETF - Share Class A - Accumul,ADX,fund,etf
+USTBILL.DU,Chimera iBoxx US Treasury Bill ETF Units B,ADX,fund,etf
+USVALUE.DU,Chimera S&P US Shariah Value ETF - Share Class B -  Income,ADX,fund,etf

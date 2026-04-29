@@ -1,0 +1,30 @@
+﻿symbol,name,exchange,type,specs
+ABTC,21Shares Bitcoin ETP,NASDAQDUBAI,fund,etf
+AGIX,KraneShares Artificial Intelligence & Technology ETF,ADX,fund,etf
+AIPOWR,"Boreas S&P AI Data, Power & Infrastructure UCITS ETF - AED (Dist) AED",ADX,fund,etf
+AMCREIT,Al Mal Capital REIT,DFM,fund,trust
+BONDAE,Chimera JP Morgan UAE Bond UCITS ETF-Share Class-D Income,ADX,fund,etf
+CHADX15,Chimera FTSE ADX 15 ETF Class B Income,ADX,fund,etf
+CHAE,Chimera UCITS ICAV -Chimera S&P UAE UCITS ETF,DFM,fund,etf
+CHAESHIN,Chimera Umbrella Fund Chimera S&P UAE Shariah ETF Units B,DFM,fund,etf
+CHHK,Chimera S&P China HK Shariah ETF - Share Class B -  Income,ADX,fund,etf
+DUBAIRESI,Dubai Residential REIT,DFM,fund,trust
+ENBDREIT,ENBD REIT (CEIC) PLC,NASDAQDUBAI,fund,reit
+GRMNY,Chimera S&P Germany UCITS ETF - Share Class D - In     ,ADX,fund,etf
+INDI,CHIMERA S&P INDIA SHARIAH ETF-SHARE CLASS B INCOME,ADX,fund,etf
+JPANI,Chimera S&P Japan UCITS ETF - Share Class D-Income,ADX,fund,etf
+KRBN,KraneShares Global Carbon Strategy ETF,ADX,fund,etf
+KWEB,KraneShares CSI China Internet ETF,ADX,fund,etf
+KWTI,CHIMERA S&P KUWAIT SHARIAH ETF-Share Class B-Income,ADX,fund,etf
+LUXURY,Boreas S&P Absolute Luxury UCITS ETF - AED,ADX,fund,etf
+PKSTN,Chimera S&P Pakistan UCITS ETF- Share D - Income,ADX,fund,etf
+QUANTM,Chimera UCITS ICAV - Boreas Solactive Quantum Computing UCITS ETF Unhedged AED,ADX,fund,etf
+REIT,Emirates REIT (CEIC) PLC,NASDAQDUBAI,fund,trust
+SAUDIA,CHIMERA S&P KSA SHARIAH ETF-SHARE CLASS B-INCOME,ADX,fund,etf
+SUKUK,Chimera Umbrella Fund - Chimera JP Morgan Global   Sukuk,ADX,fund,etf
+TURKI,CHIMERA S&P TURKEY SHARIAH ETF SHARE CLASS B - Income,ADX,fund,etf
+UAEA,Chimera S&P UAE Shariah ETF- Share class A- Accumulating,ADX,fund,etf
+UAED,CHIMERA S&P UAE UCITS ETF - SHARE CLASS D INCOME,ADX,fund,etf
+USGRWTH,Chimera S&P US Shariah Growth ETF - Share Class A - Accumul,ADX,fund,etf
+USTBILL,Chimera iBoxx US Treasury Bill ETF Units B,ADX,fund,etf
+USVALUE,Chimera S&P US Shariah Value ETF - Share Class B -  Income,ADX,fund,etf

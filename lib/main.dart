@@ -18,7 +18,6 @@ import 'screens/investments_screen.dart';
 import 'screens/chat_screen.dart';
 import 'config/api_keys.dart';
 import 'screens/market_screen.dart';
-import 'models/mock_market_data.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -280,10 +279,10 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   final List<Widget> _screens = const [
     InvestmentsScreen(),
-    MarketScreen(marketName: 'Egyptian Market', stocks: MockMarketData.egyptStocks, funds: MockMarketData.egyptFunds),
+    MarketScreen(marketName: 'Egyptian Market', marketSuffix: '.CA'),
     ChatScreen(),
-    MarketScreen(marketName: 'Tadawul', stocks: MockMarketData.saudiStocks),
-    MarketScreen(marketName: 'DFM & ADX', stocks: MockMarketData.uaeStocks),
+    MarketScreen(marketName: 'Tadawul', marketSuffix: '.SR'),
+    MarketScreen(marketName: 'DFM & ADX', marketSuffix: '.DU'), // DFM/ADX handled by service
   ];
 
   void _onTabTapped(int index) {
