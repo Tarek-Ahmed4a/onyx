@@ -157,7 +157,9 @@ class StockListItem extends StatelessWidget {
     return StreamBuilder<String>(
       stream: marketData.priceUpdates.where((s) => s == symbol),
       builder: (context, snapshot) {
-        final currentData = marketData.allStocksData[symbol] ?? stock;
+        final currentData = marketData.stocksData[symbol] ?? stock;
+        // Use the name from the passed 'stock' map (which has the correct name from DB)
+        final displayName = stock['name']?.toString().isNotEmpty == true ? stock['name'] : (currentData['name'] ?? symbol);
         final price = (currentData['price'] as num?)?.toDouble() ?? 0.0;
         final changePercent = (currentData['change'] as num?)?.toDouble() ?? 0.0;
         final rsi = (currentData['rsi'] as num?)?.toDouble() ?? 50.0;
@@ -187,7 +189,7 @@ class StockListItem extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(displayName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                       Text(symbol, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                       Text(indicatorStatus.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold,
                         color: indicatorStatus == 'positive' ? Colors.green : (indicatorStatus == 'negative' ? Colors.red : Colors.grey))),
