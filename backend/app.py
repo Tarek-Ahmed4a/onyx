@@ -112,6 +112,7 @@ MARKET_DATA_CACHE = {
         "resistance": 0.0,
         "source": "Initializing",
         "name": TICKER_NAMES_MAP.get(ticker, ticker),
+        "is_fund": ticker in MUTUAL_FUNDS,
         "deque": deque(maxlen=100)
     }
     for ticker in WATCHLIST
