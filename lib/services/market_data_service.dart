@@ -6,6 +6,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 /// Single Source of Truth for all EGX market data.
 ///
@@ -260,6 +261,31 @@ class MarketDataService extends ChangeNotifier with WidgetsBindingObserver {
     }
     */
   }
+
+  /// Fetches historical graph data for a ticker
+  Future<List<FlSpot>> fetchHistory(String ticker, {String period = '1mo'}) async {
+    try {
+      final response = await http.get(Uri.parse('$_baseUrl/history/$ticker?period=$period')).timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final historyList = data['history'] as List;
+        
+        List<FlSpot> spots = [];
+        for (int i = 0; i < historyList.length; i++) {
+          final item = historyList[i];
+          final price = _parseNum(item['close']);
+          if (price > 0) {
+            spots.add(FlSpot(i.toDouble(), price));
+          }
+        }
+        return spots;
+      }
+    } catch (e) {
+      debugPrint('History fetch error for $ticker: $e');
+    }
+    return [];
+  }
+
 
   /// Get cached data for a specific ticker.
   /// Returns null if ticker not found.

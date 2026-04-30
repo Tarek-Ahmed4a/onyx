@@ -17,8 +17,34 @@ import json
 import firebase_admin
 from firebase_admin import credentials, firestore, messaging
 import time
+import sys
+
+# Add AI_model directory to sys.path robustly by searching for pipeline.py
+current_dir = os.path.dirname(os.path.abspath(__file__))
+found_pipeline = False
+
+# Search in current directory and parent directory recursively
+search_root = os.path.abspath(os.path.join(current_dir, "..")) if current_dir.endswith("backend") else current_dir
+
+for root, dirs, files in os.walk(search_root):
+    if "pipeline.py" in files:
+        sys.path.append(root)
+        print(f"✅ Found pipeline.py at: {root}")
+        found_pipeline = True
+        break
+
+if not found_pipeline:
+    print(f"❌ CRITICAL ERROR: Could not find pipeline.py anywhere inside {search_root}")
+    # Fallback to appending a few common paths
+    sys.path.append(os.path.join(current_dir, "AI_model"))
+    sys.path.append(os.path.join(current_dir, "..", "AI_model"))
+
+from pipeline import OnyxAI # type: ignore
+
+# Initialize AI Pipeline
+onyx_ai = OnyxAI()
 try:
-    from tvDatafeed import TvDatafeed, Interval
+    from tvDatafeed import TvDatafeed, Interval # type: ignore
     HAS_TV = True
 except ImportError:
     print("⚠️ tvDatafeed not installed. TradingView fallback will be disabled.")
@@ -1010,6 +1036,70 @@ scheduler.add_job(
     minute=0,
     timezone='Africa/Cairo'
 )
+
+def ai_scan_market():
+    """
+    Background job to run AI analysis on top EGX 30 stocks.
+    """
+    if not is_market_open():
+        print("🌙 Market is closed. Skipping AI Scan.")
+        return
+        
+    print("🤖 Starting AI Market Scan for EGX 30...")
+    
+    # List of top stocks to scan periodically
+    TOP_STOCKS = [
+        'ABUK.CA', 'ADIB.CA', 'AMOC.CA', 'ARCC.CA', 'BTFH.CA', 
+        'CCAP.CA', 'COMI.CA', 'EAST.CA', 'EFID.CA', 'EFIH.CA', 
+        'EGAL.CA', 'EGCH.CA', 'EMFD.CA', 'ETEL.CA', 'FWRY.CA', 
+        'GBCO.CA', 'HELI.CA', 'HRHO.CA', 'ISPH.CA', 'JUFO.CA', 
+        'MCQE.CA', 'ORAS.CA', 'ORHD.CA', 'OIH.CA', 'ORWE.CA', 
+        'PHDC.CA', 'RAYA.CA', 'RMDA.CA', 'TMGH.CA', 'VLMR.CA'
+    ]
+    
+    for ticker in TOP_STOCKS:
+        try:
+            print(f"Analyzing {ticker}...")
+            result = onyx_ai.run_analysis(ticker)
+            
+            if result and result['decision'] in ["BUY", "SELL"]:
+                # Save to Firestore
+                db.collection('ai_reports').document(ticker).set({
+                    "ticker": ticker,
+                    "decision": result['decision'],
+                    "tech_prob": result['tech_prob'],
+                    "sentiment_score": result['sentiment_score'],
+                    "report": result['report'],
+                    "timestamp": firestore.SERVER_TIMESTAMP
+                })
+                print(f"✅ AI Report saved for {ticker}: {result['decision']}")
+                
+                # Send push notification for BUY/SELL
+                try:
+                    title = "AI Alert: Opportunity 🎯" if result['decision'] == "BUY" else "AI Alert: Exit Warning ⚠️"
+                    body = f"Onyx AI suggests {result['decision']} for {ticker}. Check the full report!"
+                    
+                    message = messaging.Message(
+                        notification=messaging.Notification(
+                            title=title,
+                            body=body
+                        ),
+                        topic='market_opportunities'
+                    )
+                    messaging.send(message)
+                    print(f"📲 Push notification sent for {ticker}")
+                except Exception as me:
+                    print(f"⚠️ Failed to send push: {me}")
+        except Exception as e:
+            print(f"⚠️ Error scanning {ticker} with AI: {e}")
+        time.sleep(10) # Heavy lifting, take it slow
+
+scheduler.add_job(
+    func=ai_scan_market,
+    trigger="interval",
+    hours=1, # Run every hour during trading session
+    timezone='Africa/Cairo'
+)
 scheduler.start()
 
 # Trigger an initial refresh in the background immediately on startup
@@ -1070,6 +1160,53 @@ def get_all():
         "last_updated": datetime.utcnow().isoformat()
     })
 
+@app.route('/api/history/<ticker>')
+def get_history(ticker):
+    period = request.args.get('period', '1mo')
+    interval = request.args.get('interval', '1d')
+    try:
+        import yfinance as yf
+        # Fix ticker for yfinance if it's EGX
+        yf_ticker = ticker
+        
+        data = yf.download(yf_ticker, period=period, interval=interval, auto_adjust=False, prepost=False)
+        if data is None or data.empty:
+            # Fallback to TV
+            tv = get_tv_client()
+            if tv:
+                tv_ticker = ticker.replace('.CA', '').replace('.SR', '').replace('.DU', '').replace('.AD', '')
+                exchange = 'EGX' if '.CA' in ticker else 'TADAWUL' if '.SR' in ticker else 'DFM'
+                tv_data = tv.get_hist(symbol=tv_ticker, exchange=exchange, interval=Interval.in_daily, n_bars=30)
+                if tv_data is not None and not tv_data.empty:
+                    tv_data.rename(columns={'close': 'Close'}, inplace=True)
+                    data = tv_data
+
+        if data is None or data.empty:
+            return jsonify({"error": "No data found"}), 404
+
+        # Format for Flutter
+        history = []
+        try:
+            close_col = data['Close']
+            if isinstance(close_col, pd.DataFrame):
+                close_series = close_col.iloc[:, 0]
+            else:
+                close_series = close_col
+                
+            for index, value in close_series.items():
+                if not pd.isna(value):
+                    history.append({
+                        "date": index.isoformat() if hasattr(index, 'isoformat') else str(index),
+                        "close": float(value)
+                    })
+        except Exception as ex:
+            print("Error parsing history dataframe:", ex)
+            
+        return jsonify({"ticker": ticker, "history": history})
+    except Exception as e:
+        print(f"Error fetching history for {ticker}: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/')
 def health_check():
     return jsonify({"status": "ONYX Radar is awake and running"}), 200
@@ -1083,6 +1220,38 @@ def debug_stats():
         "db_path_resolved": os.path.join(os.path.dirname(__file__), "..", "ticker_data", "tickers.db"),
         "db_exists": os.path.exists(os.path.join(os.path.dirname(__file__), "..", "ticker_data", "tickers.db"))
     })
+
+@app.route('/api/ai_analyze', methods=['POST'])
+def ai_analyze():
+    """
+    Endpoint for real-time AI analysis of a specific ticker.
+    """
+    data = request.get_json()
+    if not data or 'ticker' not in data:
+        return jsonify({"error": "Missing ticker in request body"}), 400
+        
+    ticker = data['ticker']
+    print(f"🤖 AI Analysis requested for: {ticker}")
+    
+    try:
+        # Run the full AI pipeline
+        result = onyx_ai.run_analysis(ticker)
+        
+        if result:
+            return jsonify({
+                "status": "success",
+                "ticker": result['ticker'],
+                "decision": result['decision'],
+                "tech_prob": result['tech_prob'],
+                "sentiment_score": result['sentiment_score'],
+                "report": result['report']
+            })
+        else:
+            return jsonify({"status": "error", "message": "Analysis failed for this ticker"}), 500
+            
+    except Exception as e:
+        print(f"❌ AI Analysis Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
     # When running locally via 'python app.py'

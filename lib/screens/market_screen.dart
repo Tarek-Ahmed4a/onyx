@@ -31,8 +31,8 @@ class _MarketScreenState extends State<MarketScreen> {
             ? TextField(
                 controller: _searchController,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Search ticker or name...',
+                decoration: InputDecoration(
+                  hintText: 'Search ${widget.marketName}...',
                   border: InputBorder.none,
                 ),
                 onChanged: (val) {
@@ -155,19 +155,26 @@ class _MarketScreenState extends State<MarketScreen> {
   }
 
   List<Map<String, dynamic>> _getDisplayedItems(BuildContext context, MarketDataService service) {
-    // Note: service is passed from Selector, or fetched with listen: false if called elsewhere.
-    List<Map<String, dynamic>> items = service.getStocksByMarket(
+    if (_searchQuery.isNotEmpty) {
+      // Search across both stocks and funds in THIS specific market
+      List<Map<String, dynamic>> allMarketItems = [
+        ...service.getStocksByMarket(widget.marketSuffix, isFund: false),
+        ...service.getStocksByMarket(widget.marketSuffix, isFund: true)
+      ];
+      
+      return allMarketItems.where((s) {
+        final symbol = (s['symbol'] as String).toLowerCase();
+        final name = (s['name'] as String? ?? '').toLowerCase();
+        final query = _searchQuery.toLowerCase();
+        return symbol.contains(query) || name.contains(query);
+      }).toList();
+    }
+
+    // Default behavior when not searching (respects the filter chip)
+    return service.getStocksByMarket(
       widget.marketSuffix, 
       isFund: _selectedFilter == 'Mutual Funds'
     );
-    
-    if (_searchQuery.isNotEmpty) {
-      items = items.where((s) => 
-        (s['symbol'] as String).toLowerCase().contains(_searchQuery.toLowerCase()) || 
-        (s['name'] as String? ?? '').toLowerCase().contains(_searchQuery.toLowerCase())
-      ).toList();
-    }
-    return items;
   }
 
   Widget _buildFilterChip(String label) {

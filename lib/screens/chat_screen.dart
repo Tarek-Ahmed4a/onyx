@@ -7,7 +7,6 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/market_data_service.dart';
 import '../services/onyx_ai_router_service.dart';
-import '../widgets/elite_header.dart';
 import 'profile_screen.dart';
 
 // ─────────────────────────────────────────────────────────────
@@ -303,6 +302,16 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                       elevation: 0,
                       floating: true,
                       pinned: false,
+                      centerTitle: true,
+                      title: const Text(
+                        'Onyx AI',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
                       leading: IconButton(
                         icon: const Icon(Icons.arrow_back, color: Colors.black),
                         onPressed: () => Navigator.pop(context),
@@ -330,13 +339,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                         const SizedBox(width: 8),
                       ],
                     ),
-                    const SliverToBoxAdapter(
-                      child: EliteHeader(
-                        title: 'ONYX AI',
-                        showGreeting: false,
-                        showBackButton: false,
-                      ),
-                    ),
+                    // EliteHeader removed in favor of AppBar title
                     _buildSliverMessageList(),
                   ],
                 ),
@@ -493,52 +496,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             ),
           ),
           const SizedBox(height: 32),
-          // Quick prompt chips
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            alignment: WrapAlignment.center,
-            children: [
-              _buildQuickPrompt('📊 Market Overview',
-                  payload: 'نظرة عامة على السوق المصري (EGX) وأحدث الأخبار'),
-              _buildQuickPrompt('💰 أشتري إيه؟',
-                  payload:
-                      'بناءً على السوق المصري اليوم، إيه أفضل الأسهم اللي ممكن أشتريها دلوقتي وليه؟'),
-            ],
-          ),
+          // Quick prompts removed per user request
         ],
       ),
     );
   }
 
-  Widget _buildQuickPrompt(String label, {String? payload}) {
-    return GestureDetector(
-      onTap: () {
-        _textController.text = payload ??
-            label.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF؟]'), '').trim();
-        _sendMessage();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: _ChatColors.surfaceLight,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: _ChatColors.aiBorder,
-            width: 1,
-          ),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: _ChatColors.textSecondary,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildTypingIndicator() {
     return Padding(

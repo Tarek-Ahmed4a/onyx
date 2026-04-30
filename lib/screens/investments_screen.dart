@@ -319,11 +319,12 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
   }
 
   Future<void> _createDefaultPortfolioIfMissing() async {
-    final uid = (FirebaseAuth.instance.currentUser?.uid ?? 'guest_user');
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return; // Do not sync to Firestore for guests
 
     final collection = FirebaseFirestore.instance
         .collection('users')
-        .doc(uid)
+        .doc(user.uid)
         .collection('investments');
 
     try {
@@ -345,11 +346,33 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
   }
 
   Future<void> _loadPortfolios() async {
-    final uid = (FirebaseAuth.instance.currentUser?.uid ?? 'guest_user');
+    final user = FirebaseAuth.instance.currentUser;
+    
+    // For guests, we only rely on local storage.
+    if (user == null) {
+      if (mounted) {
+        setState(() {
+          if (_portfolios.isEmpty) {
+            _portfolios = [
+              Portfolio(
+                id: 'guest_fallback_id',
+                name: 'Main Profile',
+                balance: 0.0,
+                initialBudget: 0.0,
+                assets: [],
+              )
+            ];
+            _activePortfolioId = _portfolios.first.id;
+          }
+          _isLoading = false;
+        });
+      }
+      return;
+    }
 
     final collection = FirebaseFirestore.instance
         .collection('users')
-        .doc(uid)
+        .doc(user.uid)
         .collection('investments');
 
     try {
@@ -371,8 +394,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                   Portfolio(
                     id: 'guest_fallback_id',
                     name: 'Main Profile',
-                    balance: 10000.0,
-                    initialBudget: 10000.0,
+                    balance: 0.0,
+                    initialBudget: 0.0,
                     assets: [],
                   )
                 ];
@@ -389,14 +412,13 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
           debugPrint('Firestore Error loading portfolios: $e');
           if (mounted) {
             setState(() {
-              // Create fallback on error (e.g. permission denied for guest)
               if (_portfolios.isEmpty) {
                 _portfolios = [
                   Portfolio(
                     id: 'guest_fallback_id',
                     name: 'Main Profile',
-                    balance: 10000.0,
-                    initialBudget: 10000.0,
+                    balance: 0.0,
+                    initialBudget: 0.0,
                     assets: [],
                   )
                 ];
@@ -416,8 +438,8 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
               Portfolio(
                 id: 'guest_fallback_id',
                 name: 'Main Profile',
-                balance: 10000.0,
-                initialBudget: 10000.0,
+                balance: 0.0,
+                initialBudget: 0.0,
                 assets: [],
               )
             ];
@@ -485,13 +507,15 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
 
     // Background sync to Firestore
     try {
-      final uid = (FirebaseAuth.instance.currentUser?.uid ?? 'guest_user');
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('investments')
-          .doc(newPortfolio.id)
-          .set(newPortfolio.toJson());
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('investments')
+            .doc(newPortfolio.id)
+            .set(newPortfolio.toJson());
+      }
     } catch (e) {
       debugPrint('Firestore sync error (non-blocking): $e');
     }
@@ -530,13 +554,16 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
               });
               _savePortfoliosLocally();
               // Background sync
-              FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(FirebaseAuth.instance.currentUser?.uid ?? 'guest_user')
-                  .collection('investments')
-                  .doc(portfolio.id)
-                  .delete()
-                  .catchError((e) => debugPrint('Delete sync error: $e'));
+              final user = FirebaseAuth.instance.currentUser;
+              if (user != null) {
+                FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(user.uid)
+                    .collection('investments')
+                    .doc(portfolio.id)
+                    .delete()
+                    .catchError((e) => debugPrint('Delete sync error: $e'));
+              }
             },
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete'),
@@ -600,13 +627,15 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
 
     // Background sync to Firestore
     try {
-      final uid = (FirebaseAuth.instance.currentUser?.uid ?? 'guest_user');
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('investments')
-          .doc(activePortfolio.id)
-          .set(activePortfolio.toJson());
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('investments')
+            .doc(activePortfolio.id)
+            .set(activePortfolio.toJson());
+      }
     } catch (e) {
       debugPrint('Firestore sync error (non-blocking): $e');
     }
@@ -1326,6 +1355,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
     double portfolioValue = 0;
     double totalPnlEgp = 0;
     double totalPnlPercent = 0;
+    double currentTotalValue = 0;
 
     final marketData = Provider.of<MarketDataService>(context).stocksData;
 
@@ -1337,7 +1367,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
         portfolioValue += livePrice * asset.quantity;
       }
 
-      final currentTotalValue = activePortfolio.balance + portfolioValue;
+      currentTotalValue = activePortfolio.balance + portfolioValue;
       totalPnlEgp = currentTotalValue - activePortfolio.initialBudget;
       if (activePortfolio.initialBudget > 0) {
         totalPnlPercent = (totalPnlEgp / activePortfolio.initialBudget) * 100;
@@ -1561,15 +1591,10 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
 
                             if (!snapshot.hasData ||
                                 snapshot.data!.docs.isEmpty) {
-                              // Return mock chart for visual instead of empty text
-                              final List<FlSpot> mockSpots = [
-                                const FlSpot(0, 100),
-                                const FlSpot(1, 105),
-                                const FlSpot(2, 102),
-                                const FlSpot(3, 108),
-                                const FlSpot(4, 115),
-                                const FlSpot(5, 110),
-                                const FlSpot(6, 120),
+                              // No history yet, just show current value as a flat line
+                              final List<FlSpot> realSpots = [
+                                FlSpot(0, currentTotalValue),
+                                FlSpot(1, currentTotalValue),
                               ];
                               return LineChart(
                                 LineChartData(
@@ -1578,15 +1603,20 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                   borderData: FlBorderData(show: false),
                                   lineBarsData: [
                                     LineChartBarData(
-                                      spots: mockSpots,
+                                      spots: realSpots,
                                       isCurved: true,
-                                      color: Colors.black,
+                                      color: totalPnlEgp >= 0
+                                          ? const Color(0xFF34C759)
+                                          : const Color(0xFFFF3B30),
                                       barWidth: 3,
                                       isStrokeCapRound: true,
                                       dotData: const FlDotData(show: false),
                                       belowBarData: BarAreaData(
                                         show: true,
-                                        color: Colors.black.withValues(alpha: 0.05),
+                                        color: (totalPnlEgp >= 0
+                                                ? const Color(0xFF34C759)
+                                                : const Color(0xFFFF3B30))
+                                            .withValues(alpha: 0.05),
                                       ),
                                     ),
                                   ],
@@ -1606,40 +1636,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
                                 spots.add(FlSpot(i.toDouble(), val.toDouble()));
                               }
                             }
-
-                            if (!snapshot.hasData ||
-                                snapshot.data!.docs.isEmpty) {
-                              // Return mock chart for visual instead of empty text
-                              final List<FlSpot> mockSpots = [
-                                const FlSpot(0, 100),
-                                const FlSpot(1, 105),
-                                const FlSpot(2, 102),
-                                const FlSpot(3, 108),
-                                const FlSpot(4, 115),
-                                const FlSpot(5, 110),
-                                const FlSpot(6, 120),
-                              ];
-                              return LineChart(
-                                LineChartData(
-                                  gridData: const FlGridData(show: false),
-                                  titlesData: const FlTitlesData(show: false),
-                                  borderData: FlBorderData(show: false),
-                                  lineBarsData: [
-                                    LineChartBarData(
-                                      spots: mockSpots,
-                                      isCurved: true,
-                                      color: Colors.black,
-                                      barWidth: 3,
-                                      isStrokeCapRound: true,
-                                      dotData: const FlDotData(show: false),
-                                      belowBarData: BarAreaData(
-                                        show: true,
-                                        color: Colors.black.withValues(alpha: 0.05),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
+                            
+                            if (spots.length == 1) {
+                                spots.add(FlSpot(1, spots.first.y));
                             }
 
                             final lineColor = totalPnlEgp >= 0

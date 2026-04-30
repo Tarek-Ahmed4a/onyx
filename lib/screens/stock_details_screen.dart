@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:provider/provider.dart';
+import '../services/market_data_service.dart';
 
 class StockDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> stock;
@@ -13,6 +15,38 @@ class StockDetailsScreen extends StatefulWidget {
 class _StockDetailsScreenState extends State<StockDetailsScreen> {
   String selectedPeriod = '1M';
   final List<String> periods = ['1D', '1W', '1M', '3M', '1Y', 'ALL'];
+  List<FlSpot> _spots = [];
+  bool _isLoadingChart = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    setState(() {
+      _isLoadingChart = true;
+    });
+    
+    final marketData = Provider.of<MarketDataService>(context, listen: false);
+    String apiPeriod = '1mo';
+    if (selectedPeriod == '1D') apiPeriod = '1d';
+    else if (selectedPeriod == '1W') apiPeriod = '5d';
+    else if (selectedPeriod == '1M') apiPeriod = '1mo';
+    else if (selectedPeriod == '3M') apiPeriod = '3mo';
+    else if (selectedPeriod == '1Y') apiPeriod = '1y';
+    else if (selectedPeriod == 'ALL') apiPeriod = 'max';
+    
+    final fetchedSpots = await marketData.fetchHistory(widget.stock['symbol'], period: apiPeriod);
+    
+    if (mounted) {
+      setState(() {
+        _spots = fetchedSpots;
+        _isLoadingChart = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +58,22 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
     final isPositive = changePercent >= 0;
     final primaryColor = isPositive ? const Color(0xFF34C759) : const Color(0xFFFF3B30);
     final changeAmount = (price * changePercent / 100).abs();
+
+    // Calculate Y-axis bounds
+    double minY = 0;
+    double maxY = 10;
+    if (_spots.isNotEmpty) {
+      minY = _spots.map((e) => e.y).reduce((a, b) => a < b ? a : b);
+      maxY = _spots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
+      
+      double padding = (maxY - minY) * 0.1;
+      minY -= padding;
+      maxY += padding;
+      if (minY < 0) minY = 0;
+    }
+
+    final marketData = context.watch<MarketDataService>();
+    final newsList = marketData.news;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F2F7),
@@ -140,41 +190,46 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
               ),
               child: Column(
                 children: [
-                  // FL Chart Mock
                   SizedBox(
                     height: 200,
                     width: double.infinity,
-                    child: LineChart(
-                      LineChartData(
-                        gridData: FlGridData(
-                          show: true,
-                          drawVerticalLine: false,
-                          horizontalInterval: 1,
-                          getDrawingHorizontalLine: (value) {
-                            return FlLine(
-                              color: Colors.grey.shade200,
-                              strokeWidth: 1,
-                            );
-                          },
-                        ),
-                        titlesData: const FlTitlesData(show: false),
-                        borderData: FlBorderData(show: false),
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: _generateMockSpots(),
-                            isCurved: false,
-                            color: const Color(0xFF1B5E20), // Dark green line like in image
-                            barWidth: 2,
-                            isStrokeCapRound: true,
-                            dotData: const FlDotData(show: false),
-                            belowBarData: BarAreaData(
-                              show: true,
-                              color: const Color(0xFF1B5E20).withValues(alpha: 0.1),
+                    child: _isLoadingChart 
+                      ? const Center(child: CircularProgressIndicator(color: Colors.black))
+                      : _spots.isEmpty 
+                          ? Center(child: Text("No chart data available.", style: TextStyle(color: Colors.grey.shade600)))
+                          : LineChart(
+                              LineChartData(
+                                minY: minY,
+                                maxY: maxY,
+                                gridData: FlGridData(
+                                  show: true,
+                                  drawVerticalLine: false,
+                                  horizontalInterval: (maxY - minY) > 0 ? (maxY - minY) / 4 : 1,
+                                  getDrawingHorizontalLine: (value) {
+                                    return FlLine(
+                                      color: Colors.grey.shade200,
+                                      strokeWidth: 1,
+                                    );
+                                  },
+                                ),
+                                titlesData: const FlTitlesData(show: false),
+                                borderData: FlBorderData(show: false),
+                                lineBarsData: [
+                                  LineChartBarData(
+                                    spots: _spots,
+                                    isCurved: false,
+                                    color: primaryColor,
+                                    barWidth: 2,
+                                    isStrokeCapRound: true,
+                                    dotData: const FlDotData(show: false),
+                                    belowBarData: BarAreaData(
+                                      show: true,
+                                      color: primaryColor.withValues(alpha: 0.1),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                   const SizedBox(height: 16),
                   const Divider(color: Color(0xFFF2F2F7)),
@@ -189,9 +244,12 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
                         final isSelected = selectedPeriod == period;
                         return GestureDetector(
                           onTap: () {
-                            setState(() {
-                              selectedPeriod = period;
-                            });
+                            if (!isSelected) {
+                              setState(() {
+                                selectedPeriod = period;
+                              });
+                              _loadHistory();
+                            }
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -227,24 +285,25 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            const Divider(color: Color(0xFFE5E5EA), height: 1),
-            _buildNewsItem(
-              'Apple Vision Pro sees early success in enterprise...',
-              'FINANCIAL TIMES',
-              '2H AGO',
-            ),
-            const Divider(color: Color(0xFFE5E5EA), height: 1),
-            _buildNewsItem(
-              'Analysts upgrade AAPL price target amidst strong iPhone...',
-              'BLOOMBERG',
-              '5H AGO',
-            ),
-            const Divider(color: Color(0xFFE5E5EA), height: 1),
-            _buildNewsItem(
-              'Supply chain reports indicate stabilization in...',
-              'REUTERS',
-              '1D AGO',
-            ),
+            if (newsList.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text("No recent news available."),
+              )
+            else
+              ...newsList.take(5).map((newsStr) {
+                // News strings are typically like "TITLE" or we can just show the string as title
+                return Column(
+                  children: [
+                    const Divider(color: Color(0xFFE5E5EA), height: 1),
+                    _buildNewsItem(
+                      newsStr,
+                      'MARKET NEWS',
+                      'RECENT',
+                    ),
+                  ],
+                );
+              }),
             const Divider(color: Color(0xFFE5E5EA), height: 1),
             const SizedBox(height: 40),
           ],
@@ -289,7 +348,7 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
                     fontWeight: FontWeight.w600,
                     color: Colors.black,
                   ),
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 12),
@@ -327,38 +386,9 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 16),
-          // Mock Image
-          Container(
-            width: 80,
-            height: 60,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(4),
-              image: const DecorationImage(
-                image: NetworkImage('https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=200'),
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
-
-  List<FlSpot> _generateMockSpots() {
-    // Generate some random points based on the selected period
-    // The image shows a jagged line chart
-    return [
-      const FlSpot(0, 1),
-      const FlSpot(1, 1.2),
-      const FlSpot(2, 0.8),
-      const FlSpot(3, 1.8),
-      const FlSpot(4, 1.5),
-      const FlSpot(5, 2.5),
-      const FlSpot(6, 2.2),
-      const FlSpot(7, 3.2),
-      const FlSpot(8, 3.0),
-    ];
-  }
 }
+
