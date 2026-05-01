@@ -18,7 +18,7 @@ import '../widgets/animated_amount.dart';
 import '../widgets/connectivity_indicator.dart';
 import '../widgets/elite_selection_sheet.dart';
 import '../services/market_data_service.dart';
-import '../models/mock_market_data.dart';
+
 import 'profile_screen.dart';
 
 
@@ -650,18 +650,7 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
     final stopLossController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
-    // Build combined map from MockMarketData (stocks + funds)
-    final Map<String, Map<String, dynamic>> allAssets = {};
-    for (final s in MockMarketData.egyptStocks) {
-      allAssets[s.symbol] = {'name': s.name, 'price': s.price};
-    }
-    for (final f in MockMarketData.egyptFunds) {
-      allAssets[f.symbol] = {'name': f.name, 'price': f.price};
-    }
-    for (final s in MockMarketData.saudiStocks) {
-      allAssets[s.symbol] = {'name': s.name, 'price': s.price};
-    }
-
+    // Removed MockMarketData initialization. We now use live MarketDataService directly.
     EliteDialog.show(
       context: context,
       title: 'Acquire Asset',
@@ -674,22 +663,51 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
             children: [
               InkWell(
                 onTap: () async {
+                  // Cache marketData before async gap
+                  final marketData = context.read<MarketDataService>().stocksData;
+                  
+                  // 1. Select Market First
+                  final market = await EliteSelectionSheet.show<String>(
+                    context: context,
+                    title: 'Select Market',
+                    items: ['Egypt (EGX)', 'Saudi Arabia (Tadawul)', 'UAE (DFM/ADX)', 'All Markets'],
+                    labelBuilder: (m) => m,
+                    allowCustomEntry: false,
+                  );
+                  
+                  if (market == null || !context.mounted) return;
+                  
+                  // 2. Filter Assets
+                  List<String> filteredTickers = [];
+                  for (final t in marketData.keys) {
+                    if (market == 'Egypt (EGX)' && (t.endsWith('.CA') || !t.contains('.'))) {
+                      filteredTickers.add(t);
+                    } else if (market == 'Saudi Arabia (Tadawul)' && t.endsWith('.SR')) {
+                      filteredTickers.add(t);
+                    } else if (market == 'UAE (DFM/ADX)' && (t.endsWith('.DU') || t.endsWith('.AD'))) {
+                      filteredTickers.add(t);
+                    } else if (market == 'All Markets') {
+                      filteredTickers.add(t);
+                    }
+                  }
+                  
+                  if (!context.mounted) return;
+                  
+                  // 3. Select Asset
                   final result = await EliteSelectionSheet.show<String>(
                     context: context,
                     title: 'Select Asset Ticker',
-                    items: allAssets.keys.toList(),
+                    items: filteredTickers,
                     labelBuilder: (ticker) => ticker,
-                    subtitleBuilder: (ticker) =>
-                        allAssets[ticker]?['name'] ?? '',
-                    allowCustomEntry: false,
-                    selectedItem: nameController.text.isNotEmpty
-                        ? nameController.text
-                        : null,
+                    subtitleBuilder: (ticker) => marketData[ticker]?['name'] ?? '',
+                    allowCustomEntry: true,
+                    selectedItem: nameController.text.isNotEmpty ? nameController.text : null,
                   );
+
                   if (result != null) {
                     setDialogState(() {
                       nameController.text = result;
-                      final price = allAssets[result]?['price'];
+                      final price = marketData[result]?['price'];
                       if (price != null) {
                         currentPriceController.text = price.toString();
                         buyPriceController.text = price.toString();
@@ -949,18 +967,44 @@ class _InvestmentsScreenState extends State<InvestmentsScreen>
             children: [
               InkWell(
                 onTap: () async {
+                  // 1. Select Market First
+                  final market = await EliteSelectionSheet.show<String>(
+                    context: context,
+                    title: 'Select Market',
+                    items: ['Egypt (EGX)', 'Saudi Arabia (Tadawul)', 'UAE (DFM/ADX)', 'All Markets'],
+                    labelBuilder: (m) => m,
+                    allowCustomEntry: false,
+                  );
+                  
+                  if (market == null || !context.mounted) return;
+                  
+                  // 2. Filter Assets
+                  List<String> filteredTickers = [];
+                  for (final t in marketData.keys) {
+                    if (market == 'Egypt (EGX)' && (t.endsWith('.CA') || !t.contains('.'))) {
+                      filteredTickers.add(t);
+                    } else if (market == 'Saudi Arabia (Tadawul)' && t.endsWith('.SR')) {
+                      filteredTickers.add(t);
+                    } else if (market == 'UAE (DFM/ADX)' && (t.endsWith('.DU') || t.endsWith('.AD'))) {
+                      filteredTickers.add(t);
+                    } else if (market == 'All Markets') {
+                      filteredTickers.add(t);
+                    }
+                  }
+                  
+                  if (!context.mounted) return;
+                  
+                  // 3. Select Asset
                   final result = await EliteSelectionSheet.show<String>(
                     context: context,
                     title: 'Select Asset Ticker',
-                    items: marketData.keys.toList(),
+                    items: filteredTickers,
                     labelBuilder: (ticker) => ticker,
-                    subtitleBuilder: (ticker) =>
-                        marketData[ticker]?['name'] ?? '',
+                    subtitleBuilder: (ticker) => marketData[ticker]?['name'] ?? '',
                     allowCustomEntry: true,
-                    selectedItem: nameController.text.isNotEmpty
-                        ? nameController.text
-                        : null,
+                    selectedItem: nameController.text.isNotEmpty ? nameController.text : null,
                   );
+
                   if (result != null) {
                     setDialogState(() {
                       nameController.text = result;

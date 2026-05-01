@@ -29,12 +29,12 @@ search_root = os.path.abspath(os.path.join(current_dir, "..")) if current_dir.en
 for root, dirs, files in os.walk(search_root):
     if "pipeline.py" in files:
         sys.path.append(root)
-        print(f"✅ Found pipeline.py at: {root}")
+        print(f"[OK] Found pipeline.py at: {root}")
         found_pipeline = True
         break
 
 if not found_pipeline:
-    print(f"❌ CRITICAL ERROR: Could not find pipeline.py anywhere inside {search_root}")
+    print(f"CRITICAL ERROR: Could not find pipeline.py anywhere inside {search_root}")
     # Fallback to appending a few common paths
     sys.path.append(os.path.join(current_dir, "AI_model"))
     sys.path.append(os.path.join(current_dir, "..", "AI_model"))
@@ -293,10 +293,17 @@ def _fetch_mubasher_news():
         url = "https://www.mubasher.info/markets/EGX/news"
         resp = requests.get(url, headers=get_headers(), timeout=10)
         if resp.status_code == 200:
-            soup = BeautifulSoup(resp.text, 'lxml')
-            news_tags = soup.select('.news-list__item-title')
-            headlines = [t.text.strip() for t in news_tags[:10]] # Top 10
-            return headlines
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            news_items = []
+            links = soup.find_all('a', href=True)
+            for link in links:
+                if len(news_items) >= 10: break
+                href = link['href']
+                title = link.get_text(strip=True)
+                if '/news/' in href and len(title) > 25:
+                    if title not in [item.replace('• ', '') for item in news_items]:
+                        news_items.append(f"• {title}")
+            return news_items
     except Exception as e:
         print(f"News Fetch Error: {e}")
     return []
@@ -511,7 +518,8 @@ FUND_KEYWORDS = {
 }
 
 def _fetch_fund_price(ticker): 
-    """Offset-Paginated JSON API scraper with per-refresh caching."""
+    """Offset-Paginated JSON API scraper with per-refresh caching.
+    Supports EGX (.CA), Saudi (.SR), and UAE (.DU/.AD) funds."""
     global MUBASHER_FUNDS_BUFFER, MUBASHER_FUNDS_LAST_FETCH
     try:
         # If cache is fresh (less than 4 minutes old), use it
@@ -521,40 +529,86 @@ def _fetch_fund_price(ticker):
             if val is not None:
                 return val
 
-        # Otherwise, refresh the entire fund buffer
-        keyword = FUND_KEYWORDS.get(ticker)
-        if not keyword: return None
-            
-        print(f"🔄 Refreshing Global Fund Buffer for {ticker}...")
+        print(f"[FUND] Refreshing fund buffer for {ticker}...")
         temp_buffer = {}
         
-        # Paginate to find all keywords
-        for start_offset in range(0, 200, 20):
-            url = f"https://www.mubasher.info/api/1/funds?country=eg&size=20&start={start_offset}"
-            resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
+        # Determine which country APIs to query based on the ticker
+        country_apis = []
+        if ticker.endswith('.CA') or not '.' in ticker:
+            country_apis.append(('eg', 'EGX'))
+        elif ticker.endswith('.SR'):
+            country_apis.append(('sa', 'Tadawul'))
+        elif ticker.endswith('.DU'):
+            country_apis.append(('ae', 'DFM'))
+        elif ticker.endswith('.AD'):
+            country_apis.append(('ae', 'ADX'))
+        else:
+            # Try all markets
+            country_apis = [('eg', 'EGX'), ('sa', 'Tadawul'), ('ae', 'UAE')]
+        
+        clean = ticker.split('.')[0]
+        
+        for country_code, market_name in country_apis:
+            # Strategy 1: Try Mubasher Funds API (paginated)
+            for start_offset in range(0, 200, 20):
+                url = f"https://www.mubasher.info/api/1/funds?country={country_code}&size=20&start={start_offset}"
+                try:
+                    resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        rows = data.get('rows', [])
+                        if not rows: break
+                        
+                        for row in rows:
+                            row_symbol = str(row.get('symbol', '')).upper()
+                            r_name = row.get('name', '')
+                            price_val = row.get('price') or row.get('lastPrice') or row.get('nav')
+                            
+                            # Match by symbol or by FUND_KEYWORDS name
+                            matched_key = None
+                            if row_symbol == clean:
+                                matched_key = clean
+                            elif r_name:
+                                for fk, fv in FUND_KEYWORDS.items():
+                                    if fv in r_name or r_name in fv:
+                                        matched_key = fk
+                                        break
+                            
+                            if matched_key and price_val:
+                                try:
+                                    pv = float(price_val)
+                                    if pv > 0:
+                                        temp_buffer[matched_key] = pv
+                                        print(f"[FUND OK] {matched_key} -> {pv} ({market_name})")
+                                except (ValueError, TypeError):
+                                    pass
+                    else:
+                        break
+                except Exception:
+                    break
             
-            if resp.status_code == 200:
-                data = resp.json()
-                rows = data.get('rows', [])
-                if not rows: break
-                
-                for row in rows:
-                    r_name = row.get('name', '')
-                    if r_name and any(k in r_name for k in FUND_KEYWORDS.values()):
-                        # Find which ticker this belongs to
-                        for t, k in FUND_KEYWORDS.items():
-                            if k in r_name:
-                                price_val = row.get('price')
-                                if price_val and float(price_val) > 0:
-                                    temp_buffer[t] = float(price_val)
-                                    print(f"✅ Buffered Fund: {t} -> {price_val}")
-            else:
-                break
+            # Strategy 2: Try Mubasher stock page scraper as fallback for ETFs
+            if clean not in temp_buffer:
+                try:
+                    market_map = {'eg': 'EGX', 'sa': 'TDWL', 'ae': 'DFM'}
+                    m = market_map.get(country_code, 'EGX')
+                    stock_url = f"https://www.mubasher.info/markets/{m}/stocks/{clean}"
+                    resp2 = requests.get(stock_url, headers=get_headers(), timeout=10)
+                    if resp2.status_code == 200:
+                        soup2 = BeautifulSoup(resp2.text, 'html.parser')
+                        price_el = soup2.select_one('[data-field="LastTradePrice"], .last-price, .stock-price')
+                        if price_el:
+                            pv = float(price_el.text.strip().replace(',', ''))
+                            if pv > 0:
+                                temp_buffer[clean] = pv
+                                print(f"[FUND OK via scraper] {clean} -> {pv} ({market_name})")
+                except Exception:
+                    pass
         
         if temp_buffer:
             MUBASHER_FUNDS_BUFFER.update(temp_buffer)
             MUBASHER_FUNDS_LAST_FETCH = now
-            return MUBASHER_FUNDS_BUFFER.get(ticker)
+            return MUBASHER_FUNDS_BUFFER.get(clean)
             
     except Exception as e:
         print(f"Fund Scraping Exception: {e}")
@@ -580,8 +634,8 @@ def _fetch_single_ticker_aggressive(ticker):
         data = MARKET_DATA_CACHE.get(ticker)
         if not data: return None
         
-        is_fund = ticker in MUTUAL_FUNDS
         clean_ticker = ticker.split('.')[0]
+        is_fund = clean_ticker in FUND_KEYWORDS or ticker in MUTUAL_FUNDS
         
         # 1. Primary Live Price Fetching
         live_price = None
@@ -714,10 +768,13 @@ def _recalculate_technicals(ticker):
 
 def refresh_market_data():
     """Iterates through all tickers, updates prices, and calculates indicators."""
+    global NEWS_CACHE
     print(f"🕒 Refreshing {len(WATCHLIST)} tickers + News + Macro...")
     
     # 1. Macro Indicators Fallback
     _fetch_macro_indicators()
+    NEWS_CACHE.clear()
+    NEWS_CACHE.extend(_fetch_mubasher_news())
     
     # 2. Sequential Stock Refresh with Rate Limiting
     # 2. Parallel Ticker Refresh with ThreadPool
@@ -1134,45 +1191,68 @@ def get_history(ticker):
     interval = request.args.get('interval', '1d')
     try:
         import yfinance as yf
-        # Fix ticker for yfinance if it's EGX
         yf_ticker = ticker
         
-        data = yf.download(yf_ticker, period=period, interval=interval, auto_adjust=False, prepost=False)
+        data = None
+        try:
+            data = yf.download(yf_ticker, period=period, interval=interval, auto_adjust=False, prepost=False, timeout=10)
+        except Exception as yfe:
+            print(f"[HISTORY] yfinance failed for {ticker}: {yfe}")
+        
         if data is None or data.empty:
             # Fallback to TV
-            tv = get_tv_client()
-            if tv:
-                tv_ticker = ticker.replace('.CA', '').replace('.SR', '').replace('.DU', '').replace('.AD', '')
-                exchange = 'EGX' if '.CA' in ticker else 'TADAWUL' if '.SR' in ticker else 'DFM'
-                tv_data = tv.get_hist(symbol=tv_ticker, exchange=exchange, interval=Interval.in_daily, n_bars=30)
-                if tv_data is not None and not tv_data.empty:
-                    tv_data.rename(columns={'close': 'Close'}, inplace=True)
-                    data = tv_data
-
-        if data is None or data.empty:
-            return jsonify({"error": "No data found"}), 404
+            try:
+                tv = get_tv_client()
+                if tv:
+                    tv_ticker = ticker.replace('.CA', '').replace('.SR', '').replace('.DU', '').replace('.AD', '')
+                    exchange = 'EGX' if '.CA' in ticker else 'TADAWUL' if '.SR' in ticker else 'DFM'
+                    tv_data = tv.get_hist(symbol=tv_ticker, exchange=exchange, interval=Interval.in_daily, n_bars=30)
+                    if tv_data is not None and not tv_data.empty:
+                        tv_data.rename(columns={'close': 'Close'}, inplace=True)
+                        data = tv_data
+            except Exception:
+                pass
 
         # Format for Flutter
         history = []
-        try:
-            close_col = data['Close']
-            if isinstance(close_col, pd.DataFrame):
-                close_series = close_col.iloc[:, 0]
-            else:
-                close_series = close_col
-                
-            for index, value in close_series.items():
-                if not pd.isna(value):
-                    history.append({
-                        "date": index.isoformat() if hasattr(index, 'isoformat') else str(index),
-                        "close": float(value)
-                    })
-        except Exception as ex:
-            print("Error parsing history dataframe:", ex)
+        if data is not None and not data.empty:
+            try:
+                close_col = data['Close']
+                if isinstance(close_col, pd.DataFrame):
+                    close_series = close_col.iloc[:, 0]
+                else:
+                    close_series = close_col
+                    
+                for index, value in close_series.items():
+                    if not pd.isna(value):
+                        history.append({
+                            "date": index.isoformat() if hasattr(index, 'isoformat') else str(index),
+                            "close": float(value)
+                        })
+            except Exception as ex:
+                print(f"[HISTORY] Error parsing dataframe for {ticker}: {ex}")
+        
+        # Fallback 3: Use cached deque data if we have it
+        if not history:
+            cached = MARKET_DATA_CACHE.get(ticker)
+            if cached:
+                dq = list(cached.get('deque', []))
+                if dq:
+                    for i, price in enumerate(dq):
+                        history.append({"date": str(i), "close": float(price)})
+                    print(f"[HISTORY] Used deque fallback for {ticker} ({len(dq)} points)")
+                elif cached.get('price', 0) > 0:
+                    # Last resort: just return the current price as a flat line
+                    p = cached['price']
+                    history = [{"date": "0", "close": p}, {"date": "1", "close": p}]
+                    print(f"[HISTORY] Used flat-line fallback for {ticker} (price={p})")
+            
+        if not history:
+            return jsonify({"error": "No data found"}), 404
             
         return jsonify({"ticker": ticker, "history": history})
     except Exception as e:
-        print(f"Error fetching history for {ticker}: {e}")
+        print(f"[HISTORY] Error for {ticker}: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/')

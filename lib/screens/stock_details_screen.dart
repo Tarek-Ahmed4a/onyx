@@ -39,6 +39,9 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
     else if (selectedPeriod == 'ALL') apiPeriod = 'max';
     
     final fetchedSpots = await marketData.fetchHistory(widget.stock['symbol'], period: apiPeriod);
+    if (fetchedSpots.length == 1) {
+      fetchedSpots.add(FlSpot(1, fetchedSpots.first.y));
+    }
     
     if (mounted) {
       setState(() {
