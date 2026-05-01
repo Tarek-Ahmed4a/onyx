@@ -113,6 +113,19 @@ def load_all_symbols():
         
         conn.close()
         print(f"✅ [SUCCESS] Loaded {len(tickers)} tickers and {len(funds)} funds with names.")
+        
+        # Load Arabic translations if available
+        trans_path = os.path.join(os.path.dirname(__file__), "ticker_translations.json")
+        if os.path.exists(trans_path):
+            try:
+                with open(trans_path, "r", encoding="utf-8") as f:
+                    translations = json.load(f)
+                    for sym, ar_name in translations.items():
+                        if sym in ticker_names:
+                            ticker_names[sym] = ar_name
+                print(f"🌍 [SUCCESS] Loaded Arabic translations for {len(translations)} items.")
+            except Exception as te:
+                print(f"⚠️ Warning: Could not apply translations: {te}")
     except Exception as e:
         print(f"❌ [ERROR] Database loading failed: {e}")
         tickers, funds = [], []
@@ -253,7 +266,14 @@ def calculate_macd(series, fast=12, slow=26, signal=9):
 # --- Scrapers ---
 def _fetch_mubasher_price(ticker):
     try:
-        url = f"https://www.mubasher.info/markets/EGX/stocks/{ticker.split('.')[0]}"
+        market = "EGX"
+        clean_ticker = ticker.split('.')[0]
+        
+        if ".SR" in ticker: market = "TDWL"
+        elif ".AD" in ticker: market = "ADX"
+        elif ".DU" in ticker: market = "DFM"
+        
+        url = f"https://www.mubasher.info/markets/{market}/stocks/{clean_ticker}"
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
@@ -282,7 +302,13 @@ def _fetch_mubasher_news():
     return []
 
 def get_stock_news_mubasher(ticker_symbol, limit=3):
-    url = f"https://www.mubasher.info/markets/EGX/stocks/{ticker_symbol.upper()}/news"
+    market = "EGX"
+    clean_sym = ticker_symbol.upper().split('.')[0]
+    if ".SR" in ticker_symbol.upper(): market = "TDWL"
+    elif ".AD" in ticker_symbol.upper(): market = "ADX"
+    elif ".DU" in ticker_symbol.upper(): market = "DFM"
+    
+    url = f"https://www.mubasher.info/markets/{market}/stocks/{clean_sym}/news"
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8'
@@ -293,24 +319,20 @@ def get_stock_news_mubasher(ticker_symbol, limit=3):
         soup = BeautifulSoup(response.text, 'html.parser')
         
         news_items = []
-        articles = soup.find_all('div', class_='md:w-2/3')
-        
-        for article in articles:
-            if len(news_items) >= limit:
-                break
-            title_tag = article.find('a')
-            if title_tag:
-                title = title_tag.get_text(strip=True)
-                time_tag = article.find('time')
-                date = time_tag.get_text(strip=True) if time_tag else "Recent"
-                news_items.append(f"[{date}] {title}")
-                
+        links = soup.find_all('a', href=True)
+        for link in links:
+            if len(news_items) >= limit: break
+            href = link['href']
+            title = link.get_text(strip=True)
+            if '/news/' in href and len(title) > 25:
+                if title not in [item.replace('• ', '') for item in news_items]:
+                    news_items.append(f"• {title}")
         if not news_items:
             return ["لا توجد أخبار حديثة لهذا السهم"]
         return news_items
     except Exception as e:
         print(f"[Scraping Error] {ticker_symbol}: {e}")
-        return ["السعر اللحظي متوفر لكن الأخبار غير متاحة حالياً"]
+        return ["الأخبار غير متاحة حالياً"]
 
 def get_macro_news_enterprise(limit=3):
     url = "https://enterprise.press/arabic/"
@@ -561,119 +583,65 @@ def _fetch_single_ticker_aggressive(ticker):
         is_fund = ticker in MUTUAL_FUNDS
         clean_ticker = ticker.split('.')[0]
         
-        # 1. Primary Live Price
+        # 1. Primary Live Price Fetching
         live_price = None
         source = "Initializing"
         
-        # Try yfinance first for everything (as requested by user)
+        # Try yfinance first
         try:
-            yf_ticker = ticker
-            # Ensure suffixes are correct for yfinance
-            # EGX -> .CA (already there)
-            # KSA -> .SR (already there)
-            # DFM -> .DU (already there)
-            # ADX -> .AD (already there)
-            
-            ticker_obj = yf.Ticker(yf_ticker)
-            # Use fast_info or info (fast_info is better for just price)
+            ticker_obj = yf.Ticker(ticker)
             live_price = ticker_obj.fast_info.get('last_price')
             if live_price is not None and math.isfinite(live_price) and live_price > 0:
-                source = f"yfinance (Live)"
+                source = "yfinance (Live)"
             else:
                 live_price = None
-        except Exception as e:
-            # If yfinance is blocked (common on HF), print and continue to scrapers
-            print(f"⚠️ yfinance blocked/failed for {ticker}: {e}")
+        except Exception:
             pass 
 
-        # Fallback to Scrapers if yfinance failed or returned nothing
+        # Fallback to Scrapers
         if live_price is None:
             if is_fund:
                 live_price = _fetch_fund_price(clean_ticker)
                 source = "Fund Scraper (Mubasher)"
             else:
                 live_price = _fetch_mubasher_price(ticker)
-                source = "Mubasher Scraper (Live)"
-        
-        # Final Fallback to Firestore DB
-        if live_price is None:
-            try:
-                if firebase_admin._apps:
-                    db = firestore.client()
-                    users_ref = db.collection('users')
-                    for user_doc in users_ref.stream():
-                        inv_ref = users_ref.document(user_doc.id).collection('investments')
-                        for portfolio in inv_ref.stream():
-                            p_data = portfolio.to_dict()
-                            for asset in p_data.get('assets', []):
-                                if asset.get('name') == ticker:
-                                    val = float(asset.get('buyPrice', 0.0))
-                                    if val > 0:
-                                        live_price = val
-                                        break
-                            if live_price is not None: break
-                        if live_price is not None: break
-            except Exception as e:
-                print(f"Firestore fallback error {ticker}: {e}")
+                if live_price:
+                    source = "Mubasher Scraper (Live)"
         
         # 2. History Bootstrap (Warm-up)
         history_dq = data["deque"]
-        source = "Fund Scraper" if is_fund else "Mubasher (Live Accumulation)"
         
-        if len(history_dq) < 40:
-            # ONLY bootstrap if it's a priority or has no data
-            # To avoid slowing down, we skip bootstrapping for the bulk list on startup
-            if not is_fund and len(history_dq) == 0:
+        if len(history_dq) < 20:
+            if not is_fund:
                 try:
-                    # Only fetch if we really have 0 data
                     df = yf.download(ticker, period="2d", interval="5m", progress=False, timeout=5)
-                    
                     if not df.empty:
-                        # Robust column extraction (handles MultiIndex or Single Index)
-                        closes_series = None
+                        # Handle MultiIndex
                         if isinstance(df.columns, pd.MultiIndex):
-                            # Case: MultiIndex (Ticker, Column) or (Column, Ticker)
                             if 'Close' in df.columns.get_level_values(0):
-                                closes_series = df['Close']
-                            elif 'Close' in df.columns.get_level_values(1):
-                                closes_series = df.xs('Close', axis=1, level=1)
+                                closes = df['Close']
+                            else:
+                                closes = df.xs('Close', axis=1, level=1)
                         else:
-                            # Case: Single Index
-                            if 'Close' in df.columns:
-                                closes_series = df['Close']
-
-                        if closes_series is not None:
-                            if isinstance(closes_series, pd.DataFrame):
-                                if ticker in closes_series.columns:
-                                    closes_series = closes_series[ticker]
-                                else:
-                                    closes_series = closes_series.iloc[:, 0]
-                                
-                            history_dq.clear()
-                            closes_list = closes_series.dropna().tail(80).tolist()
-                            for p in closes_list:
-                                history_dq.append(float(p))
-
-                    if len(history_dq) >= 20:
-                        source = f"Robust Bootstrap (yf {len(history_dq)}pts)"
-                        print(f"✅ {ticker} warmed up with {len(history_dq)} yf points.")
+                            closes = df['Close']
+                            
+                        # If multiple tickers in download (shouldn't happen here but safe)
+                        if isinstance(closes, pd.DataFrame):
+                            closes = closes.iloc[:, 0]
+                            
+                        history_dq.clear()
+                        for p in closes.dropna().tail(80).tolist():
+                            history_dq.append(float(p))
+                        source += " + yf-Warmup"
                     else:
-                        # [Fallback] Try TvDatafeed for warm-up
-                        try:
-                            tv = get_tv_client()
-                            if tv:
-                                tv_ticker = ticker.replace('.CA', '')
-                                hist = tv.get_hist(symbol=tv_ticker, exchange='EGX', interval=Interval.in_1_minute, n_bars=80)
-                                if hist is not None and not hist.empty:
-                                    history_dq.clear()
-                                    for p in hist['close'].tail(80).tolist():
-                                        history_dq.append(float(p))
-                                    source = f"TradingView Bootstrap ({len(history_dq)}pts)"
-                                    print(f"✅ {ticker} warmed up via TV.")
-                        except Exception as tv_e:
-                            print(f"⚠️ TV Bootstrap failed for {ticker}: {tv_e}")
+                        # Synthetic fallback
+                        if live_price and live_price > 0:
+                            for _ in range(40): history_dq.append(live_price)
+                            source += " + Synthetic-Warmup"
                 except Exception as e:
                     print(f"⚠️ Bootstrap failed for {ticker}: {e}")
+                    if live_price and live_price > 0:
+                        for _ in range(20): history_dq.append(live_price)
             
             # If still empty (Funds or yf failed), only then use a minimal seed to avoid crash
             if len(history_dq) < 40 and live_price:

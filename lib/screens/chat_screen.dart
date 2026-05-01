@@ -175,7 +175,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       // ── Handle success ───────────────────────────────────
       setState(() {
         _addMessage(Message(
-          text: response.text,
+          text: _cleanAiText(response.text),
           isUser: false,
           sources: response.sources,
           aiModelName: response.modelName,
@@ -278,6 +278,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     });
   }
 
+  /// Cleans AI text to remove excessive empty lines and fix RTL formatting glitches.
+  String _cleanAiText(String text) {
+    // Remove triple+ newlines
+    String cleaned = text.replaceAll(RegExp(r'\n{3,}'), '\n\n');
+    // Ensure bullet points are well-spaced for RTL
+    cleaned = cleaned.replaceAll(RegExp(r'\n\* '), '\n\n* ');
+    return cleaned.trim();
+  }
+
   // ─── BUILD ────────────────────────────────────────────────
 
   @override
@@ -296,22 +305,22 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     controller: _scrollController,
                     primary: false,
                     physics: const BouncingScrollPhysics(),
-                  slivers: [
-                    SliverAppBar(
-                      backgroundColor: Colors.transparent,
-                      elevation: 0,
-                      floating: true,
-                      pinned: false,
-                      centerTitle: true,
-                      title: const Text(
-                        'Onyx AI',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 18,
-                          letterSpacing: 1.2,
+                    slivers: [
+                      SliverAppBar(
+                        backgroundColor: _ChatColors.background.withValues(alpha: 0.95),
+                        elevation: 0,
+                        floating: false,
+                        pinned: true,
+                        centerTitle: true,
+                        title: const Text(
+                          'Onyx AI',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                            letterSpacing: 1.2,
+                          ),
                         ),
-                      ),
                       leading: IconButton(
                         icon: const Icon(Icons.arrow_back, color: Colors.black),
                         onPressed: () => Navigator.pop(context),
@@ -822,11 +831,14 @@ class _MessageBubble extends StatelessWidget {
                               ),
                               p: const TextStyle(
                                 color: _ChatColors.textPrimary,
-                                height: 1.65,
+                                height: 1.5,
                                 fontSize: 14.5,
                               ),
+                              blockSpacing: 10.0,
+                              listBulletPadding: const EdgeInsets.only(right: 8.0, top: 4.0),
+                              listIndent: 16.0,
                               strong: const TextStyle(
-                                color: Colors.white,
+                                color: Colors.black,
                                 fontWeight: FontWeight.bold,
                               ),
                               em: TextStyle(
